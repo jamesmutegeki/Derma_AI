@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 *.pyo
+venv/
+*.egg-info/
 
 # Generated / runtime data
 agent_params.pt
@@ -17,7 +19,7 @@ srv_out.txt
 srv_err.txt
 srv_test.txt
 
-# Patient / doctor data
+# Patient / doctor data (may contain sensitive info)
 doctors.json
 patients.json
 
