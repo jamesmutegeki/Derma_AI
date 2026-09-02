@@ -1,15 +1,15 @@
 # Dermatology AI
 
-AI-powered dermatology triage and diagnosis support system with clinician-in-the-loop (HITL) reinforcement learning.
+AI-powered dermatology triage and diagnosis support system with Human-in-the-loop (HITL) reinforcement learning.
 
 ## Overview
 
-Dermatology AI is a clinical decision support system designed to assist dermatologists in triaging skin lesions and making more accurate diagnoses. The system uses machine learning models to analyze dermoscopic images and provide AI-assisted diagnoses, while keeping the clinician in the loop through a Human-in-the-Loop (HITL) approach.
+Dermatology_AI is a clinical decision support system designed to assist dermatologists in triaging skin lesions and making more accurate diagnoses. The system uses machine learning models to analyze dermoscopic images and provide AI-assisted diagnoses, while keeping the dermatologist or clinician in the loop through a Human-in-the-Loop (HITL) approach.
 
 ### Key Features
 
 - **AI-Powered Triage**: Automatically triages skin lesions based on ABCD criteria (Asymmetry, Border, Color, Diameter)
-- **Clinician-in-the-Loop (HITL)**: Reinforcement learning module that incorporates clinician feedback to improve accuracy
+- **Human-in-the-Loop (HITL)**: Reinforcement learning module that incorporates clinician feedback to improve accuracy
 - **Fairness & Equity**: Built-in bias detection and dataset equity analysis to ensure fair treatment across all Fitzpatrick skin types
 - **Metrics Tracking**: Comprehensive analytics dashboard for monitoring system performance
 - **Case History Management**: Full patient case history tracking with visit notes and AI findings
@@ -135,14 +135,6 @@ The system can assist with triage for:
 ## Fitzpatrick Skin Types
 
 The system supports all Fitzpatrick skin types (I-VI) and includes equity analysis to ensure fair diagnosis across diverse patient populations.
-
-## License
-
-MIT License
-
-## Author
-
-Dr. James Doe - Board-Certified Dermatologist
 
 ## Acknowledgments
 
