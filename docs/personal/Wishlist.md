@@ -1,0 +1,4 @@
+﻿
+
+## Navigation
+← Back to [[📇Life]]

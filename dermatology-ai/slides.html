@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Dermatology AI — Interactive Overview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0B1121;
+  --bg2:#111827;
+  --card:#1E293B;
+  --border:#1E3A5F;
+  --text:#F1F5F9;
+  --text2:#94A3B8;
+  --blue:#3B82F6;
+  --cyan:#06B6D4;
+  --mint:#10B981;
+  --emerald:#059669;
+  --amber:#F59E0B;
+  --rose:#EF4444;
+  --violet:#8B5CF6;
+  --pink:#EC4899;
+  --grad1:linear-gradient(135deg,#3B82F6,#06B6D4);
+  --grad2:linear-gradient(135deg,#10B981,#059669);
+  --grad3:linear-gradient(135deg,#F59E0B,#EF4444);
+  --grad4:linear-gradient(135deg,#8B5CF6,#EC4899);
+  --shadow:0 8px 32px rgba(0,0,0,.4);
+}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+body{display:flex;align-items:center;justify-content:center}
+
+/* ===== SLIDES CONTAINER ===== */
+#slides{position:relative;width:100vw;height:100vh;overflow:hidden}
+.slide{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 64px;
+  opacity:0;pointer-events:none;
+  transition:opacity .6s ease,transform .6s ease;
+  transform:scale(.96);
+  overflow-y:auto;
+}
+.slide.active{opacity:1;pointer-events:auto;transform:scale(1)}
+.slide.exit{opacity:0;transform:scale(1.04)}
+
+/* ===== NAV ===== */
+#nav{
+  position:fixed;bottom:32px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:20px;z-index:100;
+  background:rgba(15,23,42,.8);backdrop-filter:blur(12px);
+  padding:12px 24px;border-radius:999px;border:1px solid rgba(255,255,255,.08);
+}
+#nav .dots{display:flex;gap:8px}
+#nav .dot{
+  width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.2);
+  cursor:pointer;transition:.3s;border:none;
+}
+#nav .dot.active{background:var(--blue);box-shadow:0 0 12px rgba(59,130,246,.5);width:28px;border-radius:5px}
+#nav .nav-btn{
+  background:rgba(255,255,255,.08);border:none;color:var(--text);
+  width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:.2s;font-size:18px;
+}
+#nav .nav-btn:hover{background:rgba(255,255,255,.15)}
+#nav .nav-btn:active{transform:scale(.92)}
+#counter{
+  font-size:13px;font-weight:600;color:var(--text2);min-width:60px;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ===== SLIDE 1: TITLE ===== */
+.s1-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.12) 0%,transparent 60%),
+             radial-gradient(ellipse at 70% 80%,rgba(16,185,129,.08) 0%,transparent 60%),
+             var(--bg);
+}
+.s1-particles{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.s1-particle{
+  position:absolute;width:4px;height:4px;border-radius:50%;
+  background:rgba(59,130,246,.3);animation:float linear infinite;
+}
+@keyframes float{
+  0%{transform:translateY(100vh) rotate(0deg);opacity:0}
+  10%{opacity:1}
+  90%{opacity:1}
+  100%{transform:translateY(-10vh) rotate(720deg);opacity:0}
+}
+.s1-logo{
+  width:72px;height:72px;border-radius:18px;
+  background:var(--grad1);display:flex;align-items:center;justify-content:center;
+  margin-bottom:24px;position:relative;z-index:1;
+  animation:logoPulse 3s ease-in-out infinite;
+  box-shadow:0 0 40px rgba(59,130,246,.3);
+}
+@keyframes logoPulse{0%,100%{box-shadow:0 0 40px rgba(59,130,246,.3)}50%{box-shadow:0 0 60px rgba(59,130,246,.5)}}
+.s1-logo svg{width:40px;height:40px}
+.slide h1{
+  font-size:clamp(2.2rem,5vw,4.2rem);font-weight:900;text-align:center;
+  letter-spacing:-.03em;line-height:1.1;position:relative;z-index:1;
+}
+.slide h1 .grad{background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.slide h1 .grad2{background:var(--grad2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.s1-sub{
+  font-size:clamp(1rem,1.6vw,1.3rem);color:var(--text2);text-align:center;
+  max-width:640px;margin-top:16px;line-height:1.6;position:relative;z-index:1;
+}
+.s1-badges{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;justify-content:center;position:relative;z-index:1}
+.s1-badge{
+  padding:8px 18px;border-radius:999px;font-size:13px;font-weight:600;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+  display:flex;align-items:center;gap:8px;
+}
+.s1-badge svg{width:16px;height:16px;opacity:.7}
+.s1-scroll{
+  position:absolute;bottom:100px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  color:var(--text2);font-size:12px;font-weight:500;opacity:.5;
+  animation:bounce 2s ease-in-out infinite;z-index:1;
+}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+
+/* ===== SLIDE 2: PROBLEM ===== */
+.s2-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;max-width:960px;width:100%;margin-top:24px}
+.s2-card{
+  background:var(--card);border-radius:16px;padding:32px;border:1px solid var(--border);
+  text-align:center;position:relative;overflow:hidden;
+}
+.s2-card.light{background:linear-gradient(135deg,#1E293B,#162032)}
+.s2-card.dark{background:linear-gradient(135deg,#1a1a3a,#0d0d2b)}
+.s2-card h3{font-size:18px;font-weight:700;margin-bottom:8px}
+.s2-card p{font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:16px}
+.s2-bar-container{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.s2-bar-row{display:flex;align-items:center;gap:12px}
+.s2-bar-label{font-size:12px;font-weight:600;width:80px;text-align:right;flex-shrink:0}
+.s2-bar-track{flex:1;height:24px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;position:relative}
+.s2-bar-fill{height:100%;border-radius:6px;transition:width 1.5s cubic-bezier(.4,0,.2,1);width:0%}
+.s2-bar-val{font-size:13px;font-weight:700;width:44px;text-align:left;font-variant-numeric:tabular-nums}
+.s2-gap{
+  grid-column:1/-1;text-align:center;padding:20px;background:rgba(239,68,68,.08);
+  border-radius:12px;border:1px solid rgba(239,68,68,.2);
+}
+.s2-gap span{font-size:28px;font-weight:900;color:var(--rose)}
+.s2-gap p{font-size:14px;color:var(--text2);margin-top:4px}
+
+/* ===== SLIDE 3: ARCHITECTURE ===== */
+.s3-flow{display:flex;align-items:center;gap:12px;max-width:1100px;width:100%;margin-top:24px;flex-wrap:wrap;justify-content:center}
+.s3-node{
+  background:var(--card);border-radius:14px;padding:18px 20px;
+  border:1px solid var(--border);text-align:center;min-width:130px;flex:1;
+  transition:.3s;cursor:default;position:relative;
+}
+.s3-node:hover{border-color:var(--blue);transform:translateY(-3px);box-shadow:0 8px 24px rgba(59,130,246,.15)}
+.s3-node .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.s3-node h4{font-size:13px;font-weight:700;margin-bottom:3px}
+.s3-node p{font-size:11px;color:var(--text2);line-height:1.3}
+.s3-arrow{font-size:20px;color:var(--text2);opacity:.4;flex-shrink:0}
+.s3-detail{
+  max-width:1100px;width:100%;margin-top:20px;
+  background:var(--card);border-radius:14px;padding:24px 28px;border:1px solid var(--border);
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+}
+.s3-detail-item{display:flex;gap:14px;align-items:flex-start}
+.s3-detail-item .dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.s3-detail-item h5{font-size:14px;font-weight:700;margin-bottom:2px}
+.s3-detail-item p{font-size:12px;color:var(--text2);line-height:1.4}
+
+/* ===== SLIDE 4: CBM ===== */
+.s4-diagram{display:flex;align-items:center;gap:16px;max-width:1000px;width:100%;margin-top:24px;flex-wrap:wrap;justify-content:center}
+.s4-box{
+  background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);
+  text-align:center;flex:1;min-width:140px;position:relative;
+}
+.s4-box.highlight{border-color:var(--blue);background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(6,182,212,.05))}
+.s4-box h4{font-size:13px;font-weight:700;margin-bottom:6px}
+.s4-box p{font-size:11px;color:var(--text2);line-height:1.4}
+.s4-concepts{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;max-width:960px;width:100%;margin-top:20px}
+.s4-concept{
+  background:var(--card);border-radius:10px;padding:14px 10px;text-align:center;
+  border:1px solid var(--border);transition:.3s;
+}
+.s4-concept:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.3)}
+.s4-concept .icon{font-size:22px;margin-bottom:4px;display:block}
+.s4-concept .name{font-size:11px;font-weight:600;color:var(--text)}
+.s4-concept .desc{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.3}
+
+/* ===== SLIDE 5: CONCEPTS DETAIL ===== */
+.s5-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;max-width:1000px;width:100%;margin-top:20px}
+.s5-card{
+  background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);
+  position:relative;overflow:hidden;transition:.3s;
+}
+.s5-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.s5-card .bar{
+  position:absolute;top:0;left:0;height:3px;width:0%;
+  transition:width 1.5s cubic-bezier(.4,0,.2,1);
+}
+.s5-card .top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.s5-card .top .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.s5-card .top h4{font-size:14px;font-weight:700}
+.s5-card p{font-size:12px;color:var(--text2);line-height:1.5}
+
+/* ===== SLIDE 6: PPO ===== */
+.s6-flow{display:flex;align-items:center;gap:12px;max-width:1000px;width:100%;margin-top:24px;flex-wrap:wrap;justify-content:center}
+.s6-node{
+  background:var(--card);border-radius:14px;padding:18px 16px;border:1px solid var(--border);
+  text-align:center;flex:1;min-width:120px;transition:.3s;
+}
+.s6-node:hover{transform:translateY(-3px)}
+.s6-node .icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:18px}
+.s6-node h4{font-size:13px;font-weight:700;margin-bottom:2px}
+.s6-node p{font-size:11px;color:var(--text2);line-height:1.3}
+.s6-arrow{font-size:18px;color:var(--text2);opacity:.3;flex-shrink:0}
+.s6-reward{
+  max-width:800px;width:100%;margin-top:20px;background:var(--card);
+  border-radius:14px;padding:20px 24px;border:1px solid var(--border);
+}
+.s6-reward h4{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.s6-reward table{width:100%;border-collapse:collapse;font-size:13px}
+.s6-reward th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+.s6-reward th{font-weight:600;color:var(--text2);font-size:12px}
+.s6-reward .fn{color:var(--rose);font-weight:700}
+
+/* ===== SLIDE 7: HITL ===== */
+.s7-flow{display:flex;align-items:center;gap:12px;max-width:1000px;width:100%;margin-top:24px;flex-wrap:wrap;justify-content:center}
+.s7-node{
+  background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);
+  text-align:center;flex:1;min-width:130px;transition:.3s;
+}
+.s7-node:hover{transform:translateY(-3px)}
+.s7-node .icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:20px}
+.s7-node h4{font-size:14px;font-weight:700;margin-bottom:3px}
+.s7-node p{font-size:12px;color:var(--text2);line-height:1.4}
+.s7-arrow{font-size:18px;color:var(--text2);opacity:.3;flex-shrink:0}
+.s7-loop{
+  max-width:700px;width:100%;margin-top:24px;
+  display:flex;align-items:center;gap:16px;justify-content:center;
+  background:rgba(16,185,129,.06);border-radius:14px;padding:16px 24px;
+  border:1px solid rgba(16,185,129,.15);
+}
+.s7-loop span{font-size:28px}
+.s7-loop p{font-size:13px;color:var(--text2);line-height:1.4}
+.s7-loop strong{color:var(--mint)}
+
+/* ===== SLIDE 8: FAIRNESS ===== */
+.s8-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:960px;width:100%;margin-top:20px}
+.s8-chart-box{
+  background:var(--card);border-radius:14px;padding:24px;border:1px solid var(--border);
+}
+.s8-chart-box h4{font-size:14px;font-weight:700;margin-bottom:12px;text-align:center}
+.s8-bars{display:flex;gap:8px;justify-content:center;align-items:flex-end;height:140px;padding-bottom:20px}
+.s8-bar-group{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.s8-bar{
+  width:100%;max-width:32px;border-radius:4px 4px 0 0;
+  transition:height 1.5s cubic-bezier(.4,0,.2,1);height:0%;
+  position:relative;min-height:4px;
+}
+.s8-bar-val{font-size:11px;font-weight:700;opacity:0;transition:opacity .5s .8s}
+.s8-bar.active .s8-bar-val{opacity:1}
+.s8-bar-label{font-size:10px;color:var(--text2);font-weight:600}
+.s8-gap-box{
+  grid-column:1/-1;background:rgba(16,185,129,.06);border-radius:14px;
+  padding:20px;border:1px solid rgba(16,185,129,.15);text-align:center;
+}
+.s8-gap-box .big{font-size:32px;font-weight:900;color:var(--mint)}
+.s8-gap-box p{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* ===== SLIDE 9: TECH STACK ===== */
+.s9-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;max-width:960px;width:100%;margin-top:20px}
+.s9-card{
+  background:var(--card);border-radius:12px;padding:18px 14px;text-align:center;
+  border:1px solid var(--border);transition:.3s;
+}
+.s9-card:hover{transform:translateY(-3px);border-color:var(--blue)}
+.s9-card img,.s9-card .fallback{
+  width:40px;height:40px;border-radius:8px;margin:0 auto 8px;display:flex;
+  align-items:center;justify-content:center;font-size:20px;font-weight:800;
+}
+.s9-card h4{font-size:12px;font-weight:700;margin-bottom:2px}
+.s9-card p{font-size:10px;color:var(--text2);line-height:1.3}
+
+/* ===== SLIDE 10: IMPACT ===== */
+.s10-content{text-align:center;max-width:800px;position:relative;z-index:1}
+.s10-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px}
+.s10-stat{
+  background:var(--card);border-radius:14px;padding:24px 16px;border:1px solid var(--border);
+}
+.s10-stat .num{font-size:2rem;font-weight:900;background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.s10-stat .mint-num{font-size:2rem;font-weight:900;background:var(--grad2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.s10-stat .label{font-size:12px;color:var(--text2);font-weight:600;margin-top:4px}
+.s10-mission{
+  margin-top:28px;padding:24px 32px;background:rgba(59,130,246,.06);
+  border-radius:14px;border:1px solid rgba(59,130,246,.15);
+  font-size:15px;color:var(--text2);line-height:1.7;
+}
+.s10-mission strong{color:var(--text)}
+
+/* ===== GENERIC ===== */
+.slide .label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:6px}
+.slide h2{font-size:clamp(1.5rem,3vw,2.6rem);font-weight:800;text-align:center;letter-spacing:-.02em}
+.slide h2 .highlight{background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.slide .sub{font-size:14px;color:var(--text2);text-align:center;margin-top:8px;max-width:600px}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+  .slide{padding:32px 20px}
+  .s2-grid{grid-template-columns:1fr}
+  .s3-flow{gap:8px}
+  .s3-node{min-width:100px;padding:14px 12px}
+  .s3-detail{grid-template-columns:1fr}
+  .s4-diagram{gap:8px}
+  .s4-concepts{grid-template-columns:repeat(4,1fr)}
+  .s5-grid{grid-template-columns:1fr 1fr}
+  .s6-flow{gap:8px}
+  .s7-flow{gap:8px}
+  .s8-grid{grid-template-columns:1fr}
+  .s9-grid{grid-template-columns:repeat(3,1fr)}
+  .s10-stats{grid-template-columns:1fr 1fr}
+  #nav{gap:10px;padding:10px 16px;bottom:16px}
+  #nav .nav-btn{width:30px;height:30px;font-size:14px}
+  #nav .dot{width:8px;height:8px}
+  #nav .dot.active{width:20px}
+  .s1-scroll{display:none}
+}
+@media(max-width:480px){
+  .s4-concepts{grid-template-columns:repeat(2,1fr)}
+  .s5-grid{grid-template-columns:1fr}
+  .s9-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div id="slides">
+
+<!-- ============ SLIDE 1: TITLE ============ -->
+<div class="slide active" data-index="0">
+  <div class="s1-bg"></div>
+  <div class="s1-particles" id="particles"></div>
+  <div class="s1-logo">
+    <svg viewBox="0 0 40 40" fill="none">
+      <path d="M20 6c-7.732 0-14 6.268-14 14s6.268 14 14 14 14-6.268 14-14S27.732 6 20 6zm0 24a10 10 0 110-20 10 10 0 010 20z" fill="rgba(255,255,255,.15)"/>
+      <circle cx="20" cy="20" r="6" fill="white"/>
+      <path d="M20 4v4M20 32v4M4 20h4M32 20h4M10.1 10.1l2.8 2.8M27.1 27.1l2.8 2.8M10.1 29.9l2.8-2.8M27.1 12.9l2.8-2.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <h1><span class="grad">Dermatology AI</span></h1>
+  <p class="s1-sub">An AI-powered Clinical Decision Support System (CDSS) for equitable dermatology triage — purpose-built for <strong>Fitzpatrick skin types IV–VI</strong> and Ugandan healthcare.</p>
+  <div class="s1-badges">
+    <span class="s1-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Explainable AI</span>
+    <span class="s1-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Human-in-the-Loop</span>
+    <span class="s1-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Fairness-Driven</span>
+    <span class="s1-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Clinician-Verified</span>
+  </div>
+  <div class="s1-scroll">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    <span>Swipe or use arrows</span>
+  </div>
+</div>
+
+<!-- ============ SLIDE 2: THE PROBLEM ============ -->
+<div class="slide" data-index="1">
+  <div class="label">The Challenge</div>
+  <h2>The <span class="highlight">Accuracy Gap</span> in Dermatology AI</h2>
+  <p class="sub">Most dermatology AI models are trained on lighter skin (Fitzpatrick I–III), causing systematic under-diagnosis on darker skin (IV–VI).</p>
+  <div class="s2-grid">
+    <div class="s2-card light">
+      <h3>Fitzpatrick I–III (Lighter Skin)</h3>
+      <p>Well-represented in training data — models perform reliably.</p>
+      <div class="s2-bar-container">
+        <div class="s2-bar-row"><span class="s2-bar-label">Sensitivity</span><div class="s2-bar-track"><div class="s2-bar-fill" style="background:var(--blue)" data-w="92"></div></div><span class="s2-bar-val" data-v="92">0%</span></div>
+        <div class="s2-bar-row"><span class="s2-bar-label">Specificity</span><div class="s2-bar-track"><div class="s2-bar-fill" style="background:var(--cyan)" data-w="88"></div></div><span class="s2-bar-val" data-v="88">0%</span></div>
+      </div>
+    </div>
+    <div class="s2-card dark">
+      <h3>Fitzpatrick IV–VI (Darker Skin)</h3>
+      <p>Under-represented — standard models miss malignancies at higher rates.</p>
+      <div class="s2-bar-container">
+        <div class="s2-bar-row"><span class="s2-bar-label">Sensitivity</span><div class="s2-bar-track"><div class="s2-bar-fill" style="background:var(--amber)" data-w="67"></div></div><span class="s2-bar-val" data-v="67">0%</span></div>
+        <div class="s2-bar-row"><span class="s2-bar-label">Specificity</span><div class="s2-bar-track"><div class="s2-bar-fill" style="background:var(--rose)" data-w="72"></div></div><span class="s2-bar-val" data-v="72">0%</span></div>
+      </div>
+    </div>
+    <div class="s2-gap">
+      <span>25% Accuracy Gap</span>
+      <p>Darker skin patients are <strong>3–4× more likely</strong> to receive a false negative — a delayed or missed melanoma diagnosis can be fatal.<br>DermAI is built to <strong>eliminate this gap</strong>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SLIDE 3: SYSTEM ARCHITECTURE ============ -->
+<div class="slide" data-index="2">
+  <div class="label">System Architecture</div>
+  <h2>End-to-End <span class="highlight">Pipeline</span></h2>
+  <p class="sub">From image upload to equitable triage recommendation — every step is explainable, auditable, and fairness-aware.</p>
+  <div class="s3-flow">
+    <div class="s3-node"><div class="icon" style="background:rgba(59,130,246,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><h4>Image Input</h4><p>Dermoscopic photo upload</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s3-node"><div class="icon" style="background:rgba(16,185,129,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div><h4>HRNet-CBM</h4><p>7 concept scores extracted</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s3-node"><div class="icon" style="background:rgba(245,158,11,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h4>PPO Agent</h4><p>Triage recommendation</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s3-node"><div class="icon" style="background:rgba(139,92,246,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div><h4>HITL</h4><p>Clinician review + override</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s3-node"><div class="icon" style="background:rgba(239,68,68,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h4>Fairness</h4><p>Per-type accuracy tracking</p></div>
+  </div>
+  <div class="s3-detail">
+    <div class="s3-detail-item"><div class="dot" style="background:var(--blue)"></div><div><h5>Concept Bottleneck Model (CBM)</h5><p>HRNet backbone extracts visual features → ConceptBottleneck maps to 7 interpretable scores → classifier predicts benign / melanoma / Kaposi sarcoma. Each concept is measurable and clinician-inspectable.</p></div></div>
+    <div class="s3-detail-item"><div class="dot" style="background:var(--amber)"></div><div><h5>Fairness-Weighted PPO</h5><p>The RL agent's reward function applies 2–4× higher penalties for false negatives on darker skin (Fitz IV–VI). This actively counteracts the bias found in standard dermatology AI.</p></div></div>
+    <div class="s3-detail-item"><div class="dot" style="background:var(--mint)"></div><div><h5>Human-in-the-Loop</h5><p>Clinicians review AI triage and can override. Each correction is stored in a buffer, then used for offline PPO policy updates — the system continuously learns from expert feedback.</p></div></div>
+    <div class="s3-detail-item"><div class="dot" style="background:var(--violet)"></div><div><h5>XAI & Auditability</h5><p>Integrated Gradients + Grad-CAM heatmaps show what the model sees. Concept scores (asymmetry, border, color, etc.) give clinicians transparent, actionable reasoning behind each recommendation.</p></div></div>
+  </div>
+</div>
+
+<!-- ============ SLIDE 4: HRNet-CBM ============ -->
+<div class="slide" data-index="3">
+  <div class="label">Deep Learning Model</div>
+  <h2>HRNet + <span class="highlight">Concept Bottleneck</span></h2>
+  <p class="sub">A high-resolution vision backbone feeds into an interpretable concept bottleneck — making the AI's reasoning transparent.</p>
+  <div class="s4-diagram">
+    <div class="s4-box"><h4>📷 Input Image</h4><p>224×224 dermoscopic<br>photograph</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s4-box highlight"><h4>🧠 HRNet Backbone</h4><p>High-Resolution Net preserves fine spatial detail across multiple resolutions (timm hrnet_w18)</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s4-box highlight"><h4>🔬 ConceptBottleneck</h4><p>Linear projection + sigmoid → 7 interpretable concept scores (0–1)</p></div>
+    <span class="s3-arrow">→</span>
+    <div class="s4-box"><h4>🏷️ Classifier</h4><p>Benign / Melanoma<br>/ Kaposi Sarcoma</p></div>
+  </div>
+  <div class="s4-concepts">
+    <div class="s4-concept"><span class="icon">◐</span><div class="name">Asymmetry</div><div class="desc">Lesion shape irregularity</div></div>
+    <div class="s4-concept"><span class="icon">⬡</span><div class="name">Border</div><div class="desc">Irregular, poorly defined edges</div></div>
+    <div class="s4-concept"><span class="icon">🌈</span><div class="name">Color</div><div class="desc">Multiple colors / variegation</div></div>
+    <div class="s4-concept"><span class="icon">⭕</span><div class="name">Diameter</div><div class="desc">Larger than 6mm</div></div>
+    <div class="s4-concept"><span class="icon">⚫</span><div class="name">Melanin</div><div class="desc">Pigment density</div></div>
+    <div class="s4-concept"><span class="icon">🔥</span><div class="name">Inflammation</div><div class="desc">Erythema / immune response</div></div>
+    <div class="s4-concept"><span class="icon">🩹</span><div class="name">Ulceration</div><div class="desc">Surface breakdown</div></div>
+  </div>
+</div>
+
+<!-- ============ SLIDE 5: CONCEPTS DETAILED ============ -->
+<div class="slide" data-index="4">
+  <div class="label">Interpretable Concepts</div>
+  <h2>The 7 Clinical <span class="highlight">Concept Scores</span></h2>
+  <p class="sub">Each concept is a medical feature the model extracts — shown as a 0–1 confidence score that clinicians can inspect and trust.</p>
+  <div class="s5-grid" id="conceptsGrid"></div>
+</div>
+
+<!-- ============ SLIDE 6: PPO RL AGENT ============ -->
+<div class="slide" data-index="5">
+  <div class="label">Reinforcement Learning</div>
+  <h2>Equity-Driven <span class="highlight">PPO Agent</span></h2>
+  <p class="sub">Proximal Policy Optimization with a fairness-weighted reward function that penalises under-triage on darker skin.</p>
+  <div class="s6-flow">
+    <div class="s6-node"><div class="icon" style="background:rgba(59,130,246,.15)">📊</div><h4>State</h4><p>7 concept scores + Fitzpatrick type</p></div>
+    <span class="s6-arrow">→</span>
+    <div class="s6-node"><div class="icon" style="background:rgba(16,185,129,.15)">🧠</div><h4>Actor-Critic</h4><p>Shared NN → policy π(a|s) + value V(s)</p></div>
+    <span class="s6-arrow">→</span>
+    <div class="s6-node"><div class="icon" style="background:rgba(245,158,11,.15)">🎯</div><h4>Action</h4><p>Routine (0) / Follow-up (1) / Urgent (2)</p></div>
+    <span class="s6-arrow">→</span>
+    <div class="s6-node"><div class="icon" style="background:rgba(239,68,68,.15)">💰</div><h4>Reward</h4><p>Fairness-weighted (see below)</p></div>
+  </div>
+  <div class="s6-reward">
+    <h4>⚖️ Fairness-Weighted Reward Function</h4>
+    <table>
+      <tr><th>Scenario</th><th>Base Penalty</th><th>Fitz IV–VI Multiplier</th><th>Max Penalty</th></tr>
+      <tr><td>Urgent → Routine (critical miss)</td><td class="fn">−20</td><td>× 2–4</td><td class="fn">−80</td></tr>
+      <tr><td>Urgent → Follow-up (delayed)</td><td class="fn">−10</td><td>× 2–4</td><td class="fn">−40</td></tr>
+      <tr><td>General under-triage</td><td class="fn">−5</td><td>× 2–4</td><td class="fn">−20</td></tr>
+      <tr><td>Correct Urgent (reward)</td><td>+5</td><td>—</td><td>+5</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ============ SLIDE 7: HUMAN-IN-THE-LOOP ============ -->
+<div class="slide" data-index="6">
+  <div class="label">Human-in-the-Loop</div>
+  <h2>Clinician <span class="highlight">Oversight</span> &amp; <span class="highlight">Continuous Learning</span></h2>
+  <p class="sub">Every AI recommendation can be accepted or overridden. Each override improves the system.</p>
+  <div class="s7-flow">
+    <div class="s7-node"><div class="icon" style="background:rgba(59,130,246,.15)">🤖</div><h4>AI Recommends</h4><p>PPO suggests Routine / Follow-up / Urgent with concept evidence</p></div>
+    <span class="s7-arrow">→</span>
+    <div class="s7-node"><div class="icon" style="background:rgba(16,185,129,.15)">👨‍⚕️</div><h4>Clinician Reviews</h4><p>Inspects heatmaps, concept scores, and confidence — accepts or overrides</p></div>
+    <span class="s7-arrow">→</span>
+    <div class="s7-node"><div class="icon" style="background:rgba(245,158,11,.15)">📝</div><h4>Override Recorded</h4><p>Stored in correction buffer with Fitzpatrick type, concepts, and clinical notes</p></div>
+    <span class="s7-arrow">→</span>
+    <div class="s7-node"><div class="icon" style="background:rgba(139,92,246,.15)">🔄</div><h4>Policy Update</h4><p>OfflinePolicyOptimizer runs PPO update on accumulated corrections</p></div>
+  </div>
+  <div class="s7-loop">
+    <span>🔄</span>
+    <p>This creates a <strong>continuous improvement loop</strong>: more usage → more corrections → smarter AI → fewer corrections needed. The system adapts to each clinician's practice patterns.</p>
+  </div>
+</div>
+
+<!-- ============ SLIDE 8: FAIRNESS TRACKING ============ -->
+<div class="slide" data-index="7">
+  <div class="label">Fairness Monitoring</div>
+  <h2>Per-Type Accuracy <span class="highlight">Audit</span></h2>
+  <p class="sub">Every case is tracked by Fitzpatrick skin type. The dashboard surface accuracy gaps in real time.</p>
+  <div class="s8-grid">
+    <div class="s8-chart-box">
+      <h4>Accuracy by Fitzpatrick Type</h4>
+      <div class="s8-bars" id="fitzBars"></div>
+    </div>
+    <div class="s8-chart-box">
+      <h4>False Negative Rate</h4>
+      <div class="s8-bars" id="fnBars"></div>
+    </div>
+    <div class="s8-gap-box">
+      <div class="big" id="gapDisplay">0.0%</div>
+      <p>Accuracy gap between Fitzpatrick I–III and IV–VI — DermAI's target is <strong>&lt; 3%</strong></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SLIDE 9: TECH STACK ============ -->
+<div class="slide" data-index="8">
+  <div class="label">Technology</div>
+  <h2>Built With <span class="highlight">Modern Tools</span></h2>
+  <p class="sub">Open-source stack optimized for clinical deployment in resource-limited settings.</p>
+  <div class="s9-grid">
+    <div class="s9-card"><div class="fallback" style="background:rgba(238,64,46,.15);color:#EE402E">Py</div><h4>PyTorch</h4><p>Deep learning framework for model training & inference</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(59,130,246,.15);color:#3B82F6">H</div><h4>HRNet</h4><p>High-Resolution Net backbone (timm)</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(245,158,11,.15);color:#F59E0B">C</div><h4>Captum</h4><p>Model interpretability (Integrated Gradients)</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(16,185,129,.15);color:#10B981">P</div><h4>PPO</h4><p>Proximal Policy Optimization for RL triage</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(139,92,246,.15);color:#8B5CF6">F</div><h4>FastAPI</h4><p>REST API server with auto docs</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(236,64,122,.15);color:#EC407A">G</div><h4>Gradio</h4><p>Legacy prototype UI</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(255,193,7,.15);color:#FFC107">C</div><h4>Chart.js</h4><p>Dashboard analytics charts</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(0,150,136,.15);color:#009688">P</div><h4>Plotly</h4><p>Fairness metric visualizations</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(233,30,99,.15);color:#E91E63">A</div><h4>Albumentations</h4><p>Dark-skin specific augmentations</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(96,125,139,.15);color:#607D8B">O</div><h4>OpenCV</h4><p>Image preprocessing & heatmaps</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(33,150,243,.15);color:#2196F3">U</div><h4>Uvicorn</h4><p>ASGI server for FastAPI</p></div>
+    <div class="s9-card"><div class="fallback" style="background:rgba(76,175,80,.15);color:#4CAF50">R</div><h4>Render</h4><p>Cloud deployment platform</p></div>
+  </div>
+</div>
+
+<!-- ============ SLIDE 10: IMPACT ============ -->
+<div class="slide" data-index="9">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(59,130,246,.1) 0%,transparent 60%),var(--bg);pointer-events:none"></div>
+  <div class="s10-content">
+    <div class="s1-logo">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path d="M20 6c-7.732 0-14 6.268-14 14s6.268 14 14 14 14-6.268 14-14S27.732 6 20 6zm0 24a10 10 0 110-20 10 10 0 010 20z" fill="rgba(255,255,255,.15)"/>
+        <circle cx="20" cy="20" r="6" fill="white"/>
+      </svg>
+    </div>
+    <h1 style="font-size:clamp(2rem,4vw,3.2rem)"><span class="grad">AI That Works</span><br><span class="grad2">for Every Skin Tone</span></h1>
+    <div class="s10-stats">
+      <div class="s10-stat"><div class="num">500+</div><div class="label">Cases Tracked</div></div>
+      <div class="s10-stat"><div class="mint-num">84.3%</div><div class="label">Overall Accuracy</div></div>
+      <div class="s10-stat"><div class="num">&lt;3%</div><div class="label">Accuracy Gap</div></div>
+      <div class="s10-stat"><div class="mint-num">12%</div><div class="label">Override Rate</div></div>
+    </div>
+    <div class="s10-mission">
+      <strong>Our Mission:</strong> Eliminate the dermatology AI accuracy gap for Fitzpatrick skin types IV–VI. Every patient — regardless of skin tone — deserves the same standard of AI-assisted care. Built for Uganda, designed for the world.
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== NAV ===== -->
+<div id="nav">
+  <button class="nav-btn" id="prevBtn" aria-label="Previous">◀</button>
+  <div class="dots" id="dots"></div>
+  <span id="counter">1 / 10</span>
+  <button class="nav-btn" id="nextBtn" aria-label="Next">▶</button>
+</div>
+
+<script>
+(function(){
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  const dotsContainer = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  let current = 0;
+  let isAnimating = false;
+
+  // Create dots
+  for (let i = 0; i < totalSlides; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    dot.addEventListener('click', () => goTo(i));
+    dotsContainer.appendChild(dot);
+  }
+
+  function goTo(index) {
+    if (isAnimating || index === current || index < 0 || index >= totalSlides) return;
+    isAnimating = true;
+    slides[current].classList.remove('active');
+    slides[current].classList.add('exit');
+    setTimeout(() => slides[current].classList.remove('exit'), 50);
+    current = index;
+    slides[current].classList.add('active');
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current));
+    counter.textContent = (current + 1) + ' / ' + totalSlides;
+    setTimeout(() => { isAnimating = false; triggerAnimations(); }, 100);
+  }
+
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End') goTo(totalSlides - 1);
+  });
+
+  // Touch / swipe
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, {passive: true});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) next();
+      else prev();
+    }
+  }, {passive: true});
+
+  // ===== ANIMATIONS ON SLIDE ENTER =====
+  function triggerAnimations() {
+    const slide = slides[current];
+    const idx = current;
+
+    // S2: animated bars
+    if (idx === 1) {
+      slide.querySelectorAll('.s2-bar-fill').forEach(bar => {
+        bar.style.width = '0%';
+        requestAnimationFrame(() => { requestAnimationFrame(() => { bar.style.width = bar.dataset.w + '%'; }); });
+      });
+      slide.querySelectorAll('.s2-bar-val').forEach(v => {
+        v.textContent = '0%';
+        setTimeout(() => { v.textContent = v.dataset.v + '%'; }, 400);
+      });
+    }
+
+    // S5: concept cards
+    if (idx === 4) {
+      const grid = document.getElementById('conceptsGrid');
+      if (grid.children.length === 0) renderConcepts(grid);
+    }
+
+    // S8: fairness bars
+    if (idx === 7) renderFairness();
+  }
+
+  // ===== S5: CONCEPT CARDS =====
+  function renderConcepts(grid) {
+    const concepts = [
+      {icon:'◐', name:'Asymmetry', desc:'The lesion is not symmetric along both axes. Melanomas tend to exhibit irregular, asymmetric shapes.', color:'var(--blue)', w:85},
+      {icon:'⬡', name:'Border Irregularity', desc:'Poorly defined, jagged, or notched edges. Benign lesions typically have smooth, well-defined borders.', color:'var(--cyan)', w:72},
+      {icon:'🌈', name:'Color Variegation', desc:'Multiple colors within a single lesion (black, brown, red, white, blue). A hallmark of malignant melanoma.', color:'var(--amber)', w:68},
+      {icon:'⭕', name:'Large Diameter', desc:'Lesions wider than 6mm (pencil eraser) are more concerning. However, some melanomas can be smaller.', color:'var(--rose)', w:55},
+      {icon:'⚫', name:'Melanin Density', desc:'Pigment concentration in the lesion. Denser melanin can obscure visual diagnostic features in darker skin.', color:'var(--violet)', w:78},
+      {icon:'🔥', name:'Inflammation', desc:'Erythema and immune cell infiltration around the lesion. Can indicate the body mounting an immune response.', color:'var(--pink)', w:42},
+      {icon:'🩹', name:'Ulceration', desc:'Breakdown of the epidermal surface. A late but critical sign of aggressive melanoma.', color:'var(--emerald)', w:33},
+    ];
+    concepts.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 's5-card';
+      card.innerHTML = `
+        <div class="bar" style="background:${c.color}"></div>
+        <div class="top">
+          <div class="icon" style="background:${c.color}15;color:${c.color}">${c.icon}</div>
+          <h4>${c.name}</h4>
+        </div>
+        <p>${c.desc}</p>
+      `;
+      grid.appendChild(card);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { card.querySelector('.bar').style.width = c.w + '%'; });
+      });
+    });
+  }
+
+  // ===== S8: FAIRNESS CHARTS =====
+  function renderFairness() {
+    const fitzData = [87, 85, 86, 79, 76, 72];
+    const fnData = [4, 5, 5, 11, 15, 19];
+    const colors = ['#3B82F6','#06B6D4','#10B981','#F59E0B','#EF4444','#8B5CF6'];
+
+    renderBarChart('fitzBars', fitzData, colors, '%', 100);
+    renderBarChart('fnBars', fnData, colors, '%', 30, true);
+
+    // accuracy gap
+    const avgLight = (fitzData[0] + fitzData[1] + fitzData[2]) / 3;
+    const avgDark = (fitzData[3] + fitzData[4] + fitzData[5]) / 3;
+    const gap = avgLight - avgDark;
+    document.getElementById('gapDisplay').textContent = gap.toFixed(1) + '%';
+  }
+
+  function renderBarChart(id, data, colors, suffix, max, isFn) {
+    const container = document.getElementById(id);
+    container.innerHTML = '';
+    data.forEach((val, i) => {
+      const group = document.createElement('div');
+      group.className = 's8-bar-group';
+      const bar = document.createElement('div');
+      bar.className = 's8-bar';
+      bar.style.background = isFn ? `linear-gradient(to top, ${colors[i]}44, ${colors[i]})` : colors[i];
+      const pct = (val / max) * 100;
+      bar.style.height = '0%';
+      const label = document.createElement('span');
+      label.className = 's8-bar-label';
+      label.textContent = ['I','II','III','IV','V','VI'][i];
+      const valSpan = document.createElement('span');
+      valSpan.className = 's8-bar-val';
+      valSpan.textContent = val + suffix;
+      group.appendChild(bar);
+      group.appendChild(valSpan);
+      group.appendChild(label);
+      container.appendChild(group);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          bar.style.height = pct + '%';
+          group.classList.add('active');
+        });
+      });
+    });
+  }
+
+  // ===== S1: PARTICLES =====
+  function createParticles() {
+    const container = document.getElementById('particles');
+    for (let i = 0; i < 30; i++) {
+      const p = document.createElement('div');
+      p.className = 's1-particle';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.width = p.style.height = (2 + Math.random() * 4) + 'px';
+      p.style.animationDuration = (15 + Math.random() * 25) + 's';
+      p.style.animationDelay = (Math.random() * 20) + 's';
+      p.style.opacity = 0.2 + Math.random() * 0.4;
+      container.appendChild(p);
+    }
+  }
+  createParticles();
+
+  // Trigger initial animations
+  setTimeout(triggerAnimations, 200);
+})();
+</script>
+</body>
+</html>

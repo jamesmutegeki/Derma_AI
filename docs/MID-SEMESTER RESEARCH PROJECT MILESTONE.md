@@ -1,0 +1,107 @@
+MID-SEMESTER RESEARCH PROJECT MILESTONE
+Year 3, Semester 1 | BSc Computer Science & BSc Data Science and Analytics
+Wednesday, 14 October 2026 | 8:00 AM – 4:00 PM | 5 minutes per student
+
+---
+
+IDENTIFICATION
+Full name: James Mutegeki
+Registration No.: M24B23/007
+Program: BSc Computer Science
+Project title: Dermatology AI — Concept-Bottleneck Model with Clinician-in-the-Loop Reinforcement Learning for Dermatology Triage and Fairness Monitoring in Uganda / East Africa
+
+---
+
+PROBLEM AND RESEARCH OBJECTIVE
+Problem: Existing dermatology AI systems lack simultaneous support for (a) large-scale African skin-tone data, (b) clinician-in-the-loop (HITL) reinforcement learning, (c) operational fairness monitoring, and (d) integrated web-first deployment with telemetry. In Uganda (Uganda Cancer Institute, Mbarara Hospital), these gaps prevent reliable clinical adoption.
+Objective: Investigate whether a concept-bottleneck interpretability framework combined with HITL reinforcement learning improves both diagnostic reliability and fairness under limited-label, low-bandwidth clinical settings compared with standard transfer-learning baselines.
+
+---
+
+WHAT EXISTS, THE GAP, AND PROPOSED CONTRIBUTION
+Previous studies have investigated convolutional networks (ResNet, HRNet via timm), pretrained vision models, data augmentation (albumentations), fairness debiasing (CIRCLe, Skin-Deep-Unlearning), and foundation models (PanDerm, Derm1M, DermFM-Zero) for dermatology classification. Key references establishing the landscape:
+[1] Corrected-Skin-Image-Datasets (Nature Scientific Data 2025) — identified duplicates in HAM10000 and mislabeled Fitzpatrick types in Fitzpatrick17k; cleaning is retrospective.
+[2] MONET (concept bottleneck / transparency) — provides concept-level explanations but freezes concepts after training; no RL/HITL loop.
+[3] CIRCLe / Detecting-Melanoma-Fairly — address color-invariant representations and skin-tone detection, but fairness intervention is training-time only with no operational fairness monitor.
+Limitations of existing work: Western-centric pre-training data; no real African skin-tone scale; no clinician feedback loop after deployment; no telemetry in low-bandwidth settings; cleaning is retrospective rather than prospective.
+Proposed contribution: A unified pipeline that (1) ingests and curates African skin-type dataset sources (HAM10000, Fitzpatrick17k, ISIC2019/2020, synthetic); (2) implements a concept-bottleneck model (7 concepts → 3 classes + 6 Fitzpatrick types) with explainable activations via captum; (3) closes the HITL loop with PPO-style RL (rl_module.py / hitl_pipeline.py) so clinician feedback updates predictions; (4) monitors fairness operationally (metrics_tracker.py, datasetEquity.py); and (5) delivers through a web-first interface (FastAPI server + Gradio + HTML dashboard) ready for low-bandwidth deployment.
+
+---
+
+FULL RESEARCH PIPELINE / PROPOSED ARCHITECTURE
+Input data / source:
+- Skin-lesion images (HAM10000, Fitzpatrick17k, ISIC2019/2020, synthetic) plus metadata (Fitzpatrick type 1–6, patient demographics).
+- Synthetic/mock cases generated for safe HITL testing (main.py generate_mock_cases; seed_demo.py).
+Processing pipeline:
+1. Preprocessing / augmentation — albumentations, OpenCV melanin normalization (samplesEquity.py), duplicate/mislabel cleaning.
+2. Concept-bottleneck encoding — CNN backbone (torchvision / timm) → 7 interpretable concept embeddings (model.py).
+3. Diagnosis mapping — fully connected head to 3 classes with Fitzpatrick awareness; explainability via captum (Integrated Gradients).
+4. HITL / RL — clinician provides feedback (correct / incorrect / corrected label); case stored as Case object (rl_module.py); PPO-style update (hitl_pipeline.py).
+5. Fairness & metrics tracking — datasetEquity checks representation; metrics_tracker persists case_history.json / case_history.csv; activity.json tracks events.
+6. Web interface — Gradio quick interface (ui.py / main.py --ui); FastAPI REST server (server.py) with bcrypt auth, UUID sessions, endpoint routing; HTML dashboard (dashboard.html) for clinician viewing and export.
+Outputs: (a) diagnosis with concept-level explanation; (b) updated model weights after clinician feedback; (c) fairness metric reports; (d) exported case histories (CSV / JSON); (e) telemetry via server logs / render.yaml deployment.
+What is new / under investigation: The combination of concept-bottleneck interpretability with an operational HITL RL loop and real-time fairness monitoring in a web-first deployment is the research focus — not simply applying ResNet50 to HAM10000 and reporting accuracy.
+
+---
+
+COMPLETED PROGRESS TO DATE (EVIDENCE-BASED)
+Verified completed activities (distinguish from planned):
+- Repository restructuring completed (git a7ede08; 6f10c41 fixed ID/path bugs); duplicate root files removed; scripts organized; datasets/deliverables/notebooks/model_checkpoints consolidated under dermatology-ai/.
+- Concept-bottleneck model implemented (dermatology-ai/model.py; 7 concepts, 3 classes, 6 Fitzpatrick types).
+- RL / HITL pipeline implemented (rl_module.py Case class; hitl_pipeline.py feedback loop; main.py synthetic case generator with Fitzpatrick-weighted sampling).
+- Gradio UI launcher complete (dermatology-ai/ui.py; main.py --ui --share).
+- FastAPI server complete (dermatology-ai/server.py; bcrypt password hashing + migration; UUID session management with 8-hour TTL; patient/doctor endpoints; case history export).
+- Fairness / equity scripts complete (datasetEquity.py; samplesEquity.py; melanin normalization references).
+- Metrics tracking complete (metrics_tracker.py; case_history.json / case_history.csv persistence; export to CSV).
+- Dataset ingestion folders present (dermatology-ai/datasets/ham10000, fitzpatrick17k, isic2019, isic2020, synthetic); dataset download script present (dermatology-ai/scripts/download_datasets.py).
+- Synthetic/demo seed complete (dermatology-ai/seed_demo.py writes patients.json / doctors.json; agent_params.pt present).
+- HTML dashboard and poster/slides complete (dashboard.html; poster.html; slides.html); README updated to reference subfolder poster.
+- Notebook for model training present (dermatology-ai/notebooks/01_train_cbm.ipynb and .py).
+- Model checkpoint present (dermatology-ai/model_checkpoints/smoke_cbm.pt; agent_params.pt ~235 KB).
+- Latest UI fixes merged (git 18981b2: queue popup modal, notification auto-dismiss, compact profile, password toggle fix, admin login white-screen fix, queue scroll limit).
+What is NOT yet complete (do not claim as finished): formal automated test runs verified (scripts exist but execution not documented); full dataset curation completed (fitzpatrick17k lock file present); deployment to live server with telemetry confirmed; clinical stakeholder sign-off; security audit (rate limiting / audit logging) completed; full subfolder README / deployment guide written.
+
+---
+
+NEXT SIX WEEKS — REMAINING ACTIVITIES, PROTOTYPE, EVALUATION
+Week 1 (W1): Confirm dataset counts, clean dataset ingestion (remove .lock files, verify image counts against CSV indexes), and finalize patient/doctor JSON consistency after consolidation.
+Week 2 (W2): Execute test suite (dermatology-ai/scripts/tests/_run_tests.py, _full_test.py, _smoke_test.py); measure coverage; fix any import/path errors from restructuring.
+Week 3 (W3): Hard server deployment readiness — add rate-limiting middleware, audit logging, file-upload validation to server.py; prepare render.yaml for production deployment; ensure case_history.json backup.
+Week 4 (W4): Deploy to test environment (FastAPI + static dashboard); verify telemetry (activity.json, server logs) reaches external monitoring; test Gradio link with mock clinicians.
+Week 5 (W5): Conduct usability / feedback session using synthetic cases (seed_demo.py) and mock clinician scenarios; collect feedback; update hitl_pipeline.py based on observed interaction patterns.
+Week 6 (W6): Finalize working prototype (Gradio + FastAPI dashboard with concept explanations + clinician feedback + fairness metrics display); produce research poster; write evaluation summary with preliminary fairness and reliability evidence.
+Expected prototype at W6: A functioning web interface where a clinician uploads or selects a case image, receives a diagnosis with concept-level explanation (captum), confirms or corrects the prediction (HITL feedback), and sees fairness/reliability metrics — backed by verifiable dataset counts, running server, and documented evaluation protocol.
+Evaluation plan: Compare baseline (standard transfer learning) vs. proposed pipeline using held-out test splits on curated African-skin datasets; report accuracy, fairness metrics (demographic parity / equalized odds via datasetEquity), concept-consistency scores, and clinician feedback agreement rates from W5 session.
+
+---
+
+RESEARCH QUALITY REQUIREMENT
+Using pretrained models (timm, torchvision), libraries (albumentations, scikit-learn, torch), and existing datasets (HAM10000, Fitzpatrick17k, ISIC) is permitted. However, merely applying ResNet50 to HAM10000 with standard training and reporting accuracy is not sufficient. This project aims for substantive investigation: comparative evidence under fairness constraints, with interpretability and clinician feedback as measured variables, not just implementation.
+
+Final semester expectation (per guidelines): a research poster, a functioning prototype, and credible evaluation evidence.
+
+---
+
+KEY REFERENCES
+[1] Mutegeki J. (2026). Explainable AI for Skin Lesion Classification: Systematic Literature Review (PRISMA 2020). Peer-reviewed student systematic review, Uganda Christian University, Mukono, Uganda.
+[2] Tschandl P., et al. (2020). Human–computer collaboration for skin cancer recognition. Nature Medicine, 26(8), 1229–1234. https://doi.org/10.1038/s41591-020-0942-0
+[3] Ghorbani A., Abid A., Zou J. (2019). Interpretation of neural networks is fragile. AAAI, 33(01), 3681–3688. https://doi.org/10.1609/aaai.v33i01.33013681
+[4] Adebayo J., et al. (2018). Sanity checks for saliency maps. NeurIPS, 31, 9505–9515. https://arxiv.org/abs/1810.03292
+[5] Daneshjou R., et al. (2022). Disparities in dermatology AI performance on a diverse, curated clinical image set. Science Advances, 8(32). https://doi.org/10.1126/sciadv.abq6147
+[6] Sawada Y., Nakamura K. (2022). Concept bottleneck model with additional unsupervised concepts. IEEE Access, 10, 41758–41765. https://doi.org/10.1109/access.2022.3167702
+[7] Esteva A., et al. (2017). Dermatologist-level classification of skin cancer with deep neural networks. Nature, 542(7639), 115–118. https://doi.org/10.1038/nature21056
+[8] Corrected-Skin-Image-Datasets (2025). Nature Scientific Data — identified duplicates in HAM10000 and mislabeled Fitzpatrick types in Fitzpatrick17k; retrospective cleaning only.
+[9] MONET (concept bottleneck / transparency literature) — provides concept-level explanations but freezes concepts after training; no RL/HITL loop.
+[10] CIRCLe / Detecting-Melanoma-Fairly — color-invariant representations and skin-tone fairness at training time; no operational fairness monitoring.
+[11] Roadmap PDF (Sept 2026): Dermatology AI for Uganda/East Africa — gap analysis identifying need for African data, HITL RL, fairness monitoring, and integrated web-first deployment.
+
+---
+
+EVIDENCE ATTACHED / AVAILABLE
+- Source code: dermatology-ai/ (main.py, server.py, ui.py, model.py, hitl_pipeline.py, rl_module.py, metrics_tracker.py)
+- Datasets: dermatology-ai/datasets/ (HAM10000 images, Fitzpatrick17k CSV, ISIC subsets, synthetic)
+- Models / checkpoints: dermatology-ai/model_checkpoints/ (smoke_cbm.pt); agent_params.pt
+- Reports / posters: dermatology-ai/poster.html; slides.html; deliverables/Dermatology_AI_Video_Script.pdf
+- Notebook: dermatology-ai/notebooks/01_train_cbm.ipynb
+- Roadmap / background: Dermatology_AI_Uganda_Roadmap.pdf (root)
+- Project tracking: MILESTONES.md (root); git log (commits 05b2921 through 18981b2)

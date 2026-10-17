@@ -1,0 +1,104 @@
+% Mid-Semester Research Milestone — James Mutegeki (M24B23/007)
+\documentclass[7pt,a4paper]{article}
+\usepackage[margin=0.8cm,top=0.6cm,bottom=0.6cm]{geometry}
+\usepackage{tikz,graphicx,array,enumitem,booktabs,xcolor,hyperref}
+\usepackage{microtype}
+\usepackage{multicol}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
+\pagestyle{empty}
+
+% Colors
+\definecolor{darkblue}{RGB}{30,40,90}
+\definecolor{boxbg}{RGB}{245,248,252}
+\definecolor{accent}{RGB}{200,40,60}
+
+\newcommand{\sectionbox}[1]{\vskip1pt\noindent\textbf{\color{darkblue}\normalsize #1}\par\vskip1pt\noindent\rule{\linewidth}{0.6pt}\vskip1pt}
+\newcommand{\refnum}[1]{\textbf{[#1]}}
+
+\begin{document}
+\begin{center}
+{\normalsize\bfseries\color{darkblue} MID-SEMESTER RESEARCH PROJECT MILESTONE}\\[2pt]
+\rule{0.9\linewidth}{1pt}\\[3pt]
+{\small\textbf{Registration No.:} M24B23/007 \quad|\quad \textbf{Student:} James Mutegeki \quad|\quad \textbf{Program:} BSc Computer Science}\\[3pt]
+{\normalsize\bfseries Project Title:} \textit{Dermatology AI — Concept-Bottleneck Model with Clinician-in-the-Loop Reinforcement Learning for Dermatology Triage and Fairness Monitoring in Uganda / East Africa}
+\end{center}
+
+\vspace{-2pt}
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{1. \textbf{Problem and Research Objective}}
+\textbf{Problem:} Existing dermatology AI lacks simultaneous support for (a) African skin-tone data at scale, (b) clinician-in-the-loop (HITL) reinforcement learning, (c) operational fairness monitoring, and (d) integrated web-first deployment with telemetry — blocking clinical adoption at Uganda Cancer Institute / Mbarara Hospital.
+\vspace{1pt}
+\textbf{Objective:} Investigate if CBM + HITL RL improves reliability/fairness (low-label/bandwidth) vs. baselines.
+}}
+
+\vspace{2pt}
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{2. \textbf{Existing Research, Gap, and Proposed Contribution}}
+\textit{What exists:} ResNet/HRNet CNNs (timm), pretrained vision models, LIME/SHAP/Grad-CAM \refnum{[5][6][7]} (Ribeiro, Lundberg, Selvaraju); fairness debiasing (CIRCLe, Skin-Deep-Unlearning) \refnum{[10]}; concept bottleneck (MONET, Sawada \refnum{[6]}) — but no RL/HITL loop after training; dataset cleaning is retrospective (Corrected-Skin-Image-Datasets) \refnum{[8]}; pre-training Western-centric (PanDerm, DermFM-Zero); student CNNs lack fairness/HITL/deployment \refnum{[9]}.
+\vspace{1pt}
+\textbf{Limitations:} Frozen concepts, training-time-only fairness, no operational telemetry, no African-scale data, no clinician feedback loop.
+\vspace{1pt}
+\textbf{Proposed contribution (new):} (1) African skin-type dataset ingestion (HAM10000 / Fitzpatrick17k / ISIC / synthetic); (2) interpretability via 7-concept bottleneck + captum; (3) HITL PPO-style RL loop (rl\_module / hitl\_pipeline); (4) operational fairness tracking (metrics\_tracker / datasetEquity); (5) web-first FastAPI + Gradio + HTML dashboard with telemetry.
+}}
+
+\vspace{2pt}
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{3. \textbf{Full Research Pipeline / Proposed Architecture}}
+\begin{tikzpicture}[scale=0.82, node distance=2mm and 4mm, every node/.style={font=\tiny,align=center}, box/.style={draw=darkblue,fill=boxbg,rounded corners=1.5pt,inner sep=1pt,minimum height=5mm,text width=2.2cm}, arrow/.style={-Stealth,thick,darkblue}]
+% Row 1
+\node[box,fill=blue!10] (in) {\textbf{INPUT}\\Images + meta\\HAM10000 / Fitz / ISIC / synthetic};
+\node[box,right=of in] (prep) {\textbf{PREPROCESS}\\Albumentations\\Melanin norm.\\Clean duplicates};
+\node[box,right=of prep] (cbm) {\textbf{CONCEPT-BOTTLENECK}\\CNN backbone \\ 7 concepts \to 3 classes + 6 Fitz};
+\node[box,right=of cbm] (hitl) {\textbf{HITL / RL LOOP}\\Clinician feedback \\ PPO-style update\\[NEW]};
+% Row 2 under
+\node[box,below=2mm of cbm] (fair) {\textbf{FAIRNESS MONITOR}\\datasetEquity\\metrics\_tracker\\[NEW]};
+\node[box,below=2mm of hitl] (web) {\textbf{WEB DEPLOY}\\FastAPI + Gradio\\Dashboard + auth};
+\node[box,right=4mm of web,fill=orange!10] (out) {\textbf{OUTPUTS}\\Diagnosis + concept\\Updated weights\\Fairness reports\\Exports};
+% Arrows
+\draw[arrow] (in) -- (prep);
+\draw[arrow] (prep) -- (cbm);
+\draw[arrow] (cbm) -- (hitl);
+\draw[arrow] (cbm) -- (fair);
+\draw[arrow] (hitl) -- (web);
+\draw[arrow] (fair) -- (out);
+\draw[arrow] (hitl) -- (out);
+\draw[arrow,dashed,accent] (hitl) -- node[below,font=\tiny] {under investigation} (web);
+\draw[arrow,dashed,accent] (fair) -- node[below,font=\tiny] {new / under investigation} (out);
+\end{tikzpicture}
+\vspace{-2pt}\textit{New / under investigation (highlighted):} HITL-RL loop (rl\_module) combined with operational fairness monitoring + concept-bottleneck interpretability — not merely applying ResNet50 to HAM10000 and reporting accuracy.
+}}
+
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{4. \textbf{Progress to Date (Evidence-Based)}}
+\textbf{Completed (verified):} Repo restructuring (git a7ede08 / 6f10c41); model.py (7 concepts / 3 classes / 6 Fitz); rl\_module.py + hitl\_pipeline.py; ui.py + main.py --ui; server.py (FastAPI / bcrypt sessions); datasetEquity.py + samplesEquity.py; metrics\_tracker.py; dataset folders (HAM / Fitz / ISIC / synthetic); seed\_demo.py + agent\_params.pt; dashboard.html + poster.html + slides.html; notebook (01\_train\_cbm); checkpoints (smoke\_cbm.pt); UI fixes (18981b2).
+\vspace{1pt}
+\textbf{NOT completed (planned, not claimed):} Automated test execution verified; full dataset curation (fitzpatrick lock file); live deployment + telemetry; clinical stakeholder sign-off (Roadmap: Pre-Phase 1); security audit (rate limits / audit logging); subfolder README / full docs.
+}}
+
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{5. \textbf{Next Six Weeks — Key Activities, Prototype, Evaluation}}
+\begin{tabular}{@{}p{2.6cm}p{7.8cm}@{}}
+\textbf{W1} & Confirm dataset counts / clean locks; verify patient/doctor JSON consistency. \\
+\textbf{W2} & Execute tests (\_run\_tests / \_full\_test); measure coverage. \\
+\textbf{W3} & Hard server readiness — rate limits, audit logging, upload validation; deploy render.yaml. \\
+\textbf{W4} & Deploy to test env; verify telemetry (activity.json); test dashboard with mock clinicians. \\
+\textbf{W5} & Usability / feedback session (synthetic cases); collect clinician agreement; update HITL pipeline. \\
+\textbf{W6} & Finalize prototype + poster; evaluation summary with fairness / reliability evidence. \\
+\end{tabular}
+\vspace{1pt}
+\textbf{Expected W6 prototype:} Web interface (Gradio / FastAPI dashboard) — upload/select image, get diagnosis + concept explanation (captum), confirm/correct with clinician feedback, view fairness metrics, export case history.
+\vspace{1pt}
+\textbf{Evaluation:} Held-out test splits; compare baseline (transfer learning) vs. proposed (CBM + HITL + fairness); report accuracy, fairness (demographic parity / equalized odds), concept-consistency, clinician-agreement.
+}}
+
+\vspace{2pt}
+\noindent\fbox{\parbox{\dimexpr\linewidth-8pt\relax}{
+\sectionbox{6. \textbf{Key References}}
+\textbf{[1]} Mutegeki J. (2026). \textit{Explainable AI for Skin Lesion Classification: Systematic Literature Review (PRISMA 2020)}. Peer-reviewed student SLR, Uganda Christian University. \textbf{[2]} Tschandl P., et al. (2020). Human–computer collaboration for skin cancer recognition. \textit{Nat. Med.}, 26(8), 1229–1234. \textbf{[5]} Daneshjou R., et al. (2022). Disparities in dermatology AI on diverse clinical image set. \textit{Sci. Adv.}, 8(32). \textbf{[6]} Sawada Y., Nakamura K. (2022). Concept bottleneck model with additional unsupervised concepts. \textit{IEEE Access}, 10, 41758–41765. \textbf{[7]} Esteva A., et al. (2017). Dermatologist-level classification with deep neural networks. \textit{Nature}, 542, 115–118. \textbf{[8]} Corrected-Skin-Image-Datasets (2025). \textit{Nat. Sci. Data} — duplicates / mislabeled Fitzpatrick types; retrospective cleaning. \textbf{[11]} Roadmap PDF (Sept 2026): \textit{Dermatology AI for Uganda/East Africa} — gap analysis for African data, HITL RL, fairness monitoring, integrated web-first deployment.
+}}
+
+\vfill
+\noindent\footnotesize\textit{Framework: Student Mid-Semester Milestone (PRISMA 2020 / IEEE formatting). Evidence: source code (dermatology-ai/), git log (05b2921–18981b2), Roadmap PDF (Sept 2026), SLR (Mutegeki 2026). Source path: docs/MID-SEMESTER RESEARCH PROJECT MILESTONE.md.}
+
+\end{document}
