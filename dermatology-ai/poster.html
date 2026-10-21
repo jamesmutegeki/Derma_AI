@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DermAI — Poster for Dermatologists</title>
+<!-- Disclaimer: This tool is for research and educational purposes only. It is NOT a medical device, does not provide clinical diagnosis, and should never be used to make treatment decisions. Results may be biased toward the training data and are not validated for clinical use. Always consult a qualified dermatologist or physician. -->
+
+<title>Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis — Poster for Dermatologists</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -392,7 +393,7 @@ body {
           <path d="M20 8v4M20 28v4M8 20h4M28 20h4M12.93 12.93l2.83 2.83M24.24 24.24l2.83 2.83M12.93 27.07l2.83-2.83M24.24 15.76l2.83-2.83" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
           <defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
         </svg>
-        <h1>DermAI</h1>
+        <h1>Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis</h1>
         <span class="badge">Clinical Decision Support</span>
       </div>
       <h2>AI That Works for<br><span class="highlight">Every Skin Tone</span></h2>
@@ -468,21 +469,55 @@ body {
     <div class="stats">
       <div class="stat">
         <div class="stat-val">500+</div>
-        <div class="stat-label">Cases Processed</div>
+        <div class="stat-label">Synthetic Cases</div>
       </div>
       <div class="stat">
         <div class="stat-val mint">84.3%</div>
-        <div class="stat-label">Accuracy</div>
+        <div class="stat-label">HAM10000 Accuracy</div>
       </div>
       <div class="stat">
         <div class="stat-val amber">&lt;3%</div>
-        <div class="stat-label">Accuracy Gap</div>
+        <div class="stat-label">Fitz Gap (I-III vs IV-VI)</div>
       </div>
       <div class="stat">
         <div class="stat-val rose">12%</div>
         <div class="stat-label">Override Rate</div>
       </div>
     </div>
+    <!-- Current Status -->
+    <div class="divider">Current Status (Oct 2026)</div>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon" style="background:#EFF6FF;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+        </div>
+        <h3>✅ CBM + HITL-RL Built</h3>
+        <p>HRNet-W18 CBM with 7 concepts, PPO triage, fairness-weighted rewards, FastAPI/Gradio deployment.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="background:#ECFDF5;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M8 3H3v5"/><path d="M4 7a9 9 0 0116.36-4.36"/><path d="M8 21h5v5M16 21h5v-5"/><path d="M20 17a9 9 0 01-16.36 4.36"/></svg>
+        </div>
+        <h3>✅ Literature Review Paper</h3>
+        <p>Systematic review (PRISMA 2020) drafted; targeting JMIR Dermatology / JID Innovations.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="background:#FEF3C7;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>🔄 PASSION Dataset Integration</h3>
+        <p>~19k African-sourced images (Fitz I-VI balanced). Download pending; integration next.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="background:#FEE2E2;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><circle cx="12" cy="12" r="1"/></svg>
+        </div>
+        <h3>⏳ Clinical Validation</h3>
+        <p>Awaiting stakeholder alignment (Uganda Cancer Institute / Mbarara Hospital) per Sept 2026 roadmap.</p>
+      </div>
+    </div>
+
+
 
     <!-- For Doctors -->
     <div class="for-doctors">
@@ -523,7 +558,7 @@ body {
       </span>
     </div>
     <div class="footer-right">
-      <strong>DermAI</strong> v2.0.0 &bull; For physician use only<br>
+      <strong>Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis</strong> v2.0.0 &bull; For physician use only<br>
       Not a substitute for clinical judgement
     </div>
   </div>

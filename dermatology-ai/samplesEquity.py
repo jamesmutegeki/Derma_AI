@@ -4,13 +4,21 @@ import numpy as np
 import cv2
 
 
-class MelaninNormalization:
-    def __call__(self, image, **kwargs):
+class MelaninNormalization(A.ImageOnlyTransform):
+    """Albumentations-compatible melanin normalization via LAB L-channel histogram equalization."""
+
+    def __init__(self, always_apply=False, p=1.0):
+        super().__init__(always_apply=always_apply, p=p)
+
+    def apply(self, image, **params):
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
         l, a, b = cv2.split(lab)
         l = cv2.equalizeHist(l)
         normalized = cv2.merge([l, a, b])
         return cv2.cvtColor(normalized, cv2.COLOR_LAB2RGB)
+
+    def get_transform_init_args_names(self):
+        return ()
 
 
 dark_skin_aug = A.Compose([

@@ -29,3 +29,77 @@ class DermDataset(Dataset):
         fitz = int(row['fitzpatrick_type'])  # ensure Python int, not numpy
 
         return img, label, fitz
+
+
+class MultiSourceDermDataset(Dataset):
+    """
+    Dataset that handles images from multiple source directories.
+    CSV must have columns: image_id, label, fitzpatrick_type, source
+    where 'source' is one of: 'ham10000', 'passion', 'synthetic', 'isic2019', 'isic2020'
+    """
+
+    SOURCE_DIRS = {
+        'ham10000': 'ham10000',
+        'passion': 'passion/images',
+        'synthetic': 'synthetic/images',
+        'isic2019': 'isic2019/images',
+        'isic2020': 'isic2020/images',
+    }
+
+    def __init__(self, csv_path, data_root, transform=None):
+        self.df = pd.read_csv(csv_path)
+        self.data_root = Path(data_root)
+        self.transform = transform
+        self.classes = {'benign': 0, 'melanoma': 1, 'kaposi_sarcoma': 2}
+
+        # Validate source column
+        if 'source' not in self.df.columns:
+            # Try to infer from image_id prefix
+            self.df['source'] = self.df['image_id'].apply(self._infer_source)
+
+    def _infer_source(self, image_id: str) -> str:
+        img_id = str(image_id).lower()
+        if img_id.startswith('isic_'):
+            return 'ham10000'  # HAM10000 uses ISIC_ ids
+        elif img_id.startswith('syn_'):
+            return 'synthetic'
+        elif img_id.startswith('passion_') or img_id.startswith('pas_'):
+            return 'passion'
+        else:
+            return 'ham10000'  # default
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+
+        source = row.get('source', 'ham10000')
+        img_subdir = self.SOURCE_DIRS.get(source, 'ham10000')
+        img_dir = self.data_root / img_subdir
+
+        img_path = img_dir / f"{row['image_id']}.jpg"
+
+        # Try other extensions if .jpg not found
+        if not img_path.exists():
+            for ext in ['.jpeg', '.png', '.JPG', '.JPEG', '.PNG']:
+                alt_path = img_dir / f"{row['image_id']}{ext}"
+                if alt_path.exists():
+                    img_path = alt_path
+                    break
+
+        if not img_path.exists():
+            raise FileNotFoundError(f"Image not found: {img_path}")
+
+        img = Image.open(img_path).convert('RGB')
+
+        if self.transform:
+            img = self.transform(img)
+
+        label = self.classes[row['label']]
+        fitz = int(row['fitzpatrick_type'])
+
+        return img, label, fitz
+
+
+from pathlib import Path
