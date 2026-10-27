@@ -34,3 +34,16 @@ dark_skin_aug = A.Compose([
     A.Resize(224, 224),
     ToTensorV2()
 ])
+
+# ML FIX: Deterministic inference transform (no random augmentations, NO MelaninNormalization)
+# IMPORTANT: MelaninNormalization uses cv2.equalizeHist (non-differentiable).
+# XAI (Grad-CAM, Integrated Gradients) requires differentiable path.
+# Training uses dark_skin_aug (includes MelaninNormalization) - OK for training.
+# Inference/XAI uses inference_transform (NO MelaninNormalization) - required for XAI.
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+inference_transform = A.Compose([
+    A.Resize(224, 224),
+    A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+    ToTensorV2()
+])

@@ -15,6 +15,7 @@ import os
 import sys
 import random
 import argparse
+import pandas as pd
 
 import torch
 import torch.nn.functional as F
@@ -55,6 +56,18 @@ def build_dataset(csv_path, data_root):
     ])
     transform = EvalTransform(base_transform)
     return MultiSourceDermDataset(csv_path=csv_path, data_root=data_root, transform=transform)
+
+
+def assert_no_train_val_overlap(train_csv, val_csv):
+    """Assert that train and val splits have zero row overlap."""
+    train_df = pd.read_csv(train_csv)
+    val_df = pd.read_csv(val_csv)
+    train_ids = set(train_df['image_id'].astype(str))
+    val_ids = set(val_df['image_id'].astype(str))
+    overlap = train_ids & val_ids
+    if overlap:
+        raise AssertionError(f"Train/Val overlap detected: {len(overlap)} shared image_ids: {list(overlap)[:10]}...")
+    print(f"[OK] Verified zero train/val overlap (train={len(train_ids)}, val={len(val_ids)})")
 
 
 def deterministic_val_split(dataset, seed=42, train_frac=0.80):
@@ -149,7 +162,7 @@ def main():
 
     # Load model - smoke_cbm.pt is 2-class (binary: benign/melanoma)
     # Check checkpoint to determine num_classes
-    state = torch.load(args.ckpt, map_location=device)
+    state = torch.load(args.ckpt, map_location=device, weights_only=True)
     num_classes = 2 if 'classifier.weight' in state and state['classifier.weight'].shape[0] == 2 else 3
     print(f'Detected model classes: {num_classes}')
 
@@ -165,9 +178,14 @@ def main():
     # Build dataset - use the pre-split validation metadata
     base_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(base_dir, 'dermatology-ai', 'datasets', 'val_meta.csv')
+    train_csv_path = os.path.join(base_dir, 'dermatology-ai', 'datasets', 'train_meta.csv')
     data_root = os.path.join(base_dir, 'dermatology-ai', 'datasets')
     if not os.path.isfile(csv_path):
         raise FileNotFoundError(f'CSV not found at {csv_path}')
+    
+    # ML FIX: Assert zero train/val overlap
+    assert_no_train_val_overlap(train_csv_path, csv_path)
+    
     full_ds = build_dataset(csv_path, data_root)
     val_loader = DataLoader(full_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 

@@ -15,7 +15,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import secrets
 import uuid
+import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import io as python_io
@@ -26,14 +28,23 @@ import bcrypt
 import numpy as np
 import uvicorn
 
+# SECURITY FIX: Prevent PIL decompression bomb attacks
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 10_000_000
+
+# SECURITY FIX: Rate limiting for auth endpoints
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 try:
     import torch
 except ImportError:
     torch = None
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +55,35 @@ logger = logging.getLogger(__name__)
 def _hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+# SECURITY FIX: Enforce password policy (minimum 12 chars, reject common passwords)
+COMMON_PASSWORDS = {
+    "password", "password123", "admin", "admin123", "123456", "12345678",
+    "123456789", "qwerty", "abc123", "letmein", "welcome", "monkey",
+    "dragon", "master", "hello", "freedom", "whatever", "qazwsx",
+    "trustno1", "jordan23", "harley", "password1", "password2020",
+}
+
+
+def _validate_password(pw: str) -> tuple[bool, str]:
+    """Validate password strength. Returns (is_valid, error_message)."""
+    if len(pw) < 12:
+        return False, "Password must be at least 12 characters long"
+    if pw.lower() in COMMON_PASSWORDS:
+        return False, "Password is too common, please choose a stronger one"
+    has_upper = any(c.isupper() for c in pw)
+    has_lower = any(c.islower() for c in pw)
+    has_digit = any(c.isdigit() for c in pw)
+    has_special = any(not c.isalnum() for c in pw)
+    if not (has_upper and has_lower and has_digit and has_special):
+        return False, "Password must contain uppercase, lowercase, digit, and special character"
+    return True, ""
+
+
 def _check_password(pw: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(pw.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:
-        logger.error("Password check failed — hash may be corrupted")
+        logger.error("Password check failed -- hash may be corrupted")
         return False
 
 def _migrate_passwords(data: dict):
@@ -71,13 +106,34 @@ def _migrate_passwords(data: dict):
 #  Auth sessions
 # ---------------------------------------------------------------------------
 
+# SECURITY FIX: Background task to clean expired sessions periodically
+async def _cleanup_expired_sessions():
+    """Periodically remove expired sessions from memory."""
+    while True:
+        try:
+            await asyncio.sleep(300)  # Run every 5 minutes
+            now = datetime.now(timezone.utc)
+            expired = [
+                token for token, sess in _sessions.items()
+                if sess.get("expires_at") and now > datetime.fromisoformat(sess["expires_at"])
+            ]
+            for token in expired:
+                _sessions.pop(token, None)
+            if expired:
+                logger.info(f"Cleaned up {len(expired)} expired sessions")
+        except Exception as e:
+            logger.error(f"Session cleanup error: {e}")
+
+
 _sessions: dict[str, dict] = {}
 _SESSION_TTL = timedelta(hours=8)
 
 def _create_session(user_info: dict) -> str:
     token = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
-    _sessions[token] = {**user_info, "created_at": now.isoformat(), "expires_at": (now + _SESSION_TTL).isoformat()}
+    # SECURITY FIX: Add CSRF token to session for state-changing operations
+    csrf_token = secrets.token_urlsafe(32)
+    _sessions[token] = {**user_info, "created_at": now.isoformat(), "expires_at": (now + _SESSION_TTL).isoformat(), "csrf_token": csrf_token}
     return token
 
 def _get_current_user(token: str = ""):
@@ -101,6 +157,23 @@ async def require_admin(authorization: str = Header("")):
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required.")
     return user
+
+
+# SECURITY FIX: CSRF validation for state-changing operations
+async def require_csrf(authorization: str = Header(""), x_csrf_token: str = Header(None, alias="X-CSRF-Token")):
+    """Validate CSRF token for state-changing operations (POST, PUT, DELETE, PATCH)."""
+    token = authorization.replace("Bearer ", "") if authorization else ""
+    if not token or token not in _sessions:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    session = _sessions[token]
+    expected_csrf = session.get("csrf_token")
+    if not expected_csrf:
+        raise HTTPException(status_code=403, detail="CSRF token missing from session.")
+    if not x_csrf_token:
+        raise HTTPException(status_code=403, detail="X-CSRF-Token header required.")
+    if x_csrf_token != expected_csrf:
+        raise HTTPException(status_code=403, detail="Invalid CSRF token.")
+    return _get_current_user(token)
 
 # ---------------------------------------------------------------------------
 #  Activity log
@@ -173,6 +246,7 @@ class LoginResponse(BaseModel):
     token: str
     physician: dict
     message: str
+    csrf_token: str
 
 
 class PatientRequest(BaseModel):
@@ -234,13 +308,24 @@ def _save_doctors(data: dict):
     DOCTORS_PATH.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
 
 
+# SECURITY FIX: Remove hardcoded admin password - require ADMIN_BOOTSTRAP_PASSWORD env var or generate secure one-time password
 def _init_admin():
     data = _load_doctors()
     if not any(a.get("username") == "admin" for a in data["admins"]):
+        bootstrap_pw = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD")
+        if bootstrap_pw:
+            pw_hash = _hash_password(bootstrap_pw)
+            logger.warning("Admin user created with password from ADMIN_BOOTSTRAP_PASSWORD")
+        else:
+            pw_hash = _hash_password(secrets.token_urlsafe(16))
+            logger.warning("=" * 60)
+            logger.warning("ADMIN BOOTSTRAP PASSWORD GENERATED - SAVE THIS PASSWORD:")
+            logger.warning(pw_hash)
+            logger.warning("=" * 60)
         data["admins"].append({
             "id": "admin-001",
             "username": "admin",
-            "password": _hash_password("admin123"),
+            "password": pw_hash,
             "name": "System Administrator",
         })
     _migrate_passwords(data)
@@ -266,7 +351,7 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20260510-0001",
                 "date": "2026-05-10",
-                "desc": "Initial consult — lesion mapping & dermoscopic photography. AI flagged asymmetry > 0.7. Recommended 2-week follow-up.",
+                "desc": "Initial consult -- lesion mapping & dermoscopic photography. AI flagged asymmetry > 0.7. Recommended 2-week follow-up.",
                 "tag": "followup",
                 "diagnosis": "Superficial Spreading Melanoma (suspected)",
                 "ai_findings": "Asymmetry: 0.82 | Border irregularity: 0.73 | Color variegation: 0.65 | Diameter: 0.44\nABCD criteria: High risk. Triage: Follow-up (2 weeks).",
@@ -278,7 +363,7 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20260402-0002",
                 "date": "2026-04-02",
-                "desc": "Routine skin check — no significant findings. ABCD criteria unremarkable.",
+                "desc": "Routine skin check -- no significant findings. ABCD criteria unremarkable.",
                 "tag": "routine",
                 "diagnosis": "No suspicious lesions detected",
                 "ai_findings": "Asymmetry: 0.12 | Border: 0.08 | Color: 0.15 | Diameter: 0.10\nAll concept scores low. Triage: Routine monitoring.",
@@ -290,10 +375,10 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20251218-0003",
                 "date": "2025-12-18",
-                "desc": "Urgent referral — rapid-growing nodule on right forearm. Biopsy scheduled but patient deferred.",
+                "desc": "Urgent referral -- rapid-growing nodule on right forearm. Biopsy scheduled but patient deferred.",
                 "tag": "urgent",
                 "diagnosis": "Suspicious nodule (rule out SCC)",
-                "ai_findings": "Asymmetry: 0.91 | Border: 0.88 | Color: 0.79 | Diameter: 0.85\nHigh concern. Triage: Urgent — Biopsy Recommended.",
+                "ai_findings": "Asymmetry: 0.91 | Border: 0.88 | Color: 0.79 | Diameter: 0.85\nHigh concern. Triage: Urgent -- Biopsy Recommended.",
                 "treatment_notes": "Biopsy recommended and scheduled. Patient expressed anxiety and deferred procedure. Discussed risks of delay. Prescribed topical corticosteroid for inflammation. Follow-up in 1 week.",
                 "doctor_name": "Dr. Mercy Okonkwo",
                 "lesion_location": "Right forearm, dorsal aspect",
@@ -309,7 +394,7 @@ def _seed_demo_patients():
         "gender": "male",
         "fitz": "V",
         "contact": "+254 723 456 789",
-        "history": "Completed treatment for BCC on left cheek. Treated with Mohs surgery — clear margins confirmed. No recurrence at 6-month follow-up.",
+        "history": "Completed treatment for BCC on left cheek. Treated with Mohs surgery -- clear margins confirmed. No recurrence at 6-month follow-up.",
         "diagnosis": "bcc",
         "body_site": "face",
         "status": "completed",
@@ -317,7 +402,7 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20251015-0001",
                 "date": "2025-10-15",
-                "desc": "Initial diagnosis — biopsy-confirmed BCC on left cheek.",
+                "desc": "Initial diagnosis -- biopsy-confirmed BCC on left cheek.",
                 "tag": "urgent",
                 "diagnosis": "Basal Cell Carcinoma (confirmed)",
                 "ai_findings": "Nodular BCC with ulceration. Low-risk subtype. Triage: Treatment recommended.",
@@ -329,10 +414,10 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20251120-0001",
                 "date": "2025-11-20",
-                "desc": "Mohs surgery — clear margins achieved. Wound closed with linear repair.",
+                "desc": "Mohs surgery -- clear margins achieved. Wound closed with linear repair.",
                 "tag": "followup",
-                "diagnosis": "BCC — completely excised",
-                "ai_findings": "N/A — surgical specimen",
+                "diagnosis": "BCC -- completely excised",
+                "ai_findings": "N/A -- surgical specimen",
                 "treatment_notes": "Mohs surgery performed. Clear margins. Patient recovering well.",
                 "doctor_name": "Dr. Mercy Okonkwo",
                 "lesion_location": "Left cheek",
@@ -341,9 +426,9 @@ def _seed_demo_patients():
             {
                 "id": "VIS-20260522-0001",
                 "date": "2026-05-22",
-                "desc": "6-month follow-up — no signs of recurrence. Patient discharged.",
+                "desc": "6-month follow-up -- no signs of recurrence. Patient discharged.",
                 "tag": "routine",
-                "diagnosis": "No recurrence — treatment complete",
+                "diagnosis": "No recurrence -- treatment complete",
                 "ai_findings": "No suspicious findings. Triage: Routine.",
                 "treatment_notes": "Patient discharged from follow-up. Advised on annual skin checks and sun protection.",
                 "doctor_name": "Dr. James Doe",
@@ -365,8 +450,8 @@ def _seed_demo_patients():
         "body_site": "right_arm",
         "status": "followup",
         "visits": [
-            {"id": "VIS-20260310-0001", "date": "2026-03-10", "desc": "Excision of dysplastic nevus on right shoulder. Clear margins achieved.", "tag": "followup", "diagnosis": "Dysplastic Nevus — excised", "ai_findings": "Moderate atypia. No melanoma identified.", "treatment_notes": "Excisional biopsy performed. Wound closed primarily. Follow-up in 3 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "5mm x 4mm"},
-            {"id": "VIS-20260610-0001", "date": "2026-06-10", "desc": "3-month follow-up — wound healed well. No signs of recurrence.", "tag": "routine", "diagnosis": "Healing well — no recurrence", "ai_findings": "Low risk. No suspicious features.", "treatment_notes": "Patient reassured. Next follow-up in 6 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "N/A"}
+            {"id": "VIS-20260310-0001", "date": "2026-03-10", "desc": "Excision of dysplastic nevus on right shoulder. Clear margins achieved.", "tag": "followup", "diagnosis": "Dysplastic Nevus -- excised", "ai_findings": "Moderate atypia. No melanoma identified.", "treatment_notes": "Excisional biopsy performed. Wound closed primarily. Follow-up in 3 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "5mm x 4mm"},
+            {"id": "VIS-20260610-0001", "date": "2026-06-10", "desc": "3-month follow-up -- wound healed well. No signs of recurrence.", "tag": "routine", "diagnosis": "Healing well -- no recurrence", "ai_findings": "Low risk. No suspicious features.", "treatment_notes": "Patient reassured. Next follow-up in 6 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "N/A"}
         ],
         "created_at": "2026-03-08T00:00:00+00:00"
     }
@@ -382,7 +467,7 @@ def _seed_demo_patients():
         "body_site": "left_arm",
         "status": "consultation",
         "visits": [
-            {"id": "VIS-20260601-0001", "date": "2026-06-01", "desc": "Initial consultation — rapid-growing nodule on left forearm. Biopsy scheduled.", "tag": "urgent", "diagnosis": "Suspicious nodule (rule out SCC)", "ai_findings": "Asymmetry: 0.78 | Border: 0.69 | Color: 0.71 | Diameter: 0.82\nHigh concern.", "treatment_notes": "Biopsy scheduled. Patient counseled on SCC risks and treatment options.", "doctor_name": "Dr. James Doe", "lesion_location": "Left forearm, extensor surface", "lesion_size": "10mm x 7mm, raised 2mm"}
+            {"id": "VIS-20260601-0001", "date": "2026-06-01", "desc": "Initial consultation -- rapid-growing nodule on left forearm. Biopsy scheduled.", "tag": "urgent", "diagnosis": "Suspicious nodule (rule out SCC)", "ai_findings": "Asymmetry: 0.78 | Border: 0.69 | Color: 0.71 | Diameter: 0.82\nHigh concern.", "treatment_notes": "Biopsy scheduled. Patient counseled on SCC risks and treatment options.", "doctor_name": "Dr. James Doe", "lesion_location": "Left forearm, extensor surface", "lesion_size": "10mm x 7mm, raised 2mm"}
         ],
         "created_at": "2026-06-01T00:00:00+00:00"
     }
@@ -446,18 +531,31 @@ def create_app() -> FastAPI:
     _seed_demo_patients()
 
     app = FastAPI(
-        title="Dermatology AI — Clinical API",
+        title="Dermatology AI -- Clinical API",
         version="2.0.0",
         description="Backend API for the Dermatology AI Clinical Decision Support Dashboard",
     )
 
+    # SECURITY FIX: CORS - restrict origins, methods, headers; never use "*" with credentials
+    allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:7860").split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
+
+    # SECURITY FIX: Rate limiting for auth endpoints (5 requests/min per IP)
+    limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # SECURITY FIX: Start background session cleanup task
+    @app.on_event("startup")
+    async def startup_event():
+        asyncio.create_task(_cleanup_expired_sessions())
+        logger.info("Session cleanup task started")
 
     # -----------------------------------------------------------------------
     #  Lazy backend initialisation
@@ -524,7 +622,7 @@ def create_app() -> FastAPI:
         return _backend
 
     # -----------------------------------------------------------------------
-    #  Routes — Static files
+    #  Routes -- Static files
     # -----------------------------------------------------------------------
 
     @app.get("/", response_class=HTMLResponse)
@@ -584,11 +682,13 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         }
 
     # -----------------------------------------------------------------------
-    #  Routes — Login / Auth
+    #  Routes -- Login / Auth
     # -----------------------------------------------------------------------
 
+    # SECURITY FIX: Rate limit login endpoint (5 requests/min per IP)
     @app.post("/api/login", response_model=LoginResponse)
-    async def login(req: LoginRequest):
+    @limiter.limit("5/minute")
+    async def login(req: LoginRequest, request: Request):
         if not req.email or not req.password:
             raise HTTPException(status_code=400, detail="Email and password required")
         doc_data = _load_doctors()
@@ -620,11 +720,12 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             success=True,
             token=token,
             physician=physician,
-            message="Authentication successful. HIPAA-compliant session established.",
+            message="Authentication successful.",
+            csrf_token=_sessions[token].get("csrf_token", ""),
         )
 
     # -----------------------------------------------------------------------
-    #  Routes — Patient
+    #  Routes -- Patient
     # -----------------------------------------------------------------------
 
     @app.get("/api/patients")
@@ -646,7 +747,8 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Patient not found.")
 
     @app.post("/api/patients", status_code=201)
-    async def create_patient(req: PatientRequest, _auth=Depends(require_auth)):
+    async def create_patient(req: PatientRequest, _auth=Depends(require_csrf)):
+        print("[DEBUG] create_patient called")
         patients = _load_patients()
         new_id = req.id or f"PAT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{len(patients) + 1:04d}"
         existing_ids = {p["id"] for p in patients}
@@ -684,7 +786,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "created", "patient": patient}
 
     @app.put("/api/patients/{patient_id}")
-    async def update_patient(patient_id: str, req: PatientRequest, _auth=Depends(require_auth)):
+    async def update_patient(patient_id: str, req: PatientRequest, _auth=Depends(require_csrf)):
         patients = _load_patients()
         for i, p in enumerate(patients):
             if p["id"] == patient_id:
@@ -707,7 +809,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Patient not found.")
 
     @app.delete("/api/patients/{patient_id}")
-    async def delete_patient(patient_id: str, _auth=Depends(require_auth)):
+    async def delete_patient(patient_id: str, _auth=Depends(require_csrf)):
         patients = _load_patients()
         new_list = [p for p in patients if p["id"] != patient_id]
         if len(new_list) == len(patients):
@@ -716,7 +818,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "deleted", "patient_id": patient_id}
 
     # -----------------------------------------------------------------------
-    #  Routes — Visits
+    #  Routes -- Visits
     # -----------------------------------------------------------------------
 
     @app.get("/api/patients/{patient_id}/visits")
@@ -739,7 +841,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Patient not found.")
 
     @app.post("/api/patients/{patient_id}/visits", status_code=201)
-    async def create_visit(patient_id: str, req: VisitRequest, _auth=Depends(require_auth)):
+    async def create_visit(patient_id: str, req: VisitRequest, _auth=Depends(require_csrf)):
         patients = _load_patients()
         for i, p in enumerate(patients):
             if p["id"] == patient_id:
@@ -764,7 +866,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Patient not found.")
 
     @app.delete("/api/patients/{patient_id}/visits/{visit_id}")
-    async def delete_visit(patient_id: str, visit_id: str, _auth=Depends(require_auth)):
+    async def delete_visit(patient_id: str, visit_id: str, _auth=Depends(require_csrf)):
         patients = _load_patients()
         for i, p in enumerate(patients):
             if p["id"] == patient_id:
@@ -778,28 +880,43 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Patient not found.")
 
     # -----------------------------------------------------------------------
-    #  Routes — Diagnosis
+    #  Routes -- Diagnosis
     # -----------------------------------------------------------------------
 
+    # SECURITY FIX: Require authentication on /api/diagnose
     @app.post("/api/diagnose")
     async def diagnose(
         file: UploadFile = File(...),
         fitzpatrick: int = Form(4),
+        _auth=Depends(require_auth),
     ):
+        # SECURITY FIX: Harden file upload validation - size cap, magic bytes, PIL bomb protection
         backend = get_backend()
         if backend is None:
             return _mock_diagnosis()
 
         if fitzpatrick < 1 or fitzpatrick > 6:
             raise HTTPException(status_code=422, detail="Fitzpatrick type must be between 1 and 6.")
-        if file.content_type and not file.content_type.startswith("image/"):
-            raise HTTPException(status_code=422, detail="Uploaded file must be an image.")
 
+        # Size cap: reject uploads > 10 MB before processing
+        MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
         contents = await file.read()
-        from PIL import Image
-        import io
+        if len(contents) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
 
-        img = Image.open(io.BytesIO(contents)).convert("RGB")
+        # Magic bytes validation - reject spoofed content-type
+        import filetype
+        kind = filetype.guess(contents)
+        if kind is None or not kind.mime.startswith("image/"):
+            raise HTTPException(status_code=422, detail="Uploaded file must be a valid image (magic bytes check failed).")
+
+        import io
+        try:
+            img = Image.open(io.BytesIO(contents)).convert("RGB")
+        except Exception as e:
+            logger.warning("Image decode failed: %s", e)
+            raise HTTPException(status_code=422, detail="Invalid or corrupted image file.")
+
         arr = np.array(img)
 
         from ui import preprocess
@@ -840,6 +957,12 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             "predicted_class": ["benign", "melanoma", "kaposi_sarcoma"][pred_class],
             "fitzpatrick": fitzpatrick,
             "fitzpatrick_label": FITZPATRICK_LABELS[fitzpatrick - 1],
+            # ML FIX: Kaposi sarcoma confidence caveat - no real HAM10000 KS samples
+            "confidence_caveat": (
+                "Kaposi sarcoma class trained on synthetic data only; "
+                "no real HAM10000 KS samples available. "
+                "Prediction unvalidated on real images."
+            ) if pred_class == 2 else None,
         }
 
     def _mock_diagnosis():
@@ -856,14 +979,15 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             "predicted_class": "melanoma",
             "fitzpatrick": 4,
             "fitzpatrick_label": "Olive",
+            "confidence_caveat": None,
         }
 
     # -----------------------------------------------------------------------
-    #  Routes — Overrides
+    #  Routes -- Overrides
     # -----------------------------------------------------------------------
 
     @app.post("/api/override")
-    async def submit_override(req: OverrideRequest, _auth=Depends(require_auth)):
+    async def submit_override(req: OverrideRequest, _auth=Depends(require_csrf)):
         backend = get_backend()
         if backend is None:
             return {"status": "recorded", "case_id": req.case_id, "action": req.clinician_action}
@@ -871,11 +995,11 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "recorded", "case_id": req.case_id, "action": req.clinician_action}
 
     # -----------------------------------------------------------------------
-    #  Routes — Notes
+    #  Routes -- Notes
     # -----------------------------------------------------------------------
 
     @app.post("/api/notes")
-    async def save_notes(req: NotesSaveRequest, _auth=Depends(require_auth)):
+    async def save_notes(req: NotesSaveRequest, _auth=Depends(require_csrf)):
         notes = _load_notes()
         notes[req.case_id] = req.notes
         _save_notes(notes)
@@ -887,7 +1011,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"case_id": case_id, "notes": notes.get(case_id, "")}
 
     # -----------------------------------------------------------------------
-    #  Routes — Analytics
+    #  Routes -- Analytics
     # -----------------------------------------------------------------------
 
     @app.get("/api/analytics")
@@ -912,7 +1036,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         }
 
     # -----------------------------------------------------------------------
-    #  Routes — History
+    #  Routes -- History
     # -----------------------------------------------------------------------
 
     @app.get("/api/history")
@@ -950,11 +1074,11 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return cases
 
     # -----------------------------------------------------------------------
-    #  Routes — System
+    #  Routes -- System
     # -----------------------------------------------------------------------
 
     @app.post("/api/offline-update")
-    async def run_offline_update(_auth=Depends(require_auth)):
+    async def run_offline_update(_auth=Depends(require_csrf)):
         backend = get_backend()
         if backend is None:
             return {"status": "simulated", "message": "Offline update completed (mock)."}
@@ -985,7 +1109,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "exported", "filename": "case_history.csv"}
 
     @app.post("/api/reset")
-    async def reset_tracker(_auth=Depends(require_auth)):
+    async def reset_tracker(_auth=Depends(require_csrf)):
         backend = get_backend()
         if backend is None:
             return {"status": "reset"}
@@ -995,15 +1119,17 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "reset"}
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin
+    #  Routes -- Admin
     # -----------------------------------------------------------------------
 
     @app.get("/api/admin/permissions")
     async def get_permissions(_auth=Depends(require_admin)):
         return {"permissions": DOCTOR_PERMISSIONS}
 
+    # SECURITY FIX: Rate limit admin login endpoint (5 requests/min per IP)
     @app.post("/api/admin/login")
-    async def admin_login(req: AdminLoginRequest):
+    @limiter.limit("5/minute")
+    async def admin_login(req: AdminLoginRequest, request: Request):
         data = _load_doctors()
         for admin in data["admins"]:
             if admin["username"] == req.username and _check_password(req.password, admin.get("password", "")):
@@ -1015,6 +1141,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                     "token": token,
                     "admin": info,
                     "message": "Admin authenticated.",
+                    "csrf_token": _sessions[token].get("csrf_token", ""),
                 }
         raise HTTPException(status_code=401, detail="Invalid admin credentials.")
 
@@ -1028,7 +1155,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"doctors": doctors}
 
     @app.post("/api/admin/doctors")
-    async def create_doctor(req: DoctorCreateRequest, _auth=Depends(require_admin)):
+    async def create_doctor(req: DoctorCreateRequest, _auth=Depends(require_csrf)):
         try:
             data = _load_doctors()
             if any(d["username"] == req.username for d in data["doctors"]):
@@ -1041,6 +1168,16 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                     status_code=409,
                     content={"detail": "Email already exists.", "field": "email"}
                 )
+            # SECURITY FIX: Validate password strength
+            valid, msg = _validate_password(req.password)
+            if not valid:
+                return JSONResponse(status_code=400, content={"detail": msg, "field": "password"})
+
+            # SECURITY FIX: Validate password strength
+            valid, msg = _validate_password(req.password)
+            if not valid:
+                return JSONResponse(status_code=400, content={"detail": msg, "field": "password"})
+
             doctor = {
                 "id": f"doc-{uuid.uuid4().hex[:6]}",
                 "username": req.username,
@@ -1073,7 +1210,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     @app.put("/api/admin/doctors/{doctor_id}")
-    async def update_doctor(doctor_id: str, req: DoctorUpdateRequest, _auth=Depends(require_admin)):
+    async def update_doctor(doctor_id: str, req: DoctorUpdateRequest, _auth=Depends(require_csrf)):
         data = _load_doctors()
         for d in data["doctors"]:
             if d["id"] == doctor_id:
@@ -1089,7 +1226,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     @app.delete("/api/admin/doctors/{doctor_id}")
-    async def deactivate_doctor(doctor_id: str, _auth=Depends(require_admin)):
+    async def deactivate_doctor(doctor_id: str, _auth=Depends(require_csrf)):
         data = _load_doctors()
         for d in data["doctors"]:
             if d["id"] == doctor_id:
@@ -1099,7 +1236,12 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     @app.post("/api/admin/doctors/{doctor_id}/reset-password")
-    async def reset_doctor_password(doctor_id: str, req: DoctorResetPasswordRequest, _auth=Depends(require_admin)):
+    async def reset_doctor_password(doctor_id: str, req: DoctorResetPasswordRequest, _auth=Depends(require_csrf)):
+        # SECURITY FIX: Validate password strength
+        valid, msg = _validate_password(req.new_password)
+        if not valid:
+            return JSONResponse(status_code=400, content={"detail": msg, "field": "new_password"})
+
         data = _load_doctors()
         for d in data["doctors"]:
             if d["id"] == doctor_id:
@@ -1109,7 +1251,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     @app.put("/api/admin/doctors/{doctor_id}/permissions")
-    async def save_doctor_permissions(doctor_id: str, req: PermissionsUpdate, _auth=Depends(require_admin)):
+    async def save_doctor_permissions(doctor_id: str, req: PermissionsUpdate, _auth=Depends(require_csrf)):
         data = _load_doctors()
         for d in data["doctors"]:
             if d["id"] == doctor_id:
@@ -1119,7 +1261,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     # -----------------------------------------------------------------------
-    #  Routes — Doctor self-service (update own profile)
+    #  Routes -- Doctor self-service (update own profile)
     # -----------------------------------------------------------------------
 
     @app.put("/api/doctors/me")
@@ -1138,11 +1280,16 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Doctor not found.")
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Change own password
+    #  Routes -- Admin: Change own password
     # -----------------------------------------------------------------------
 
     @app.post("/api/admin/change-password")
-    async def admin_change_password(req: AdminPasswordChangeRequest, _auth=Depends(require_admin)):
+    async def admin_change_password(req: AdminPasswordChangeRequest, _auth=Depends(require_csrf)):
+        # SECURITY FIX: Validate new password strength
+        valid, msg = _validate_password(req.new_password)
+        if not valid:
+            return JSONResponse(status_code=400, content={"detail": msg, "field": "new_password"})
+
         data = _load_doctors()
         admin_id = _auth.get("id")
         for admin in data["admins"]:
@@ -1154,11 +1301,11 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=403, detail="Current password is incorrect.")
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Bulk doctor actions
+    #  Routes -- Admin: Bulk doctor actions
     # -----------------------------------------------------------------------
 
     @app.post("/api/admin/doctors/bulk")
-    async def bulk_doctor_action(req: BulkDoctorAction, _auth=Depends(require_admin)):
+    async def bulk_doctor_action(req: BulkDoctorAction, _auth=Depends(require_csrf)):
         data = _load_doctors()
         count = 0
         for d in data["doctors"]:
@@ -1170,7 +1317,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"status": "updated", "count": count}
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Active sessions
+    #  Routes -- Admin: Active sessions
     # -----------------------------------------------------------------------
 
     @app.get("/api/admin/sessions")
@@ -1189,7 +1336,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"active_sessions": active, "count": len(active)}
 
     @app.post("/api/admin/sessions/{token}/revoke")
-    async def revoke_session(token: str, authorization: str = Header(""), _auth=Depends(require_admin)):
+    async def revoke_session(token: str, authorization: str = Header(""), _auth=Depends(require_csrf)):
         current_token = authorization.replace("Bearer ", "") if authorization else ""
         if token == current_token:
             raise HTTPException(status_code=400, detail="Cannot revoke your own session.")
@@ -1199,7 +1346,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         raise HTTPException(status_code=404, detail="Session not found.")
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Activity log with filtering
+    #  Routes -- Admin: Activity log with filtering
     # -----------------------------------------------------------------------
 
     @app.get("/api/admin/activity")
@@ -1213,7 +1360,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {"activity": entries[-50:]}
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Patient CSV export
+    #  Routes -- Admin: Patient CSV export
     # -----------------------------------------------------------------------
 
     @app.get("/api/admin/patients/export")
@@ -1236,7 +1383,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         )
 
     # -----------------------------------------------------------------------
-    #  Routes — Admin: Analytics data for charts
+    #  Routes -- Admin: Analytics data for charts
     # -----------------------------------------------------------------------
 
     @app.get("/api/admin/analytics-data")

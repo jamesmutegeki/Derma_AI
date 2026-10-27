@@ -26,6 +26,7 @@ from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
 from metrics_tracker import FairnessTracker, CaseRecord
 from model import CONCEPT_NAMES, DermatologyCBM, XAIExplainer
 from rl_module import FITZPATRICK_LABELS, PPOAgent, TRIAGE_NAMES, TRUE_LABEL_TO_TRIAGE
+from samplesEquity import inference_transform
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +69,12 @@ class AppState:
 #  Image preprocessing
 # ====================================================================
 
+# ML FIX: Use deterministic inference transform (no random augmentations)
 def preprocess(image: np.ndarray, device: torch.device) -> torch.Tensor:
-    img = PILImage.fromarray(image).convert("RGB").resize((224, 224))
-    arr = np.array(img, dtype=np.float32) / np.float32(255.0)
-    arr = (arr - np.float32([0.485, 0.456, 0.406])) / np.float32([0.229, 0.224, 0.225])
-    tensor = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).to(device)
-    return tensor
+    img_pil = PILImage.fromarray(image).convert("RGB")
+    # Apply deterministic inference transform
+    augmented = inference_transform(image=np.array(img_pil))
+    return augmented["image"].unsqueeze(0).to(device)
 
 
 # ====================================================================

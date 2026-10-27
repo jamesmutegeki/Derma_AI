@@ -160,7 +160,7 @@ def main():
         pretrained_backbone=True,
         freeze_backbone=False,
     ).to(device)
-    state = torch.load(args.ckpt, map_location=device)
+    state = torch.load(args.ckpt, map_location=device, weights_only=True)
     model.load_state_dict(state)
 
     # Build PASSION dataset

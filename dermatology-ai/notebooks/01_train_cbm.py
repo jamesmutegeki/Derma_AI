@@ -63,6 +63,14 @@ LABEL_TO_INT = {"benign": 0, "melanoma": 1, "kaposi_sarcoma": 2}
 INT_TO_LABEL = {v: k for k, v in LABEL_TO_INT.items()}
 FITZ_PLACEHOLDER_HAM = 3  # HAM10000 has no Fitzpatrick type; use neutral 3
 
+# ML FIX: HAM10000 binary training caveats (see P1.2 in REMEDIATION_PROMPT.md)
+# - HAM10000 has 7 dx classes: mel, nv, bkl, bcc, akiec, vasc, df
+# - Binary mapping collapses all non-melanoma to 'benign', conflating BCC/AK with nevi
+# - Kaposi sarcoma (label 2) has ZERO real HAM10000 samples; only synthetic data provides KS
+# - FITZ_PLACEHOLDER_HAM = 3 assigns neutral skin type to all HAM10000 rows, skewing fairness metrics
+# - Kaposi sarcoma predictions should include confidence_caveat in API response
+#   stating the class is synthetic-data-only and unvalidated on real images.
+
 DEVICE = torch.device("cpu")
 TORCH_SEED = 0
 
@@ -332,7 +340,8 @@ def train_cbm(args) -> None:
     print(f"[train] DONE best val_acc {best:.4f}")
 
     # Prove concept extraction works end-to-end on the trained CBM
-    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE))
+    # SECURITY FIX: Use weights_only=True to prevent arbitrary code execution
+    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE, weights_only=True))
     cbm.eval()
     xb, _, _ = next(iter(val_loader))
     with torch.no_grad():
@@ -392,7 +401,7 @@ def train_ppo_loop(cases, episodes: int = 2000, update_interval: int = 64):
 
 def train_ppo(args) -> None:
     cbm = load_cbm(num_classes=3)
-    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE))
+    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE, weights_only=True))
     cases = build_cases(cbm, SYN_META, SYN_DIR, limit=args.limit)
     agent = train_ppo_loop(cases, episodes=args.episodes, update_interval=args.interval)
     agent.save(str(PPO_CKPT))
@@ -402,7 +411,7 @@ def train_ppo(args) -> None:
 
 def fair_audit(args) -> None:
     cbm = load_cbm(num_classes=3)
-    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE))
+    cbm.load_state_dict(torch.load(CBM_CKPT, map_location=DEVICE, weights_only=True))
     cases = build_cases(cbm, SYN_META, SYN_DIR, limit=args.limit)
     env = DermTriageEnv(num_concepts=NUM_CONCEPTS)
     agent = PPOAgent(env.state_dim, env.action_dim)

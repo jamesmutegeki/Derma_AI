@@ -232,6 +232,14 @@ class XAIExplainer:
         - Integrated Gradients (via Captum)
         - Grad-CAM saliency maps
         - Concept attribution heatmaps
+
+    IMPORTANT: For correct gradient-based attributions, input tensor MUST NOT have
+    passed through MelaninNormalization (cv2.equalizeHist is non-differentiable).
+    The inference pipeline (ui.py preprocess, server.py /api/diagnose) uses
+    inference_transform (Resize + Normalize only) which excludes MelaninNormalization.
+    Training uses dark_skin_aug which includes MelaninNormalization - this is fine
+    for training (no gradients through normalization needed), but XAI MUST use
+    tensors that have NOT passed through MelaninNormalization.
     """
 
     def __init__(self, model: DermatologyCBM, device: torch.device):

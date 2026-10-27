@@ -44,6 +44,7 @@ IMAGES_DIR = DATA_ROOT / "images"
 
 # PASSION class mapping to our 3-class schema
 # PASSION has 12 disease categories. Map them as follows:
+# ML FIX: Exclude BCC/SCC (malignant) from benign class - they are filtered out
 CLASS_MAPPING = {
     # Benign conditions
     "nevus": "benign",
@@ -55,13 +56,17 @@ CLASS_MAPPING = {
     "melanoma": "melanoma",
     # Kaposi sarcoma (if present in PASSION)
     "kaposi_sarcoma": "kaposi_sarcoma",
-    # Other mappings - adjust based on actual PASSION classes
-    "basal_cell_carcinoma": "benign",  # BCC is locally malignant but often grouped differently
-    "squamous_cell_carcinoma": "benign",  # SCC - adjust if you want separate class
+    # ML FIX: BCC and SCC are MALIGNANT - exclude from benign class
+    # These will be filtered out and logged (see standardize_metadata)
+    # "basal_cell_carcinoma": "benign",  # EXCLUDED - malignant
+    # "squamous_cell_carcinoma": "benign",  # EXCLUDED - malignant
     "actinic_keratosis": "benign",
     "eczema": "benign",
     "psoriasis": "benign",
 }
+
+# Classes to exclude (malignant but not melanoma/KS)
+EXCLUDED_CLASSES = {"basal_cell_carcinoma", "squamous_cell_carcinoma"}
 
 # ============================================================
 
@@ -155,7 +160,9 @@ def standardize_metadata(metadata_path: Path, output_path: Path):
     # Create standardized dataframe
     std_df = pd.DataFrame()
     std_df["image_id"] = df[id_col].astype(str)
-    std_df["label"] = df[label_col].map(CLASS_MAPPING)
+    # Map labels, keeping original for exclusion logic
+    std_df["_original_label"] = df[label_col].astype(str)
+    std_df["label"] = std_df["_original_label"].map(CLASS_MAPPING)
 
     # Handle Fitzpatrick
     if fitz_col and fitz_col in df.columns:
@@ -165,12 +172,19 @@ def standardize_metadata(metadata_path: Path, output_path: Path):
         print("WARNING: No Fitzpatrick column found. Using default type 3.")
         std_df["fitzpatrick_type"] = 3
 
-    # Check for unmapped labels
-    unmapped = std_df[std_df["label"].isna()]["label"].unique()
+    # Check for unmapped labels (excluding explicitly excluded classes)
+    unmapped = std_df[std_df["label"].isna()]["_original_label"].unique()
     if len(unmapped) > 0:
         print(f"WARNING: Unmapped labels (will be dropped): {unmapped}")
         print("Update CLASS_MAPPING in this script to include them.")
         std_df = std_df.dropna(subset=["label"])
+
+    # ML FIX: Exclude BCC/SCC (malignant) from benign class
+    excluded_mask = std_df["_original_label"].isin(EXCLUDED_CLASSES)
+    excluded_count = excluded_mask.sum()
+    if excluded_count > 0:
+        print(f"ML FIX: Excluding {excluded_count} samples with malignant labels {EXCLUDED_CLASSES} from benign class")
+        std_df = std_df[~excluded_mask].copy()
 
     # Ensure image files exist
     print("Verifying image files...")

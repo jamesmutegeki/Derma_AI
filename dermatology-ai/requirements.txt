@@ -15,3 +15,5 @@ fastapi                 # REST API for the new clinical dashboard
 uvicorn                 # ASGI server for the dashboard API
 python-multipart        # form data parsing for file uploads
 bcrypt                  # password hashing
+filetype                # magic bytes validation for file uploads
+slowapi                 # rate limiting for auth endpoints
