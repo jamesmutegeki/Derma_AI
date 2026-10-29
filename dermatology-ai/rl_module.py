@@ -2,11 +2,18 @@
 Equity-Driven Reinforcement Learning Agent (PPO) for dermatology triage.
 
 Components:
-    - DermTriageEnv: custom Gym-like environment.
-    - FairnessWeightedReward: penalises FN with dynamic multiplier for
-      Fitzpatrick IV-VI, eliminating the accuracy gap.
+    - DermTriageEnv: single-decision (contextual-bandit) environment.
+    - fairness_weighted_reward: penalises misses with a dynamic multiplier for
+      Fitzpatrick IV-VI.  This is an *explicit policy choice*, not a claim that
+      the accuracy gap disappears -- see MODEL_CARD.md.
     - PPONetwork: shared actor-critic architecture.
-    - PPOAgent: full PPO training loop with GAE, clipped surrogate, etc.
+    - PPOAgent: clipped-surrogate policy-gradient update.
+
+Scope note: every episode is one decision (``done=True`` always), so there is
+no temporal credit assignment.  The update below is the PPO clipped objective
+applied to a one-step advantage; gamma/lambda exist only for API compatibility
+and never change the result of a single-step update.  Documentation must not
+describe this as sequential RL or claim GAE-based credit assignment.
 """
 
 from __future__ import annotations
@@ -24,18 +31,26 @@ from torch.distributions import Categorical
 
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants (defined in ``constants.py`` so torch-free modules can import them)
 # ---------------------------------------------------------------------------
 
-FITZPATRICK_LABELS = ["I", "II", "III", "IV", "V", "VI"]
-NUM_FITZ_TYPES = len(FITZPATRICK_LABELS)
+from constants import (  # noqa: E402  (after the dataclass/typing imports above)
+    FITZPATRICK_LABELS,
+    NUM_FITZ_TYPES,
+    TRIAGE_NAMES,
+    TRUE_LABEL_NAMES,
+    TRUE_LABEL_TO_TRIAGE,
+)
 
 # Mapping from true label to the *correct* triage level
-#   0 = Routine (no follow-up)
-#   1 = Follow-up (schedule check-up)
-#   2 = Urgent (immediate referral / biopsy)
-TRUE_LABEL_TO_TRIAGE = {0: 0, 1: 2, 2: 2}  # benign -> routine, melanoma/KS -> urgent
-TRIAGE_NAMES = ["routine", "follow_up", "urgent"]
+#   0 = Routine, 1 = Follow-up (short-interval review), 2 = Urgent
+#   benign -> routine, melanoma -> urgent, kaposi_sarcoma -> urgent,
+#   atypical_lesion -> follow-up
+#
+# NOTE: ``atypical_lesion`` is a category of the *triage catalogue*; the
+# 3-class vision head cannot emit it.  It exists so that the middle action in
+# the action space has a clinically meaningful target (indeterminate lesions
+# that warrant short-interval review) instead of being unreachable.
 
 # Penalty multiplier for darker Fitzpatrick skin types
 FITZPATRICK_MULTIPLIER = {1: 1.0, 2: 1.0, 3: 1.0, 4: 2.0, 5: 3.0, 6: 4.0}
@@ -55,6 +70,9 @@ def fairness_weighted_reward(
 
     Returns:
         Scalar reward.
+
+    Every expected action in ``TRUE_LABEL_TO_TRIAGE`` (routine, follow-up and
+    urgent) is reachable; a correct follow-up scores 2.0.
     """
     expected_triage = TRUE_LABEL_TO_TRIAGE[true_label]
     multiplier = FITZPATRICK_MULTIPLIER.get(fitz_type, 1.0)
@@ -321,7 +339,7 @@ class PPOAgent:
             dones = torch.tensor(rollout.dones, dtype=torch.float32)
             values = torch.tensor(rollout.values, dtype=torch.float32)
 
-            advantages = self._compute_gae(rewards, dones, values)
+            advantages = self._compute_advantages(rewards, dones, values)
             returns = advantages + values
 
             all_states.append(states)
@@ -338,9 +356,15 @@ class PPOAgent:
             torch.cat(all_advantages),
         )
 
-    def _compute_gae(
+    def _compute_advantages(
         self, rewards: torch.Tensor, dones: torch.Tensor, values: torch.Tensor
     ) -> torch.Tensor:
+        """One-step advantage estimates.
+
+        Because episodes are single-decision, ``next_value`` is always zero and
+        the lambda term never accumulates; the result is ``r_t - V(s_t)``.
+        Kept in this shape so a multi-step environment could reuse it.
+        """
         advantages = []
         gae = 0.0
         for t in reversed(range(len(rewards))):
@@ -353,6 +377,9 @@ class PPOAgent:
             gae = delta + self.gamma * self.gae_lambda * (1.0 - dones[t]) * gae
             advantages.insert(0, gae)
         return torch.tensor(advantages, dtype=torch.float32)
+
+    # Backwards-compatible alias.
+    _compute_gae = _compute_advantages
 
     def save(self, path: str):
         torch.save({

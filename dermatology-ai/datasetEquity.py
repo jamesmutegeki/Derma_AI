@@ -1,17 +1,41 @@
-import pandas as pd
 import os
+from pathlib import Path
+
+import pandas as pd
 from PIL import Image
-import torch
 from torch.utils.data import Dataset
+
+
+REQUIRED_COLUMNS = ("image_id", "label", "fitzpatrick_type")
+CLASSES = {"benign": 0, "melanoma": 1, "kaposi_sarcoma": 2}
+
+
+def _load_metadata(csv_path, required=REQUIRED_COLUMNS) -> pd.DataFrame:
+    """Read a metadata CSV and fail with an actionable message on bad schemas."""
+    path = Path(csv_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Metadata CSV not found: {path}")
+    df = pd.read_csv(path)
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise ValueError(
+            f"{path} is missing required column(s) {missing}; found {list(df.columns)}. "
+            f"Expected at least {list(required)}."
+        )
+    if df.empty:
+        raise ValueError(f"{path} contains no rows")
+    return df
 
 
 class DermDataset(Dataset):
     def __init__(self, csv_path, img_dir, transform=None):
-        self.df = pd.read_csv(csv_path)
-        # CSV columns: image_id, label, fitzpatrick_type (1-6)
-        self.img_dir = img_dir
+        self.df = _load_metadata(csv_path)
+        self.img_dir = str(img_dir)
         self.transform = transform
-        self.classes = {'benign': 0, 'melanoma': 1, 'kaposi_sarcoma': 2}
+        self.classes = dict(CLASSES)
+        unknown = set(self.df["label"].unique()) - set(self.classes)
+        if unknown:
+            raise ValueError(f"Unknown labels {sorted(unknown)}; expected {sorted(self.classes)}")
 
     def __len__(self):
         return len(self.df)
@@ -47,7 +71,7 @@ class MultiSourceDermDataset(Dataset):
     }
 
     def __init__(self, csv_path, data_root, transform=None):
-        self.df = pd.read_csv(csv_path)
+        self.df = _load_metadata(csv_path)
         self.data_root = Path(data_root)
         self.transform = transform
         self.classes = {'benign': 0, 'melanoma': 1, 'kaposi_sarcoma': 2}
@@ -101,5 +125,3 @@ class MultiSourceDermDataset(Dataset):
 
         return img, label, fitz
 
-
-from pathlib import Path

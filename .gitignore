@@ -39,3 +39,12 @@ _verify_*
 # OS
 .DS_Store
 Thumbs.db
+
+# SQLite store and bootstrap credential (never commit patient data or secrets)
+dermatology-ai/data/
+derma.db
+derma.db-wal
+derma.db-shm
+INITIAL_ADMIN_PASSWORD.txt
+.pytest_cache/
+.ruff_cache/

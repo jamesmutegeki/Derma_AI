@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 
 from datasetEquity import DermDataset, MultiSourceDermDataset
 from model import NUM_CONCEPTS
-from samplesEquity import MelaninNormalization, dark_skin_aug
+from transforms import build_transform
 from rl_module import Case, DermTriageEnv, PPOAgent, Rollout, TRUE_LABEL_TO_TRIAGE, TRIAGE_NAMES
 
 # ---------------------------------------------------------------------------
@@ -230,42 +230,17 @@ def combine_datasets() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4) Transforms (PIL -> numpy -> albumentations -> tensor)
+# 4) Transforms -- single source of truth in ``transforms.py``
 # ---------------------------------------------------------------------------
+# Train and serve pipelines differ only in the random augmentations listed in
+# TRANSFORM_PARITY.md; MelaninNormalization and Normalize are applied in both.
 
-class PILToAug:
-    """Adapter: DermDataset hands us a PIL image; albumentations wants np arrays."""
-
-    def __init__(self, transform):
-        self.transform = transform
-
-    def __call__(self, pil_img):
-        out = self.transform(image=np.array(pil_img.convert("RGB")))
-        return out["image"]
-
-
-def build_transform(train: bool):
-    import albumentations as A
-    from albumentations.pytorch import ToTensorV2
-
-    # dark_skin_aug ends with ToTensorV2() -> strip it, keep the equity augs
-    base = [t for t in dark_skin_aug.transforms if not isinstance(t, ToTensorV2)]
-    if train:
-        steps = [MelaninNormalization()] + base + [
-            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            ToTensorV2(),
-        ]
-    else:
-        steps = [
-            A.Resize(IMG_SIZE, IMG_SIZE),
-            A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            ToTensorV2(),
-        ]
-    return PILToAug(A.Compose(steps))
+def pipeline(train: bool):
+    return build_transform("train" if train else "eval")
 
 
 def make_loader(csv_path: Path, batch_size: int, train: bool):
-    ds = MultiSourceDermDataset(str(csv_path), DATA_DIR, transform=build_transform(train))
+    ds = MultiSourceDermDataset(str(csv_path), DATA_DIR, transform=pipeline(train))
     sampler = None
     if train:
         counts = ds.df["label"].value_counts()
@@ -358,7 +333,7 @@ def build_cases(cbm, csv_path: Path, img_dir: Path, limit: int | None = None):
     meta = pd.read_csv(csv_path)
     if limit:
         meta = meta.sample(n=min(limit, len(meta)), random_state=TORCH_SEED)
-    ds = DermDataset(str(csv_path), str(img_dir), transform=build_transform(train=False))
+    ds = DermDataset(str(csv_path), str(img_dir), transform=pipeline(train=False))
     loader = torch.utils.data.DataLoader(ds, batch_size=32, num_workers=0)
     cases: list[Case] = []
     with torch.no_grad():
@@ -434,6 +409,8 @@ def _fairness_report(agent, cases, title: str) -> None:
                        if c.true_label in (1, 2) and agent.evaluate(env._build_state(c)) != 2) / n
         rows.append((fitz, n, acc, critical))
     print(f"\n[fair] == {title} ==")
+    print("  NOTE: synthetic cases generated from label-conditional ranges; "
+          "these numbers are NOT clinical or fairness evidence.")
     print("  Fitz  n     triage_acc  critical_miss")
     for fitz, n, acc, crit in rows:
         print(f"  {fitz:<4} {n:<5} {acc:<11.4f} {crit:.4f}")

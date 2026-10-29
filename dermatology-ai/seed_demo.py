@@ -1,13 +1,19 @@
-"""
-Comprehensive demo data seeder for Dermatology AI.
-Run: python seed_demo.py
+"""Demo data seeder (explicit opt-in; never run in production).
+
+Writes demo patients, clinicians and notes into the SQLite store.
+
+Credentials are **never** hard-coded: supply them explicitly, e.g.::
+
+    DEMO_ADMIN_PASSWORD='...' DEMO_DOCTOR_PASSWORD='...' python seed_demo.py
+
+Passwords must satisfy the same policy as the API (12+ characters, mixed case,
+digit, symbol).
 """
 
 from __future__ import annotations
 
 import json
 import uuid
-import bcrypt
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -20,8 +26,7 @@ DOCTOR_PERMISSIONS = [
 ]
 
 
-def _hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+from auth import hash_password as _hash_password  # noqa: E402  (shared hashing path)
 
 
 def _ts(days_ago: int = 0):
@@ -553,7 +558,7 @@ DOCTORS = {
         {
             "id": "admin-001",
             "username": "admin",
-            "password": _hash_password("admin123"),
+            "password": "",  # set at seed time from env, never in source
             "name": "System Administrator",
         },
     ],
@@ -561,7 +566,7 @@ DOCTORS = {
         {
             "id": "doc-james-doe",
             "username": "james.doe",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. James Doe",
             "email": "j.doe@hospital.org",
             "nin": "NIN-9876543210",
@@ -574,7 +579,7 @@ DOCTORS = {
         {
             "id": "doc-mercy-okonkwo",
             "username": "mercy.okonkwo",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. Mercy Okonkwo",
             "email": "m.okonkwo@hospital.org",
             "nin": "NIN-1234567890",
@@ -587,7 +592,7 @@ DOCTORS = {
         {
             "id": "doc-sarah-kimani",
             "username": "sarah.kimani",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. Sarah Kimani",
             "email": "s.kimani@hospital.org",
             "nin": "NIN-5678901234",
@@ -600,7 +605,7 @@ DOCTORS = {
         {
             "id": "doc-grace-wanjiku",
             "username": "grace.wanjiku",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. Grace Wanjiku",
             "email": "g.wanjiku@hospital.org",
             "nin": "NIN-3456789012",
@@ -613,7 +618,7 @@ DOCTORS = {
         {
             "id": "doc-peter-kamau",
             "username": "peter.kamau",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. Peter Kamau",
             "email": "p.kamau@hospital.org",
             "nin": "NIN-7890123456",
@@ -635,7 +640,7 @@ DOCTORS = {
         {
             "id": "doc-linda-nyambura",
             "username": "linda.nyambura",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. Linda Nyambura",
             "email": "l.nyambura@hospital.org",
             "nin": "NIN-9012345678",
@@ -657,7 +662,7 @@ DOCTORS = {
         {
             "id": "doc-inactive-john",
             "username": "john.mbugua",
-            "password": _hash_password("Doctor123!"),
+            "password": "",  # set at seed time from env, never in source
             "name": "Dr. John Mbugua",
             "email": "j.mbugua@hospital.org",
             "nin": "NIN-4567890123",
@@ -739,35 +744,103 @@ Plan: Shave biopsy scheduled. Results in 5-7 business days.""",
 #  SEED FUNCTION
 # =========================================================================
 
-def seed_all():
-    print("Seeding demo data for Dermatology AI...")
+def seed_demo_patients(store) -> int:
+    """Insert the fictional demo cohort, flagged ``simulated``.
 
-    # Patients
-    patients_path = HERE / "patients.json"
-    patients_path.write_text(json.dumps(PATIENTS, indent=2, default=str), encoding="utf-8")
-    print(f"  OK {len(PATIENTS)} patients written to patients.json")
+    Used by ``server.create_app`` when ``DEMO_MODE=1``.  Idempotent: an existing
+    database is left untouched.  No credentials are created here.
+    """
+    if store.count_patients():
+        return 0
+    written = 0
+    for patient in PATIENTS:
+        record = dict(patient)
+        record["simulated"] = True
+        try:
+            store.create_patient(record)
+            written += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ! skipped demo patient {patient.get('id')}: {exc}")
+    return written
 
-    # Doctors
-    doctors_path = HERE / "doctors.json"
-    doctors_path.write_text(json.dumps(DOCTORS, indent=2, default=str), encoding="utf-8")
-    print(f"  OK {len(DOCTORS['doctors'])} doctors + {len(DOCTORS['admins'])} admin written to doctors.json")
 
-    # Activity
-    activity_path = HERE / "activity.json"
-    activity_path.write_text(json.dumps(ACTIVITY, indent=2), encoding="utf-8")
-    print(f"  OK {len(ACTIVITY)} activity entries written to activity.json")
+def seed_all(data_dir=None, admin_password: str = "", doctor_password: str = "") -> int:
+    """Seed demo data into the SQLite store.  Returns the number of patients written."""
+    import os
+    from pathlib import Path as _Path
 
-    # Notes
-    notes_path = HERE / "notes.json"
-    notes_path.write_text(json.dumps(NOTES, indent=2), encoding="utf-8")
-    print(f"  OK {len(NOTES)} patient notes written to notes.json")
+    from storage import Store
 
-    print("\nDemo data seeded successfully!")
-    print("\nLogin credentials:")
-    print("  Admin:   username = admin     / password = admin123")
-    print("  Doctors: email   = <doctor email> / password = Doctor123!")
-    print("           e.g. j.doe@hospital.org / Doctor123!")
+    admin_password = admin_password or os.environ.get("DEMO_ADMIN_PASSWORD", "")
+    doctor_password = doctor_password or os.environ.get("DEMO_DOCTOR_PASSWORD", "")
+
+    for label, value in (("admin", admin_password), ("doctor", doctor_password)):
+        valid, message = _validate(value) if value else (False, "not provided")
+        if not valid:
+            raise SystemExit(
+                f"Refusing to seed: demo {label} password {message}. "
+                f"Set DEMO_{label.upper()}_PASSWORD to a 12+ character password with "
+                "upper, lower, digit and symbol."
+            )
+
+    target = _Path(data_dir) if data_dir else _Path(os.environ.get("DATA_DIR", _Path(__file__).parent / "data"))
+    store = Store(target)
+
+    written = 0
+    for patient in PATIENTS:
+        try:
+            store.create_patient(patient)
+            written += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ! skipped patient {patient.get('id')}: {exc}")
+
+    admin = dict(DOCTORS["admins"][0])
+    admin["password"] = _hash_password(admin_password)
+    admin["role"] = "admin"
+    admin.setdefault("email", "")
+    try:
+        store.create_user(admin)
+        print(f"  OK admin {admin['username']}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! admin not created: {exc}")
+
+    for doctor in DOCTORS["doctors"]:
+        record = dict(doctor)
+        record["password"] = _hash_password(doctor_password)
+        record["role"] = "doctor"
+        try:
+            store.create_user(record)
+            print(f"  OK doctor {record['username']}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ! doctor {record['username']} not created: {exc}")
+
+    store.set_kv("notes", NOTES)
+    for entry in ACTIVITY:
+        store.append_audit(
+            actor=entry.get("actor", "system"),
+            role="admin" if entry.get("level") == "admin" else "system",
+            action=entry.get("event", "event"),
+            detail="seeded demo activity",
+        )
+
+    print(f"\nSeeded {written} demo patients into {target / 'derma.db'}")
+    print("Passwords were taken from DEMO_ADMIN_PASSWORD / DEMO_DOCTOR_PASSWORD.")
+    print("Reminder: this is fictional demo data. Do not mix it with real patient records.")
+    return written
+
+
+def _validate(password: str):
+    from auth import validate_password
+
+    return validate_password(password) if password else (False, "not provided")
 
 
 if __name__ == "__main__":
-    seed_all()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Seed demo data (explicit opt-in)")
+    parser.add_argument("--data-dir", default=None)
+    parser.add_argument("--admin-password", default="")
+    parser.add_argument("--doctor-password", default="")
+    args = parser.parse_args()
+    seed_all(args.data_dir, args.admin_password, args.doctor_password)

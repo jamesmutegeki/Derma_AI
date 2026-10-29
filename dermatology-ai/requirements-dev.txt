@@ -1,0 +1,7 @@
+# Test and analysis dependencies (not required to run the server).
+-r requirements.txt
+
+pytest==9.2.0
+pytest-cov==7.1.0
+httpx==0.28.1        # fastapi.testclient
+ruff==0.17.3

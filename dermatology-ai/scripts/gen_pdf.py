@@ -261,7 +261,7 @@ stack_data = [
     ["RLHF", "PPO (stable-baselines3) with concept-level reward model", "Proven algorithm; concept rewards align with clinician mental model"],
     ["Fairness Monitor", "Custom streaming metrics (TPR/FPR parity, calibration curves)", "Real-time; no batch recomputation needed"],
     ["Data Quality", "pHash (imagehash) + CLIP-based OOD detector + Fitzpatrick CNN", "Fast duplicate detection; semantic OOD; skin-tone estimation"],
-    ["Database", "PostgreSQL (Supabase) + pgvector for embeddings", "Managed; vector search for similar cases; HIPAA-ready"],
+    ["Database", "PostgreSQL (Supabase) + pgvector for embeddings", "Managed; vector search for similar cases. Not a covered entity; no BAA offered"],
     ["Auth", "Supabase Auth (OIDC) + role-based access (clinician/admin/researcher)", "Standards-compliant; granular permissions"],
     ["Telemetry", "OpenTelemetry \u2192 Grafana Cloud / self-hosted Prometheus", "Vendor-neutral; dashboards for UCI/Mbarara"],
     ["CI/CD", "GitHub Actions \u2192 Docker \u2192 Fly.io / Railway / self-hosted K8s", "GitOps; zero-downtime deploys; rollback on fairness alert"],
@@ -398,7 +398,7 @@ story.append(Paragraph(
 questions = [
     ("Data Governance", [
         "Who owns the Ugandan clinical images and derived models? (Recommendation: UCI/Mbarara retain data sovereignty; model weights open-sourced under Apache-2 with data-use restriction)",
-        "What de-identification standard? (Recommendation: HIPAA Safe Harbor + facial/landmark removal via segmentation)",
+        "What de-identification standard? (Recommendation: a published safe-harbour rule + facial/landmark removal via segmentation)",
         "Can de-identified data leave Uganda? (Recommendation: No \u2014 training runs on-prem or in Uganda-hosted cloud)",
     ]),
     ("Clinical Workflow", [

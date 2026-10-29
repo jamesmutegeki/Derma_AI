@@ -5,8 +5,15 @@ Provides:
     - ClinicianOverride: dataclass for a single manual override.
     - HITLPipeline: orchestrates daily clinician overrides and feeds corrections
       into the PPO agent via offline policy optimisation.
-    - OfflinePolicyOptimizer: uses clinician corrections as ground-truth
-      reward signals to update the PPO policy.
+    - OfflinePolicyOptimizer: uses clinician corrections as reward signals for a
+      one-step policy update.
+
+Scope note: because every episode is a single decision, this is a contextual
+bandit update, not off-policy evaluation of a sequential policy.  It uses the
+clinician's action with the fairness-weighted reward as an on-policy-style
+signal; it does **not** implement importance weighting or doubly-robust
+estimation.  Do not describe it as "offline RL" in publications without that
+qualification.
 """
 
 from __future__ import annotations
@@ -147,9 +154,7 @@ class OfflinePolicyOptimizer:
         self.ppo_agent = ppo_agent
         self.num_epochs = num_epochs
         self.batch_size = batch_size
-
-        for param_group in self.ppo_agent.optimizer.param_groups:
-            param_group["lr"] = learning_rate
+        self.learning_rate = learning_rate
 
     def optimise(self, overrides: List[ClinicianOverride]) -> dict:
         """Run offline PPO update from clinician correction data.
@@ -166,11 +171,20 @@ class OfflinePolicyOptimizer:
             return {}
 
         rollouts = self._overrides_to_rollouts(overrides)
-        metrics = self.ppo_agent.update(
-            rollouts,
-            epochs=self.num_epochs,
-            batch_size=min(self.batch_size, len(overrides)),
-        )
+        # Apply the offline learning rate for this update only, then restore it so
+        # we do not silently change the shared PPO optimiser for other callers.
+        previous = [group["lr"] for group in self.ppo_agent.optimizer.param_groups]
+        for group in self.ppo_agent.optimizer.param_groups:
+            group["lr"] = self.learning_rate
+        try:
+            metrics = self.ppo_agent.update(
+                rollouts,
+                epochs=self.num_epochs,
+                batch_size=min(self.batch_size, len(overrides)),
+            )
+        finally:
+            for group, lr in zip(self.ppo_agent.optimizer.param_groups, previous):
+                group["lr"] = lr
         logger.info("Offline policy update complete: %s", metrics)
         return metrics
 
@@ -189,7 +203,6 @@ class OfflinePolicyOptimizer:
                 ov.fitz_type,
             )
 
-            import torch
             state_t = torch.FloatTensor(state).to(self.ppo_agent.device).unsqueeze(0)
             action_t = torch.LongTensor([ov.clinician_action]).to(self.ppo_agent.device)
             with torch.no_grad():

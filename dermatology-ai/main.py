@@ -1,34 +1,39 @@
-"""
-Integrated demo + Gradio UI launcher for the Dermatology AI HITL system.
+"""Launcher for the Dermatology AI system.
 
-Usage:
-    python main.py                  # headless demo (CLI)
-    python main.py --ui             # launch Gradio web UI
-    python main.py --ui --share     # launch with public Gradio link
+Usage::
+
+    python main.py                  # FastAPI dashboard (default)
+    python main.py --demo           # synthetic end-to-end pipeline demo (no persistence)
+    python main.py --ui             # legacy Gradio researcher UI (needs checkpoints)
+
+``--demo`` is the only mode that generates synthetic cases.  It prints results to
+stdout and never writes to the database or the API.
 """
+
+from __future__ import annotations
 
 import argparse
 import logging
 import os
 import random
 import sys
+from pathlib import Path
 from typing import List
 
 import numpy as np
 
 try:
     import torch
-    _TORCH_AVAILABLE = True
-except ImportError:
-    _TORCH_AVAILABLE = False
-    torch = None
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-)
+    _TORCH_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
+    _TORCH_AVAILABLE = False
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
+APP_DIR = Path(__file__).resolve().parent
 NUM_CONCEPTS = 7
 NUM_CLASSES = 3
 NUM_FITZ_TYPES = 6
@@ -40,269 +45,193 @@ else:
 
 
 # ---------------------------------------------------------------------------
-#  Synthetic data generation
+#  Synthetic demo data (demo mode only)
 # ---------------------------------------------------------------------------
 
-def generate_mock_cases(num_cases: int = 500) -> List:
+def generate_synthetic_cases(num_cases: int = 500, seed: int = 0) -> List:
+    """Create synthetic triage cases for the pipeline demo.
+
+    These are **not** evaluation data: the concept vectors are drawn from
+    label-conditional ranges, so a model evaluated on them measures nothing.
+    """
+    from constants import TRUE_LABEL_NAMES
     from rl_module import Case
-    cases = []
+
+    rng = random.Random(seed)
     fitz_weights = [1, 1, 1, 3, 4, 4]
-    for i in range(num_cases):
-        true_label = random.choices([0, 1, 2], weights=[0.6, 0.25, 0.15])[0]
-        fitz_type = random.choices(range(1, 7), weights=fitz_weights)[0]
-        if true_label == 0:
-            concept = np.array([random.uniform(0, 0.3), random.uniform(0, 0.3), random.uniform(0, 0.3), random.uniform(0, 0.4), random.uniform(0.4, 0.7), random.uniform(0, 0.2), random.uniform(0, 0.1)])
-        elif true_label == 1:
-            concept = np.array([random.uniform(0.7, 1.0), random.uniform(0.6, 1.0), random.uniform(0.5, 1.0), random.uniform(0.7, 1.0), random.uniform(0.1, 0.4), random.uniform(0.3, 0.7), random.uniform(0.2, 0.6)])
-        else:
-            concept = np.array([random.uniform(0.3, 0.6), random.uniform(0.3, 0.6), random.uniform(0.4, 0.8), random.uniform(0.3, 0.6), random.uniform(0.6, 0.9), random.uniform(0.4, 0.7), random.uniform(0.5, 0.9)])
-        cases.append(Case(concept_embedding=concept, fitz_type=fitz_type, true_label=true_label, patient_id=f"PAT-{i:04d}"))
+    label_weights = [0.55, 0.2, 0.1, 0.15]  # includes atypical_lesion -> follow_up
+    ranges = {
+        0: [(0.0, 0.3), (0.0, 0.3), (0.0, 0.3), (0.0, 0.4), (0.4, 0.7), (0.0, 0.2), (0.0, 0.1)],
+        1: [(0.7, 1.0), (0.6, 1.0), (0.5, 1.0), (0.7, 1.0), (0.1, 0.4), (0.3, 0.7), (0.2, 0.6)],
+        2: [(0.3, 0.6), (0.3, 0.6), (0.4, 0.8), (0.3, 0.6), (0.6, 0.9), (0.4, 0.7), (0.5, 0.9)],
+        3: [(0.4, 0.7), (0.4, 0.7), (0.3, 0.6), (0.2, 0.5), (0.3, 0.6), (0.1, 0.4), (0.0, 0.3)],
+    }
+    cases = []
+    for index in range(num_cases):
+        true_label = rng.choices(range(len(TRUE_LABEL_NAMES)), weights=label_weights)[0]
+        fitz = rng.choices(range(1, 7), weights=fitz_weights)[0]
+        concept = np.array([rng.uniform(low, high) for low, high in ranges[true_label]], dtype=np.float32)
+        cases.append(Case(
+            concept_embedding=concept,
+            fitz_type=fitz,
+            true_label=true_label,
+            patient_id=f"SYN-{index:04d}",
+        ))
     return cases
 
 
 # ---------------------------------------------------------------------------
-#  PPO training
+#  Dashboard
 # ---------------------------------------------------------------------------
 
-def train_ppo_agent(agent, env, cases, num_episodes: int = 2000, update_interval: int = 64):
-    from rl_module import Rollout
+def run_dashboard(port: int = 7860, reload: bool = False) -> None:
+    import uvicorn
+
+    from server import create_app
+
+    app = create_app()
+    logger.info("Starting dashboard on 0.0.0.0:%s", port)
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=reload)
+
+
+# ---------------------------------------------------------------------------
+#  Legacy Gradio UI
+# ---------------------------------------------------------------------------
+
+def _load_checkpoint_state(path: str) -> dict:
+    if not path:
+        raise SystemExit(
+            "MODEL_CHECKPOINT_PATH is not set. This UI will not run without real weights "
+            "(it previously served predictions from a randomly initialised head)."
+        )
+    if not Path(path).is_file():
+        raise SystemExit(f"Checkpoint not found: {path}")
+    return torch.load(path, map_location="cpu", weights_only=True)
+
+
+def run_ui(share: bool = False) -> None:
+    if not _TORCH_AVAILABLE:
+        raise SystemExit("PyTorch is required for the Gradio UI.")
+
+    from backend import file_sha256
+    from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
+    from metrics_tracker import FairnessTracker
+    from model import DermatologyCBM
+    from rl_module import PPOAgent
+    from storage import Store
+    from ui import AppState, create_ui
+
+    model_path = os.environ.get("MODEL_CHECKPOINT_PATH", "")
+    state_dict = _load_checkpoint_state(model_path)
+    num_classes = int(state_dict["classifier.weight"].shape[0])
+    model = DermatologyCBM(num_classes=num_classes, num_concepts=NUM_CONCEPTS,
+                           hrnet_name="hrnet_w18", pretrained_backbone=False)
+    model.load_state_dict(state_dict, strict=True)
+    model.eval().to(DEVICE)
+
+    agent = None
+    hitl = None
+    optimizer = None
+    agent_path = os.environ.get("AGENT_CHECKPOINT_PATH", "")
+    if agent_path and Path(agent_path).is_file():
+        agent = PPOAgent(state_dim=NUM_CONCEPTS + NUM_FITZ_TYPES, action_dim=3, device=DEVICE)
+        agent.load(agent_path)
+        hitl = HITLPipeline(agent, num_concepts=NUM_CONCEPTS)
+        optimizer = OfflinePolicyOptimizer(agent, learning_rate=5e-5)
+
+    data_dir = Path(os.environ.get("DATA_DIR", APP_DIR / "data"))
+    store = Store(data_dir)
+    tracker = FairnessTracker(store, export_path=str(data_dir / "case_history.csv"))
+
+    app_state = AppState(
+        model=model,
+        ppo_agent=agent,
+        hitl=hitl,
+        offline_optimizer=optimizer,
+        tracker=tracker,
+        device=DEVICE,
+        model_version=f"{Path(model_path).name}@{file_sha256(model_path)[:12]}",
+        weights_sha256=file_sha256(model_path),
+    )
+    create_ui(app_state).launch(share=share, server_name="0.0.0.0", server_port=7860)
+
+
+# ---------------------------------------------------------------------------
+#  Synthetic pipeline demo
+# ---------------------------------------------------------------------------
+
+def run_demo(episodes: int = 500) -> None:
+    """Train/inspect the Triage policy on synthetic cases and print metrics.
+
+    Explicitly labelled synthetic: nothing here is evidence of clinical or
+    fairness performance.
+    """
+    if not _TORCH_AVAILABLE:
+        raise SystemExit("PyTorch is required for --demo.")
+
+    from constants import TRUE_LABEL_NAMES, TRUE_LABEL_TO_TRIAGE
+    from rl_module import DermTriageEnv, PPOAgent, Rollout
+
+    logger.info("=" * 64)
+    logger.info("SYNTHETIC DEMO — not evaluation data, not clinical evidence")
+    logger.info("=" * 64)
+
+    cases = generate_synthetic_cases(num_cases=500)
+    env = DermTriageEnv(num_concepts=NUM_CONCEPTS)
     env.seed(cases)
-    rollouts = []
-    episode_rewards = []
-    for episode in range(1, num_episodes + 1):
+    agent = PPOAgent(state_dim=NUM_CONCEPTS + NUM_FITZ_TYPES, action_dim=3, device=DEVICE)
+
+    rollouts: list[Rollout] = []
+    for episode in range(1, episodes + 1):
         state = env.reset()
-        done = False
-        ep_reward = 0.0
-        while not done:
-            action, log_prob, value = agent.select_action(state)
-            next_state, reward, done, info = env.step(action)
-            rollouts.append(Rollout(states=[state], actions=[action], rewards=[reward], dones=[done], log_probs=[log_prob], values=[value]))
-            state = next_state
-            ep_reward += reward
-        episode_rewards.append(ep_reward)
-        if episode % update_interval == 0 and rollouts:
+        action, log_prob, value = agent.select_action(state)
+        _, reward, _, _ = env.step(action)
+        rollouts.append(Rollout(states=[state], actions=[action], rewards=[reward],
+                                dones=[True], log_probs=[log_prob], values=[value]))
+        if episode % 64 == 0:
             metrics = agent.update(rollouts)
-            avg_reward = np.mean(episode_rewards[-update_interval:])
-            logger.info("Episode %5d | Avg Reward %6.2f | Policy loss %.4f | Value loss %.4f", episode, avg_reward, metrics.get("policy_loss", 0.0), metrics.get("value_loss", 0.0))
+            logger.info("episode %4d | policy_loss %.4f | value_loss %.4f",
+                        episode, metrics["policy_loss"], metrics["value_loss"])
             rollouts = []
-    return agent
 
-
-def compute_fairness_metrics(agent, cases: List) -> dict:
-    from rl_module import TRUE_LABEL_TO_TRIAGE
-    metrics = {}
+    logger.info("Triage action distribution by Fitzpatrick type (synthetic):")
     for fitz in range(1, 7):
         subset = [c for c in cases if c.fitz_type == fitz]
         if not subset:
             continue
-        correct = sum(1 for c in subset if agent.evaluate(np.concatenate([c.concept_embedding.astype(np.float32), np.eye(6, dtype=np.float32)[c.fitz_type - 1]])) == TRUE_LABEL_TO_TRIAGE[c.true_label])
-        metrics[f"Fitz_{fitz}"] = round(correct / len(subset), 4)
-    return metrics
-
-
-# ---------------------------------------------------------------------------
-#  Seed the fairness tracker with benchmark data for the UI dashboard
-# ---------------------------------------------------------------------------
-
-def seed_tracker(agent, cases: List, tracker, hitl):
-    from rl_module import TRUE_LABEL_TO_TRIAGE
-    from metrics_tracker import CaseRecord
-    for case in cases:
-        state = np.concatenate([case.concept_embedding.astype(np.float32), np.eye(6, dtype=np.float32)[case.fitz_type - 1]])
-        model_action = agent.evaluate(state)
-        expected = TRUE_LABEL_TO_TRIAGE[case.true_label]
-
-        record = CaseRecord(
-            case_id=case.patient_id,
-            fitz_type=case.fitz_type,
-            true_label=case.true_label,
-            model_triage=model_action,
-            is_override=False,
+        states = [env._build_state(c) for c in subset]
+        actions = [agent.evaluate(s) for s in states]
+        correct = sum(
+            1 for c, a in zip(subset, actions) if TRUE_LABEL_TO_TRIAGE[c.true_label] == a
         )
-        tracker.register_case(record)
+        logger.info("  Fitz %s | n=%3d | agreement with catalogue %5.1f%% | actions %s",
+                    fitz, len(subset), 100 * correct / len(subset),
+                    {name: actions.count(i) for i, name in enumerate(["routine", "follow_up", "urgent"])})
 
-        model_action_p, override = hitl.process_case(
-            patient_id=case.patient_id,
-            concept_embed=case.concept_embedding,
-            fitz_type=case.fitz_type,
-            true_label=case.true_label,
-            clinician_action=None,
-        )
-
-    # Inject a few overrides to show on the dashboard
-    for i, case in enumerate(cases[:int(len(cases) * 0.12)]):
-        expected = TRUE_LABEL_TO_TRIAGE[case.true_label]
-        if random.random() < 0.5:
-            override_action = expected
-        else:
-            override_action = random.choice([a for a in range(3) if a != expected])
-        hitl.process_case(
-            patient_id=case.patient_id,
-            concept_embed=case.concept_embedding,
-            fitz_type=case.fitz_type,
-            true_label=case.true_label,
-            clinician_action=override_action,
-        )
-        tracker.register_override(case.patient_id, override_action)
-
-    tracker.snapshot("initial_benchmark")
-    logger.info("Seeded tracker with %d cases + overrides", len(cases))
+    logger.info("Catalogue: %s", TRUE_LABEL_NAMES)
+    logger.info("Reminder: these cases are generated from label-conditional ranges.")
 
 
 # ---------------------------------------------------------------------------
-#  Headless demo (CLI)
-# ---------------------------------------------------------------------------
 
-def run_headless():
-    if not _TORCH_AVAILABLE:
-        logger.error("PyTorch is required for headless mode. pip install torch")
-        sys.exit(1)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Dermatology AI launcher")
+    parser.add_argument("--dashboard", action="store_true", help="run the FastAPI dashboard (default)")
+    parser.add_argument("--ui", action="store_true", help="run the legacy Gradio UI")
+    parser.add_argument("--share", action="store_true", help="public Gradio link (implies --ui)")
+    parser.add_argument("--demo", action="store_true", help="run the synthetic pipeline demo")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 7860)))
+    parser.add_argument("--reload", action="store_true")
+    parser.add_argument("--episodes", type=int, default=500)
+    args = parser.parse_args()
 
-    from model import DermatologyCBM, XAIExplainer
-    from rl_module import PPOAgent, DermTriageEnv, TRUE_LABEL_TO_TRIAGE
-    from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
-
-    logger.info("=" * 60)
-    logger.info("Dermatology AI — Headless Integration Demo")
-    logger.info("Device: %s", DEVICE)
-    logger.info("=" * 60)
-
-    cases = generate_mock_cases(num_cases=500)
-    logger.info("[1] %d cases generated", len(cases))
-
-    logger.info("[2] Initialising HRNet-CBM model...")
-    model = DermatologyCBM(num_classes=NUM_CLASSES, num_concepts=NUM_CONCEPTS, hrnet_name="hrnet_w18", pretrained_backbone=True, freeze_backbone=False).to(DEVICE)
-    logger.info("    Parameters: %.2fM", sum(p.numel() for p in model.parameters()) / 1e6)
-
-    logger.info("[3] XAI clinical audit...")
-    model.eval()
-    dummy = torch.randn(1, 3, 224, 224, requires_grad=True).to(DEVICE)
-    explainer = XAIExplainer(model, DEVICE)
-    cam = explainer.grad_cam(dummy)
-    logger.info("    Grad-CAM: %s, [%.4f, %.4f]", cam.shape, cam.min(), cam.max())
-    concepts = explainer.concept_attribution(dummy)
-    logger.info("    Concepts: %s", concepts)
-    explainer.cleanup()
-
-    logger.info("[4] Training PPO agent...")
-    state_dim = NUM_CONCEPTS + NUM_FITZ_TYPES
-    agent = PPOAgent(state_dim=state_dim, action_dim=3, lr=3e-4, device=DEVICE)
-    env = DermTriageEnv(num_concepts=NUM_CONCEPTS)
-    agent = train_ppo_agent(agent, env, cases, num_episodes=2000)
-
-    logger.info("    Fairness audit:")
-    fm = compute_fairness_metrics(agent, cases)
-    for k, v in fm.items():
-        logger.info("      %s: %.2f%%", k, v * 100)
-    low = [v for k, v in fm.items() if int(k.split("_")[1]) <= 3]
-    high = [v for k, v in fm.items() if int(k.split("_")[1]) >= 4]
-    if low and high:
-        logger.info("    Accuracy gap (I-III vs IV-VI): %.2f%%", (np.mean(low) - np.mean(high)) * 100)
-
-    logger.info("[5] HITL workflow + offline update...")
-    hitl = HITLPipeline(agent)
-    optimizer = OfflinePolicyOptimizer(agent, learning_rate=5e-5)
-    random.shuffle(cases)
-    num_override = max(1, int(len(cases) * 0.2))
-    for i, case in enumerate(cases[:num_override]):
-        clinician_action = TRUE_LABEL_TO_TRIAGE[case.true_label]
-        hitl.process_case(
-            patient_id=case.patient_id,
-            concept_embed=case.concept_embedding,
-            fitz_type=case.fitz_type,
-            true_label=case.true_label,
-            clinician_action=clinician_action,
-        )
-    logger.info("    Corrections in buffer: %d", len(hitl.correction_buffer))
-    if hitl.correction_buffer:
-        metrics = optimizer.optimise(hitl.correction_buffer)
-        if metrics:
-            logger.info("    Offline update: %s", metrics)
-
-    logger.info("=" * 60)
-    logger.info("Headless demo complete.")
-    logger.info("=" * 60)
-
-
-# ---------------------------------------------------------------------------
-#  Gradio UI launcher
-# ---------------------------------------------------------------------------
-
-def run_ui(share: bool = False):
-    if not _TORCH_AVAILABLE:
-        logger.error("PyTorch is required for Gradio UI mode. pip install torch")
-        sys.exit(1)
-
-    from model import DermatologyCBM
-    from rl_module import PPOAgent, DermTriageEnv
-    from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
-    from metrics_tracker import FairnessTracker
-
-    logger.info("=" * 60)
-    logger.info("Dermatology AI — Launching Gradio UI")
-    logger.info("Device: %s", DEVICE)
-    logger.info("=" * 60)
-
-    logger.info("Initialising HRNet-CBM model...")
-    model = DermatologyCBM(num_classes=NUM_CLASSES, num_concepts=NUM_CONCEPTS, hrnet_name="hrnet_w18", pretrained_backbone=True, freeze_backbone=False).to(DEVICE)
-    model.eval()
-
-    logger.info("Initialising PPO agent...")
-    state_dim = NUM_CONCEPTS + NUM_FITZ_TYPES
-    agent = PPOAgent(state_dim=state_dim, action_dim=3, lr=3e-4, device=DEVICE)
-    cases = generate_mock_cases(num_cases=500)
-    env = DermTriageEnv(num_concepts=NUM_CONCEPTS)
-    agent = train_ppo_agent(agent, env, cases, num_episodes=2000)
-
-    logger.info("Initialising HITL pipeline...")
-    hitl = HITLPipeline(agent, num_concepts=NUM_CONCEPTS)
-    optimizer = OfflinePolicyOptimizer(agent, learning_rate=5e-5)
-
-    logger.info("Initialising fairness tracker...")
-    tracker = FairnessTracker(persist_path="case_history.json")
-    seed_tracker(agent, cases, tracker, hitl)
-
-    logger.info("Building Gradio interface...")
-    from ui import create_ui, AppState
-    app_state = AppState(model=model, ppo_agent=agent, hitl=hitl, offline_optimizer=optimizer, tracker=tracker, device=DEVICE)
-
-    demo = create_ui(app_state)
-
-    logger.info("Launching UI at http://127.0.0.1:7860")
-    demo.launch(share=share, server_name="0.0.0.0", server_port=7860)
-
-
-# ---------------------------------------------------------------------------
-#  Entry point
-# ---------------------------------------------------------------------------
-
-def run_dashboard(port: int = 7860, reload: bool = False):
-    """Launch the new HTML/CSS dashboard via FastAPI."""
-    try:
-        from server import create_app
-
-        app = create_app()
-        import uvicorn
-
-        logger.info("Starting Dermatology AI Dashboard on 0.0.0.0:%s", port)
-        uvicorn.run(app, host="0.0.0.0", port=port, reload=reload)
-    except Exception as e:
-        logger.error("Cannot start dashboard server: %s", e)
-        logger.error("Install required packages: pip install fastapi uvicorn")
-        sys.exit(1)
+    if args.demo:
+        run_demo(episodes=args.episodes)
+    elif args.ui or args.share:
+        run_ui(share=args.share)
+    else:
+        run_dashboard(port=args.port, reload=args.reload)
 
 
 if __name__ == "__main__":
-    env_port = int(os.environ.get("PORT", 0))
-    parser = argparse.ArgumentParser(description="Dermatology AI — HITL System")
-    parser.add_argument("--ui", action="store_true", help="Launch Gradio web UI instead of headless demo")
-    parser.add_argument("--share", action="store_true", help="Generate a public Gradio share link (implies --ui)")
-    parser.add_argument("--dashboard", action="store_true", help="Launch the redesigned clinical dashboard")
-    parser.add_argument("--port", type=int, default=env_port or 7860, help="Dashboard server port (default: 7860 or $PORT)")
-    parser.add_argument("--reload", action="store_true", help="Auto-reload dashboard server on file changes")
-    args = parser.parse_args()
-
-    if args.dashboard or (not args.ui and not args.share):
-        run_dashboard(port=args.port, reload=args.reload)
-    elif args.ui or args.share:
-        run_ui(share=args.share)
+    main()

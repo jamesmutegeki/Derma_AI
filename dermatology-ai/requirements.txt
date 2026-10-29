@@ -1,19 +1,39 @@
-torch>=2.1
-torchvision
-timm                    # pretrained vision models incl. HRNet
-albumentations          # image augmentation
-captum                  # PyTorch-native XAI (Integrated Gradients)
-scikit-learn
-pandas
-numpy
-pillow
-matplotlib
-plotly                  # interactive charts for analytics dashboard
-gradio>=6.0             # doctor-facing web UI (legacy)
-opencv-python           # melanin normalisation in samplesEquity
-fastapi                 # REST API for the new clinical dashboard
-uvicorn                 # ASGI server for the dashboard API
-python-multipart        # form data parsing for file uploads
-bcrypt                  # password hashing
-filetype                # magic bytes validation for file uploads
-slowapi                 # rate limiting for auth endpoints
+# Runtime dependencies for the Derma-AI clinical dashboard, API and training code.
+#
+# Pinned to the versions this repository was verified against on 2026-10-30
+# (Python 3.11).  The previous file was unpinned and omitted uvicorn, requests
+# and pytest, so a fresh clone could not run the server or the tests.
+#
+# Install:            pip install -r requirements.txt
+# Install + tests:    pip install -r requirements.txt -r requirements-dev.txt
+
+# --- deep learning -----------------------------------------------------------
+torch==2.15.0
+torchvision==0.29.2
+timm==1.0.30                 # HRNet / ConvNeXt backbones
+captum==0.9.0                # Integrated Gradients / Grad-CAM
+
+# --- imaging -----------------------------------------------------------------
+albumentations==2.0.8        # preprocessing + augmentation (transforms.py)
+opencv-python-headless==5.0.0.93   # MelaninNormalization (samplesEquity.py); headless so servers need no GL
+pillow==13.0.0
+numpy==2.4.6
+
+# --- data / metrics ----------------------------------------------------------
+pandas==3.1.0
+scikit-learn==1.9.1
+matplotlib==3.11.2
+
+# --- API ---------------------------------------------------------------------
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+pydantic==2.14.2
+bcrypt==5.0.0                # password hashing
+filetype==1.2.0              # magic-byte validation for uploads
+slowapi==0.1.10              # per-IP rate limiting
+
+# --- optional ----------------------------------------------------------------
+# gradio                     # legacy researcher UI only (`python main.py --ui`)
+# plotly                     # unused by the dashboard (charts are hand-built SVG/CSS)
+# requests                   # only used by scripts/download_passion.py

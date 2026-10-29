@@ -1,49 +1,62 @@
-"""
-Gradio-based Doctor UI for the Dermatology AI HITL system.
+"""Legacy Gradio clinician UI (optional; the FastAPI dashboard is the main app).
 
-Four tabs:
-    1. Diagnosis       — upload image, view Grad-CAM + concepts + triage + override
-    2. Analytics       — fairness metrics dashboard (accuracy gap, FN rates, etc.)
-    3. Patient History — browse/search past cases and overrides
-    4. System Settings — trigger offline policy updates, export data
+Launch with ``python main.py --ui``.  Requires a real checkpoint: the UI will
+refuse to start without ``MODEL_CHECKPOINT_PATH`` rather than show random
+predictions.
 """
 
 from __future__ import annotations
 
-import io
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-import gradio as gr
 import numpy as np
 import pandas as pd
 import torch
 from PIL import Image as PILImage
 
+try:  # optional dependency: the Gradio UI is not needed for the API/dashboard
+    import gradio as gr
+except ImportError:  # pragma: no cover - exercised only without gradio installed
+    gr = None  # type: ignore[assignment]
+
+from constants import FITZPATRICK_LABELS, TRIAGE_NAMES, TRUE_LABEL_NAMES
 from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
-from metrics_tracker import FairnessTracker, CaseRecord
+from metrics_tracker import CaseRecord, FairnessTracker
 from model import CONCEPT_NAMES, DermatologyCBM, XAIExplainer
-from rl_module import FITZPATRICK_LABELS, PPOAgent, TRIAGE_NAMES, TRUE_LABEL_TO_TRIAGE
-from samplesEquity import inference_transform
+from rl_module import PPOAgent
+from transforms import build_transform
 
 logger = logging.getLogger(__name__)
 
 TRIAGE_COLORS = {"routine": "#4CAF50", "follow_up": "#FF9800", "urgent": "#e74c3c"}
 
+# Built on first use, not at import time: importing this module must not require
+# albumentations/torchvision to be present.
+_EVAL_TRANSFORM: Optional[object] = None
+
+
+def eval_transform():
+    global _EVAL_TRANSFORM
+    if _EVAL_TRANSFORM is None:
+        _EVAL_TRANSFORM = build_transform("eval")
+    return _EVAL_TRANSFORM
+
 
 class AppState:
-    """Singleton holding all model / agent / pipeline references for the UI."""
+    """Holds the model, agent and pipelines for the Gradio app."""
 
     def __init__(
         self,
         model: DermatologyCBM,
-        ppo_agent: PPOAgent,
-        hitl: HITLPipeline,
-        offline_optimizer: OfflinePolicyOptimizer,
+        ppo_agent: Optional[PPOAgent],
+        hitl: Optional[HITLPipeline],
+        offline_optimizer: Optional[OfflinePolicyOptimizer],
         tracker: FairnessTracker,
         device: torch.device,
+        model_version: str = "",
+        weights_sha256: str = "",
     ):
         self.model = model
         self.ppo_agent = ppo_agent
@@ -51,6 +64,8 @@ class AppState:
         self.optimizer = offline_optimizer
         self.tracker = tracker
         self.device = device
+        self.model_version = model_version
+        self.weights_sha256 = weights_sha256
         self._xai = None
         self._case_counter = 0
 
@@ -65,21 +80,22 @@ class AppState:
         return f"UI-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{self._case_counter:04d}"
 
 
-# ====================================================================
-#  Image preprocessing
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  Preprocessing
+# ---------------------------------------------------------------------------
 
-# ML FIX: Use deterministic inference transform (no random augmentations)
 def preprocess(image: np.ndarray, device: torch.device) -> torch.Tensor:
-    img_pil = PILImage.fromarray(image).convert("RGB")
-    # Apply deterministic inference transform
-    augmented = inference_transform(image=np.array(img_pil))
-    return augmented["image"].unsqueeze(0).to(device)
+    """Deterministic, train-parity preprocessing (see TRANSFORM_PARITY.md)."""
+    pil = PILImage.fromarray(image).convert("RGB")
+    return eval_transform()(pil).unsqueeze(0).to(device)
 
 
-# ====================================================================
-#  Tab 1 – Diagnosis
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  Tab 1 - Diagnosis
+# ---------------------------------------------------------------------------
+
+EMPTY_DIAGNOSIS_OUTPUTS = (None, "Public. Upload an image.", "", "", {}, "", "", "")
+
 
 def run_diagnosis(
     image: Optional[np.ndarray],
@@ -88,336 +104,289 @@ def run_diagnosis(
     state: AppState,
 ) -> Tuple:
     if image is None:
-        return (None, "Please upload an image.", "", gr.update(), gr.update(), gr.update(), gr.update(), None, "", gr.update(), gr.update(), gr.update())
+        return (None, "Please upload an image.", "", "", None, "", "", "")
 
     fitz_type = int(fitz_dropdown)
-    true_label = int(true_label_dropdown)
     tensor = preprocess(image, state.device)
 
     with torch.no_grad():
         logits, concepts = state.model(tensor)
-        pred_class = logits.argmax(dim=1).item()
+        probabilities = torch.softmax(logits, dim=1)[0]
+        pred_class = int(probabilities.argmax().item())
+    concept_vector = concepts[0].cpu().numpy()
 
-    concept_dict = {CONCEPT_NAMES[i]: round(concepts[0, i].item(), 4) for i in range(len(CONCEPT_NAMES))}
+    concept_dict = {name: round(float(concept_vector[i]), 4) for i, name in enumerate(CONCEPT_NAMES)}
 
-    # Grad-CAM overlay
     try:
         state.model.eval()
         cam = state.xai.grad_cam(tensor.clone().requires_grad_())
-        cam_resized = np.array(PILImage.fromarray((cam * 255).astype(np.uint8)).resize((image.shape[1], image.shape[0])))
+        cam_resized = np.array(
+            PILImage.fromarray((cam * 255).astype(np.uint8)).resize((image.shape[1], image.shape[0]))
+        )
         overlay = (image * 0.5 + np.stack([cam_resized] * 3, axis=-1) * 0.5).astype(np.uint8)
-    except Exception as e:
-        logger.warning("Grad-CAM failed: %s", e)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Grad-CAM failed: %s", exc)
         overlay = image
 
-    # Build concept score bars (markdown progress bars)
-    concept_md = "### Concept Scores  \n"
+    concept_md = "### Concept scores\n"
     for name in CONCEPT_NAMES:
-        val = concept_dict[name]
-        pct = int(val * 100)
-        bar_color = "#e74c3c" if val > 0.6 else ("#f39c12" if val > 0.3 else "#4CAF50")
+        value = concept_dict[name]
+        pct = int(value * 100)
+        colour = "#e74c3c" if value > 0.6 else ("#f39c12" if value > 0.3 else "#4CAF50")
         label = name.replace("_", " ").title()
-        concept_md += f"**{label}**  " + chr(10) * 1
         concept_md += (
-            '<div style="background:#e0e0e0;border-radius:8px;height:20px;width:100%">'
-            f'<div style="background:{bar_color};border-radius:8px;height:20px;width:{pct}%"></div>'
-            f"</div> `{val:.2f}`" + chr(10) * 2
+            f"**{label}**\n"
+            f'<div style="background:#e0e0e0;border-radius:8px;height:20px;width:100%">'
+            f'<div style="background:{colour};border-radius:8px;height:20px;width:{pct}%"></div>'
+            f"</div> `{value:.2f}`\n\n"
         )
 
-    # Build state for PPO
-    state_vec = np.concatenate([concepts[0].cpu().numpy(), np.eye(6, dtype=np.float32)[fitz_type - 1]])
-    model_action = state.ppo_agent.evaluate(state_vec)
-    triage_name = TRIAGE_NAMES[model_action]
-    triage_color = TRIAGE_COLORS[triage_name]
-    triage_md = f'<div style="background:{triage_color};color:white;padding:12px 24px;border-radius:12px;font-size:1.4em;font-weight:bold;text-align:center">{triage_name.replace("_", " ").title()}</div>'
+    model_action = None
+    if state.ppo_agent is not None:
+        state_vector = np.concatenate([concept_vector, np.eye(6, dtype=np.float32)[fitz_type - 1]])
+        model_action = int(state.ppo_agent.evaluate(state_vector))
+        triage_name = TRIAGE_NAMES[model_action]
+        triage_md = (
+            f'<div style="background:{TRIAGE_COLORS[triage_name]};color:white;padding:12px 24px;'
+            f'border-radius:12px;font-size:1.4em;font-weight:bold;text-align:center">'
+            f'{triage_name.replace("_", " ").title()}</div>'
+        )
+    else:
+        triage_md = "### Triage\n*Triage agent not loaded — no recommendation available.*"
 
-    # Detail text
-    detail = f"**Predicted class:** {['benign', 'melanoma', 'kaposi_sarcoma'][pred_class]}\n**Fitzpatrick type:** {FITZPATRICK_LABELS[fitz_type - 1]} (type {fitz_type})"
+    detail = (
+        f"**Predicted class:** {['benign', 'melanoma', 'kaposi_sarcoma'][pred_class]} "
+        f"({float(probabilities[pred_class]):.1%} confidence)\n"
+        f"**Fitzpatrick type:** {FITZPATRICK_LABELS[fitz_type - 1]} (type {fitz_type})\n"
+        f"**Model:** `{state.model_version or 'unversioned'}`"
+    )
 
-    # Record case
     case_id = state.next_case_id()
-    case_record = CaseRecord(
+    state.tracker.register_case(CaseRecord(
         case_id=case_id,
         fitz_type=fitz_type,
-        true_label=true_label,
+        predicted_label=pred_class,
         model_triage=model_action,
-        concepts=concepts[0].cpu().numpy().tolist(),
-    )
-    state.tracker.register_case(case_record)
+        ground_truth_label=int(true_label_dropdown),
+        ground_truth_confirmed=False,  # simulated label, not a clinician confirmation
+        concepts=[float(v) for v in concept_vector],
+        source="simulation",
+    ))
 
-    # Store in session state
-    session_data = {"case_id": case_id, "model_action": model_action, "true_label": true_label, "fitz_type": fitz_type}
+    session_data = {
+        "case_id": case_id,
+        "model_action": model_action,
+        "true_label": int(true_label_dropdown),
+        "fitz_type": fitz_type,
+        "concepts": [float(v) for v in concept_vector],
+    }
+    return (overlay, concept_md, triage_md, detail, session_data, f"Case {case_id}", "", "")
 
-    return (overlay, concept_md, triage_md, detail, session_data, f"Case {case_id}")
 
-
-def agree_with_model(session_data: dict, state: AppState) -> Tuple:
-    if session_data is None:
+def override_triage(session_data: Optional[dict], new_action: int, state: AppState) -> Tuple:
+    if not session_data:
         return ("No active case.", "", gr.update(), gr.update())
     case_id = session_data["case_id"]
-    return (f"✅ Agreed — no override recorded for {case_id}.", "", gr.update(variant="primary"), gr.update(variant="secondary"))
+    concepts = np.array(session_data.get("concepts") or [0.0] * len(CONCEPT_NAMES), dtype=np.float32)
+    if state.hitl is not None:
+        state.hitl.process_case(
+            patient_id=case_id,
+            concept_embed=concepts,
+            fitz_type=session_data["fitz_type"],
+            true_label=session_data["true_label"],
+            clinician_action=int(new_action),
+        )
+    state.tracker.register_override(case_id, int(new_action))
+    message = f"Override recorded: {TRIAGE_NAMES[int(new_action)]}"
+    return (message, message, gr.update(variant="secondary"), gr.update(variant="primary"))
 
 
-def override_triage(session_data: dict, new_action: int, state: AppState) -> Tuple:
-    if session_data is None:
+def agree_with_model(session_data: Optional[dict], state: AppState) -> Tuple:
+    if not session_data:
         return ("No active case.", "", gr.update(), gr.update())
-    case_id = session_data["case_id"]
-    old_action = session_data["model_action"]
-
-    state.hitl.process_case(
-        patient_id=case_id,
-        concept_embed=np.array(session_data.get("concepts", [0.0] * 7)),
-        fitz_type=session_data["fitz_type"],
-        true_label=session_data["true_label"],
-        clinician_action=new_action,
-    )
-    state.tracker.register_override(case_id, new_action)
-    msg = f"🩺 Override recorded: {TRIAGE_NAMES[old_action]} → {TRIAGE_NAMES[new_action]}"
-    return (msg, f"Overridden to {TRIAGE_NAMES[new_action].replace('_', ' ').title()}", gr.update(variant="secondary"), gr.update(variant="primary"))
+    return (f"Agreed — no override recorded for {session_data['case_id']}.", "",
+            gr.update(variant="primary"), gr.update(variant="secondary"))
 
 
-# ====================================================================
-#  Tab 2 – Analytics Dashboard
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  Tab 2 - Analytics
+# ---------------------------------------------------------------------------
 
 def refresh_analytics(state: AppState) -> Tuple:
     metrics = state.tracker.compute_metrics()
-    if not metrics:
-        return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "No data yet.", "0")
-
-    acc_chart = state.tracker.accuracy_by_type_chart()
-    fn_chart = state.tracker.fn_rate_chart()
-    gauge = state.tracker.accuracy_gauge()
-    cm = state.tracker.confusion_matrix_chart()
-    pie = state.tracker.override_pie()
-    trend = state.tracker.trend_chart()
-
-    gap = metrics.get("accuracy_gap", 0)
-    gap_color = "🟢" if gap <= 0.02 else ("🟡" if gap <= 0.05 else "🔴")
+    accuracy = metrics.get("clinical_accuracy")
+    agreement = metrics.get("model_vs_clinician_agreement")
     summary = (
-        f"{gap_color} **Accuracy Gap:** {gap:.2%}  |  "
-        f"**Overall Accuracy:** {metrics.get('overall_accuracy', 0):.1%}  |  "
-        f"**Override Rate:** {metrics.get('override_rate', 0):.1%}  |  "
-        f"**Total Cases:** {metrics.get('total_cases', 0)}"
+        f"**Clinical accuracy (confirmed cases):** "
+        f"{'n/a' if accuracy is None else f'{accuracy:.1%}'}  |  "
+        f"**Model/clinician agreement:** {'n/a' if agreement is None else f'{agreement:.1%}'}  |  "
+        f"**Override rate:** {metrics.get('override_rate', 0):.1%}  |  "
+        f"**Cases:** {metrics.get('total_cases', 0)}"
     )
-    detail = f"**Legacy (I-III):** {metrics.get('legacy_accuracy', 0):.1%}  •  **Target (IV-VI):** {metrics.get('target_accuracy', 0):.1%}"
-    return (acc_chart, fn_chart, gauge, cm, pie, trend, summary, detail)
+    notes = " • ".join(metrics.get("notes", [])) or "Metrics are computed from registered cases only."
+    return (
+        state.tracker.accuracy_by_type_chart(),
+        state.tracker.urgent_rate_chart(),
+        state.tracker.confusion_matrix_chart(),
+        state.tracker.override_pie(),
+        state.tracker.trend_chart(),
+        summary,
+        notes,
+    )
 
 
-# ====================================================================
-#  Tab 3 – Patient History
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  Tab 3 - History
+# ---------------------------------------------------------------------------
 
 def search_history(query: str, filter_fitz: int, state: AppState) -> pd.DataFrame:
     cases = state.tracker.cases
-    if filter_fitz > 0:
+    if filter_fitz:
         cases = [c for c in cases if c.fitz_type == filter_fitz]
     if query:
         cases = [c for c in cases if query.lower() in c.case_id.lower()]
-
     rows = []
-    for c in cases[-200:]:
-        actual = c.clinician_triage if c.is_override else c.model_triage
+    for case in cases[-200:]:
+        final = case.clinician_triage if case.is_override else case.model_triage
         rows.append({
-            "Case ID": c.case_id,
-            "Date": c.timestamp[:10],
-            "Fitzpatrick": FITZPATRICK_LABELS[c.fitz_type - 1],
-            "Model Triage": TRIAGE_NAMES[c.model_triage],
-            "Final Triage": TRIAGE_NAMES[actual],
-            "Override": "✅" if c.is_override else "—",
+            "Case ID": case.case_id,
+            "Date": case.timestamp[:10],
+            "Fitzpatrick": FITZPATRICK_LABELS[case.fitz_type - 1],
+            "Model triage": TRIAGE_NAMES[case.model_triage] if case.model_triage is not None else "",
+            "Final triage": TRIAGE_NAMES[final] if final is not None else "",
+            "Confirmed": "yes" if case.ground_truth_confirmed else "no",
+            "Override": "yes" if case.is_override else "",
         })
     return pd.DataFrame(rows) if rows else pd.DataFrame({"Info": ["No cases found."]})
 
 
-# ====================================================================
-#  Tab 4 – System Settings
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  Tab 4 - Settings
+# ---------------------------------------------------------------------------
 
 def run_offline_update(state: AppState) -> str:
+    if state.optimizer is None or state.hitl is None:
+        return "Offline optimisation requires a loaded triage agent."
     buffer = state.hitl.correction_buffer
     if len(buffer) < 2:
-        return "⚠️ Not enough overrides (need ≥ 2)."
+        return "Not enough overrides (need at least 2)."
     metrics = state.optimizer.optimise(buffer)
     state.tracker.snapshot("after_offline_update")
-    state.tracker.save()
-    loss = metrics.get('policy_loss', None)
-    if loss is None:
-        return "✅ Offline update complete (no loss data)."
-    return f"✅ Offline update complete. Policy loss: {loss:.4f}"
+    loss = metrics.get("policy_loss")
+    return "Offline update complete." + (f" Policy loss: {loss:.4f}" if loss is not None else "")
+
 
 def export_data(state: AppState) -> str:
-    state.tracker.export_csv()
-    return "✅ Case history exported to case_history.csv"
-
-def reset_tracker(state: AppState) -> str:
-    state.tracker.cases.clear()
-    state.tracker._snapshots.clear()
-    state.tracker.save()
-    return "🔄 Tracker reset."
+    path = state.tracker.export_csv()
+    return f"Case history exported to {path}"
 
 
-# ====================================================================
-#  Build UI
-# ====================================================================
+# ---------------------------------------------------------------------------
+#  UI
+# ---------------------------------------------------------------------------
 
-def create_ui(state: AppState) -> gr.Blocks:
-    css = """
-    .triage-badge { padding: 8px 16px; border-radius: 8px; font-weight: bold; color: white; display: inline-block; }
-    .metric-card { background: #f8f9fa; border-radius: 12px; padding: 16px; margin: 8px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    footer { display: none !important; }
-    /* Prevent text selection and I-beam cursor on all static/navigation text */
-    nav, nav *, .tabs, .tab-nav, .tab-nav *, .gr-tabs, .gr-tabs *,
-    label, .gr-label, .gr-box-title, .gr-form > label,
-    h1, h2, h3, h4, h5, h6, p, .gr-markdown, .gr-markdown *,
-    .gr-panel, .gr-panel .gr-panel-title, .gr-accordion, .gr-accordion *,
-    .gr-button, .gr-button *, button.gr-button,
-    span.gr-text-sm, .gr-form-text, .gr-form-json-label,
-    .prose, .prose * { user-select: none; -webkit-user-select: none; }
-    /* Buttons must show pointer cursor, never I-beam */
-    .gr-button, .gr-button *, button, [role="button"] { cursor: pointer; }
-    /* Restore text selection for actual input fields */
-    input, textarea, [contenteditable="true"], select { user-select: text; -webkit-user-select: text; }
-    /* Remove caret from all non-input elements */
-    nav, .tabs, .gr-tabs, label, h1, h2, h3, h4, h5, h6, p, span, div:not(input):not(textarea):not([contenteditable]) { caret-color: transparent; }
-    """
-
-    with gr.Blocks(title="Dermatology AI — HITL System") as demo:
+def create_ui(state: AppState):
+    if gr is None:  # pragma: no cover - only when gradio is not installed
+        raise RuntimeError(
+            "Gradio is not installed. Install it with `pip install gradio` or use "
+            "`python main.py --dashboard` for the FastAPI clinical dashboard."
+        )
+    with gr.Blocks(title="Dermatology AI — researcher UI") as demo:
         gr.Markdown(
-            "# 🏥 Dermatology AI — Human-in-the-Loop Triage System\n"
-            "Tailored for **Ugandan healthcare** — optimised for **Fitzpatrick IV–VI** skin types."
+            "# Dermatology AI — researcher UI\n"
+            "**Research/educational prototype. Not a medical device. "
+            "Not validated for clinical use.**"
         )
 
         session = gr.State({})
         app_state = gr.State(state)
 
-        with gr.Tabs() as tabs:
-            # ==============================================================
-            # TAB 1 – DIAGNOSIS
-            # ==============================================================
-            with gr.Tab("🔬 Diagnosis", id=0):
-                gr.Markdown("### Upload a dermoscopic image for AI-assisted triage")
-                with gr.Row(equal_height=True):
-                    with gr.Column(scale=1):
-                        image_input = gr.Image(label="Upload Image", height=350)
+        with gr.Tabs():
+            with gr.Tab("Diagnosis"):
+                with gr.Row():
+                    with gr.Column():
+                        image_input = gr.Image(label="Upload image", height=350)
                         with gr.Row():
                             fitz_input = gr.Dropdown(
-                                choices=[(f"Type {i} — {FITZPATRICK_LABELS[i-1]}", i) for i in range(1, 7)],
-                                value=4, label="Fitzpatrick Skin Type", interactive=True,
-                                info="Assessed by clinician"
+                                choices=[(f"Type {i} — {FITZPATRICK_LABELS[i - 1]}", i) for i in range(1, 7)],
+                                value=4, label="Fitzpatrick type", interactive=True,
                             )
                             true_label_input = gr.Dropdown(
-                                choices=[("Benign", 0), ("Melanoma", 1), ("Kaposi Sarcoma", 2)],
-                                value=0, label="Ground Truth (for simulation)", interactive=True,
-                                info="Known diagnosis (simulated)"
+                                choices=[(name.replace("_", " ").title(), i) for i, name in enumerate(TRUE_LABEL_NAMES)],
+                                value=0, label="Reference label (simulation)", interactive=True,
                             )
-                        diagnose_btn = gr.Button("🔍 Run Diagnosis", variant="primary", size="lg")
-
-                    with gr.Column(scale=1):
-                        triage_display = gr.Markdown("### Triage Recommendation\n*Awaiting image...*")
+                        diagnose_btn = gr.Button("Run diagnosis", variant="primary")
+                    with gr.Column():
+                        triage_display = gr.Markdown("### Triage\n*Awaiting image...*")
                         case_id_display = gr.Markdown("")
                         detail_display = gr.Markdown("")
-
+                overlay_output = gr.Image(label="Grad-CAM overlay", height=300)
+                concept_output = gr.Markdown("### Concept scores\n*Awaiting analysis...*")
+                override_dropdown = gr.Dropdown(
+                    choices=[(name.replace("_", " ").title(), i) for i, name in enumerate(TRIAGE_NAMES)],
+                    value=1, label="Override triage", interactive=False,
+                )
                 with gr.Row():
-                    overlay_output = gr.Image(label="Grad-CAM Overlay", height=300)
-
-                with gr.Row():
-                    concept_output = gr.Markdown("### Concept Scores\n*Awaiting analysis...*")
-
-                with gr.Row():
-                    gr.Markdown("### 👨‍⚕️ Clinician Override")
-                with gr.Row():
-                    override_dropdown = gr.Dropdown(
-                        choices=[("Routine (0)", 0), ("Follow-up (1)", 1), ("Urgent (2)", 2)],
-                        value=0, label="Override Triage Decision", interactive=False
-                    )
-                with gr.Row():
-                    agree_btn = gr.Button("✅ Agree with Model", variant="secondary", size="sm")
-                    override_btn = gr.Button("🩺 Submit Override", variant="secondary", size="sm")
+                    agree_btn = gr.Button("Agree with model", variant="secondary", size="sm")
+                    override_btn = gr.Button("Submit override", variant="secondary", size="sm")
                 override_msg = gr.Markdown("")
+                extra_msg = gr.Markdown("")
 
                 diagnose_btn.click(
                     fn=run_diagnosis,
                     inputs=[image_input, fitz_input, true_label_input, app_state],
-                    outputs=[overlay_output, concept_output, triage_display, detail_display, session, case_id_display],
+                    outputs=[overlay_output, concept_output, triage_display, detail_display,
+                             session, case_id_display, override_msg, extra_msg],
                 ).then(
                     fn=lambda data: (
-                        gr.update(variant="secondary", interactive=True),
-                        gr.update(variant="secondary", interactive=True),
-                        gr.update(visible=True, interactive=True, value=data.get("model_action", 0)),
+                        gr.update(interactive=True),
+                        gr.update(interactive=True),
+                        gr.update(interactive=True, value=(data or {}).get("model_action") or 1),
                     ),
                     inputs=[session],
                     outputs=[agree_btn, override_btn, override_dropdown],
                 )
-                agree_btn.click(fn=agree_with_model, inputs=[session, app_state], outputs=[override_msg, override_dropdown, agree_btn, override_btn])
-                override_btn.click(fn=override_triage, inputs=[session, override_dropdown, app_state], outputs=[override_msg, override_dropdown, agree_btn, override_btn])
+                agree_btn.click(fn=agree_with_model, inputs=[session, app_state],
+                                outputs=[override_msg, extra_msg, agree_btn, override_btn])
+                override_btn.click(fn=override_triage, inputs=[session, override_dropdown, app_state],
+                                   outputs=[override_msg, extra_msg, agree_btn, override_btn])
 
-            # ==============================================================
-            # TAB 2 – ANALYTICS DASHBOARD
-            # ==============================================================
-            with gr.Tab("📊 Analytics Dashboard", id=1):
-                gr.Markdown("### Fairness & Performance Metrics")
-                summary_md = gr.Markdown("Click *Refresh* to load data.")
-                detail_md = gr.Markdown("")
-                refresh_btn = gr.Button("🔄 Refresh Dashboard", variant="primary")
-
+            with gr.Tab("Analytics"):
+                gr.Markdown("### Fairness & performance (confirmed cases only)")
+                summary_md = gr.Markdown("Click refresh.")
+                notes_md = gr.Markdown("")
+                refresh_btn = gr.Button("Refresh", variant="primary")
                 with gr.Row():
-                    with gr.Column(scale=2):
-                        acc_chart = gr.Plot(label="Accuracy by Fitzpatrick Type")
-                    with gr.Column(scale=1):
-                        gauge = gr.Plot(label="Accuracy Gap Gauge")
-
+                    acc_chart = gr.Plot(label="Clinical accuracy by Fitzpatrick type")
+                    parity_chart = gr.Plot(label="Urgent-triage rate (demographic parity)")
                 with gr.Row():
-                    fn_chart = gr.Plot(label="False Negative Rate by Type")
-                    pie = gr.Plot(label="Override Distribution")
-
-                with gr.Row():
-                    cm = gr.Plot(label="Confusion Matrix")
-                    trend = gr.Plot(label="Metric Trends")
-
+                    cm = gr.Plot(label="Confusion matrix")
+                    pie = gr.Plot(label="Overrides")
+                trend = gr.Plot(label="Trends")
                 refresh_btn.click(
-                    fn=refresh_analytics,
-                    inputs=[app_state],
-                    outputs=[acc_chart, fn_chart, gauge, cm, pie, trend, summary_md, detail_md],
+                    fn=refresh_analytics, inputs=[app_state],
+                    outputs=[acc_chart, parity_chart, cm, pie, trend, summary_md, notes_md],
                 )
 
-            # ==============================================================
-            # TAB 3 – PATIENT HISTORY
-            # ==============================================================
-            with gr.Tab("📋 Patient History", id=2):
+            with gr.Tab("History"):
                 with gr.Row():
-                    search_input = gr.Textbox(label="Search by Case ID", placeholder="e.g. UI-20260522-0001")
+                    search_input = gr.Textbox(label="Search by case ID")
                     filter_fitz = gr.Dropdown(
-                        choices=[("All", 0)] + [(f"Type {FITZPATRICK_LABELS[i-1]}", i) for i in range(1, 7)],
-                        value=0, label="Filter by Fitzpatrick"
+                        choices=[("All", 0)] + [(f"Type {FITZPATRICK_LABELS[i - 1]}", i) for i in range(1, 7)],
+                        value=0, label="Filter by Fitzpatrick",
                     )
-                history_table = gr.Dataframe(label="Recent Cases", interactive=False)
-                search_btn = gr.Button("🔍 Search", variant="primary")
+                history_table = gr.Dataframe(label="Recent cases", interactive=False)
+                search_btn = gr.Button("Search", variant="primary")
+                search_btn.click(fn=search_history, inputs=[search_input, filter_fitz, app_state],
+                                 outputs=[history_table])
 
-                search_btn.click(fn=search_history, inputs=[search_input, filter_fitz, app_state], outputs=[history_table])
-
-            # ==============================================================
-            # TAB 4 – SYSTEM SETTINGS
-            # ==============================================================
-            with gr.Tab("⚙️ System Settings", id=3):
-                gr.Markdown("### Offline Policy Optimisation")
-                gr.Markdown(
-                    "Uses accumulated clinician overrides to update the PPO agent's policy. "
-                    "Requires at least **2 overrides** in the buffer."
-                )
-                update_btn = gr.Button("▶️ Run Offline Update", variant="primary")
+            with gr.Tab("Settings"):
+                gr.Markdown("### Research data management")
+                update_btn = gr.Button("Run offline update", variant="primary")
                 update_status = gr.Markdown("")
-
-                gr.Markdown("---")
-                gr.Markdown("### Data Management")
-                with gr.Row():
-                    export_btn = gr.Button("📥 Export CSV")
-                    reset_btn = gr.Button("🔄 Reset Tracker", variant="stop")
-
+                export_btn = gr.Button("Export case history CSV")
                 export_status = gr.Markdown("")
-                reset_status = gr.Markdown("")
-
                 update_btn.click(fn=run_offline_update, inputs=[app_state], outputs=[update_status])
                 export_btn.click(fn=export_data, inputs=[app_state], outputs=[export_status])
-                reset_btn.click(fn=reset_tracker, inputs=[app_state], outputs=[reset_status])
 
     return demo

@@ -233,13 +233,17 @@ class XAIExplainer:
         - Grad-CAM saliency maps
         - Concept attribution heatmaps
 
-    IMPORTANT: For correct gradient-based attributions, input tensor MUST NOT have
-    passed through MelaninNormalization (cv2.equalizeHist is non-differentiable).
-    The inference pipeline (ui.py preprocess, server.py /api/diagnose) uses
-    inference_transform (Resize + Normalize only) which excludes MelaninNormalization.
-    Training uses dark_skin_aug which includes MelaninNormalization - this is fine
-    for training (no gradients through normalization needed), but XAI MUST use
-    tensors that have NOT passed through MelaninNormalization.
+    IMPORTANT -- MelaninNormalization caveat: the serving pipeline applies
+    ``MelaninNormalization`` (a non-differentiable ``cv2.equalizeHist``) in both
+    train and eval mode, because a model trained on normalised luminance must be
+    served normalised images.  Consequences for explanations:
+
+    * Grad-CAM needs gradients w.r.t. a *feature map*, not the input, so it is
+      unaffected by the normalisation.
+    * Integrated Gradients needs gradients w.r.t. the *input*.  When the input
+      has passed through ``cv2`` the attribution is an approximation along a
+      path that is only piecewise differentiable.  Report it as such, or run IG
+      on the pre-normalisation image and label the map accordingly.
     """
 
     def __init__(self, model: DermatologyCBM, device: torch.device):
@@ -281,7 +285,8 @@ class XAIExplainer:
 
         saliency = attr.squeeze().cpu().numpy()
         saliency = np.max(np.abs(saliency), axis=0)
-        saliency = (saliency - saliency.min()) / max(saliency.ptp(), 1e-8)
+        spread = float(np.ptp(saliency))  # ndarray.ptp was removed in NumPy 2.0
+        saliency = (saliency - saliency.min()) / max(spread, 1e-8)
         return saliency
 
     def grad_cam(self, x: torch.Tensor, class_idx: Optional[int] = None) -> np.ndarray:

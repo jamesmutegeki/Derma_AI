@@ -1,1409 +1,835 @@
-"""
-FastAPI-based API server serving the Dermatology AI dashboard.
+"""FastAPI backend for the Dermatology AI clinical dashboard.
 
-Provides REST endpoints that bridge the new HTML dashboard to the
-existing Python backend (model, PPO agent, HITL pipeline, tracker).
+Design rules (see ``SECURITY.md`` and ``CODE_REVIEW.md``):
 
-Usage:
-    python server.py                          # start on port 7860 (default)
-    python server.py --port 8000              # custom port
-    python server.py --reload                 # auto-reload on file changes
+* **No fabricated data.**  If the model is not loaded, ``/api/diagnose`` returns
+  ``503``.  There is no mock-diagnosis, mock-analytics or mock-history path.
+* **One authorization dependency set.**  Admin routes use ``require_admin``;
+  doctor routes use ``require_permission(<flag>)``.  Both live in ``auth.py``.
+* **Bearer tokens, not cookies.**  No CSRF token is required or accepted,
+  because a cross-site request cannot attach an ``Authorization`` header.
+* Persistence is SQLite (``storage.py``); paths come from ``DATA_DIR``.
+
+Environment
+-----------
+``DATA_DIR``                 directory for ``derma.db`` (default ``./data``)
+``MODEL_CHECKPOINT_PATH``    DermatologyCBM state_dict; unset -> diagnose returns 503
+``AGENT_CHECKPOINT_PATH``    PPO triage agent; unset -> triage reported as unavailable
+``ADMIN_BOOTSTRAP_PASSWORD`` initial admin password (else generated and logged once)
+``ALLOWED_ORIGINS``          comma-separated CORS allow-list
+``TRUST_PROXY``              "1" to use the first ``X-Forwarded-For`` hop for rate limiting
+``LOGIN_RATE_LIMIT``         per-IP limit for login endpoints (default ``5/minute``)
+``DEMO_MODE``                "1" to seed demo data at startup (still no fake diagnoses)
 """
 
 from __future__ import annotations
 
-import json
+import csv
+import io as python_io
 import logging
 import os
 import secrets
-import uuid
-import asyncio
-from datetime import datetime, timezone, timedelta
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
-import io as python_io
-import csv
-from typing import Optional, List
+from typing import Optional
 
-import bcrypt
 import numpy as np
 import uvicorn
-
-# SECURITY FIX: Prevent PIL decompression bomb attacks
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from PIL import Image
-Image.MAX_IMAGE_PIXELS = 10_000_000
-
-# SECURITY FIX: Rate limiting for auth endpoints
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-try:
-    import torch
-except ImportError:
-    torch = None
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from auth import (
+    LoginThrottle,
+    Session,
+    SessionStore,
+    check_password,
+    current_token,
+    hash_password,
+    rate_limit_key,
+    require_admin,
+    require_auth,
+    require_permission,
+    validate_password,
+)
+from backend import Backend, BackendStatus, ModelUnavailable, file_sha256
+from constants import (
+    DOCTOR_PERMISSIONS,
+    FITZPATRICK_LABELS,
+    TRIAGE_NAMES,
+    TRUE_LABEL_TO_TRIAGE,
+)
+from metrics_tracker import FairnessTracker
+from schemas import (
+    AdminLoginRequest,
+    AdminPasswordChangeRequest,
+    BulkDoctorAction,
+    DoctorCreateRequest,
+    DoctorResetPasswordRequest,
+    DoctorUpdateRequest,
+    LoginRequest,
+    LoginResponse,
+    NotesSaveRequest,
+    OverrideRequest,
+    PatientRequest,
+    PermissionsUpdate,
+    VisitRequest,
+)
+from storage import Store, migrate_legacy_json
+
+# SECURITY: bound PIL's decompression-bomb protection globally.
+Image.MAX_IMAGE_PIXELS = 10_000_000
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-#  Password helpers (bcrypt)
-# ---------------------------------------------------------------------------
+APP_DIR = Path(__file__).resolve().parent
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE + 1024 * 1024
 
-def _hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+CLASS_NAMES = ["benign", "melanoma", "kaposi_sarcoma"]
 
-# SECURITY FIX: Enforce password policy (minimum 12 chars, reject common passwords)
-COMMON_PASSWORDS = {
-    "password", "password123", "admin", "admin123", "123456", "12345678",
-    "123456789", "qwerty", "abc123", "letmein", "welcome", "monkey",
-    "dragon", "master", "hello", "freedom", "whatever", "qazwsx",
-    "trustno1", "jordan23", "harley", "password1", "password2020",
-}
-
-
-def _validate_password(pw: str) -> tuple[bool, str]:
-    """Validate password strength. Returns (is_valid, error_message)."""
-    if len(pw) < 12:
-        return False, "Password must be at least 12 characters long"
-    if pw.lower() in COMMON_PASSWORDS:
-        return False, "Password is too common, please choose a stronger one"
-    has_upper = any(c.isupper() for c in pw)
-    has_lower = any(c.islower() for c in pw)
-    has_digit = any(c.isdigit() for c in pw)
-    has_special = any(not c.isalnum() for c in pw)
-    if not (has_upper and has_lower and has_digit and has_special):
-        return False, "Password must contain uppercase, lowercase, digit, and special character"
-    return True, ""
-
-
-def _check_password(pw: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(pw.encode("utf-8"), hashed.encode("utf-8"))
-    except Exception:
-        logger.error("Password check failed -- hash may be corrupted")
-        return False
-
-def _migrate_passwords(data: dict):
-    """Hash any plaintext passwords found in the data. Idempotent."""
-    changed = False
-    for a in data.get("admins", []):
-        p = a.get("password", "")
-        if p and not p.startswith("$2b$"):
-            a["password"] = _hash_password(p)
-            changed = True
-    for d in data.get("doctors", []):
-        p = d.get("password", "")
-        if p and not p.startswith("$2b$"):
-            d["password"] = _hash_password(p)
-            changed = True
-    if changed:
-        _save_doctors(data)
 
 # ---------------------------------------------------------------------------
-#  Auth sessions
+#  Helpers
 # ---------------------------------------------------------------------------
 
-# SECURITY FIX: Background task to clean expired sessions periodically
-async def _cleanup_expired_sessions():
-    """Periodically remove expired sessions from memory."""
+def _data_dir(explicit: Optional[str | Path] = None) -> Path:
+    if explicit:
+        return Path(explicit)
+    return Path(os.environ.get("DATA_DIR", APP_DIR / "data"))
+
+
+def _audit(store: Store, session: Optional[Session], action: str, target: str = "",
+           outcome: str = "ok", detail: str = "") -> None:
+    actor = "anonymous"
+    if session is not None:
+        # ``name`` is missing on service accounts; never write NULL to a NOT NULL column.
+        actor = (session.user.get("name") or session.user.get("username")
+                 or session.user_id or session.sid or "unknown")
+    store.append_audit(
+        actor=actor,
+        role=(session.role if session else "anonymous"),
+        action=action,
+        target=target,
+        outcome=outcome,
+        detail=detail,
+    )
+
+
+def _generate_password(length: int = 20) -> str:
+    """Generate a random password that passes :func:`auth.validate_password`."""
+    alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    symbols = "!@#$%^&*-_=+?"
     while True:
-        try:
-            await asyncio.sleep(300)  # Run every 5 minutes
-            now = datetime.now(timezone.utc)
-            expired = [
-                token for token, sess in _sessions.items()
-                if sess.get("expires_at") and now > datetime.fromisoformat(sess["expires_at"])
-            ]
-            for token in expired:
-                _sessions.pop(token, None)
-            if expired:
-                logger.info(f"Cleaned up {len(expired)} expired sessions")
-        except Exception as e:
-            logger.error(f"Session cleanup error: {e}")
+        core = "".join(secrets.choice(alphabet) for _ in range(length - 4))
+        candidate = (
+            core[:length // 2]
+            + secrets.choice("23456789")
+            + secrets.choice(symbols)
+            + secrets.choice("abcdefghijkmnopqrstuvwxyz")
+            + secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ")
+            + core[length // 2:]
+        )
+        if validate_password(candidate)[0]:
+            return candidate
 
 
-_sessions: dict[str, dict] = {}
-_SESSION_TTL = timedelta(hours=8)
+def _bootstrap_admin(store: Store) -> Optional[str]:
+    """Ensure an ``admin`` account exists.  Returns the generated password once.
 
-def _create_session(user_info: dict) -> str:
-    token = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
-    # SECURITY FIX: Add CSRF token to session for state-changing operations
-    csrf_token = secrets.token_urlsafe(32)
-    _sessions[token] = {**user_info, "created_at": now.isoformat(), "expires_at": (now + _SESSION_TTL).isoformat(), "csrf_token": csrf_token}
-    return token
+    SECURITY FIX: the generated password is written to
+    ``<data_dir>/INITIAL_ADMIN_PASSWORD.txt`` with mode ``0600`` and only that
+    path is logged.  The previous implementation logged the bcrypt *hash*, which
+    is both a disclosure and useless to the operator.
+    """
+    if store.find_user(identifier="admin", role="admin"):
+        return None
 
-def _get_current_user(token: str = ""):
-    if not token or token not in _sessions:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    sess = _sessions[token]
-    expires = sess.get("expires_at")
-    if expires and datetime.now(timezone.utc) > datetime.fromisoformat(expires):
-        del _sessions[token]
-        raise HTTPException(status_code=401, detail="Session expired.")
-    return sess
+    password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "")
+    generated = False
+    if not password:
+        # SECURITY FIX: generate a password that satisfies the policy instead of
+        # logging a bcrypt hash of a random string nobody can recover.
+        password = _generate_password()
+        generated = True
 
-from fastapi import Header
-async def require_auth(authorization: str = Header("")):
-    token = authorization.replace("Bearer ", "") if authorization else ""
-    return _get_current_user(token)
-
-async def require_admin(authorization: str = Header("")):
-    token = authorization.replace("Bearer ", "") if authorization else ""
-    user = _get_current_user(token)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required.")
-    return user
-
-
-# SECURITY FIX: CSRF validation for state-changing operations
-async def require_csrf(authorization: str = Header(""), x_csrf_token: str = Header(None, alias="X-CSRF-Token")):
-    """Validate CSRF token for state-changing operations (POST, PUT, DELETE, PATCH)."""
-    token = authorization.replace("Bearer ", "") if authorization else ""
-    if not token or token not in _sessions:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    session = _sessions[token]
-    expected_csrf = session.get("csrf_token")
-    if not expected_csrf:
-        raise HTTPException(status_code=403, detail="CSRF token missing from session.")
-    if not x_csrf_token:
-        raise HTTPException(status_code=403, detail="X-CSRF-Token header required.")
-    if x_csrf_token != expected_csrf:
-        raise HTTPException(status_code=403, detail="Invalid CSRF token.")
-    return _get_current_user(token)
-
-# ---------------------------------------------------------------------------
-#  Activity log
-# ---------------------------------------------------------------------------
-
-ACTIVITY_PATH = Path(__file__).parent / "activity.json"
-
-def _load_activity() -> list:
-    if ACTIVITY_PATH.exists():
-        try:
-            return json.loads(ACTIVITY_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-    return []
-
-def _save_activity(entries: list):
-    ACTIVITY_PATH.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-
-def _log_activity(event: str, actor: str = "system", level: str = "info"):
-    entries = _load_activity()
-    entries.append({
-        "event": event,
-        "actor": actor,
-        "level": level,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+    store.create_user({
+        "id": "admin-001",
+        "role": "admin",
+        "username": "admin",
+        "email": os.environ.get("ADMIN_EMAIL", ""),
+        "password": hash_password(password),
+        "name": "System Administrator",
+        "active": True,
     })
-    _save_activity(entries[-200:])  # keep last 200
 
-# ---------------------------------------------------------------------------
-#  Patient persistence
-# ---------------------------------------------------------------------------
-
-PATIENTS_PATH = Path(__file__).parent / "patients.json"
-NOTES_PATH = Path(__file__).parent / "notes.json"
-
-def _load_patients() -> list:
-    if PATIENTS_PATH.exists():
+    if generated:
+        credential_file = Path(store.data_dir) / "INITIAL_ADMIN_PASSWORD.txt"
+        credential_file.write_text(password + "\n", encoding="utf-8")
         try:
-            return json.loads(PATIENTS_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return []
-
-def _save_patients(data: list):
-    PATIENTS_PATH.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-
-def _load_notes() -> dict:
-    if NOTES_PATH.exists():
-        try:
-            return json.loads(NOTES_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
-
-def _save_notes(data: dict):
-    NOTES_PATH.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-
-# ---------------------------------------------------------------------------
-#  Pydantic models
-# ---------------------------------------------------------------------------
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-    remember_institution: bool = False
-
-
-class LoginResponse(BaseModel):
-    success: bool
-    token: str
-    physician: dict
-    message: str
-    csrf_token: str
-
-
-class PatientRequest(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    name: str
-    id: str = ""
-    age: str = ""
-    gender: str = ""
-    fitz: str = ""
-    contact: str = ""
-    history: str = ""
-    diagnosis: str = ""
-    body_site: str = ""
-    status: str = "active"
-
-class VisitRequest(BaseModel):
-    date: str = ""
-    desc: str = ""
-    tag: str = "routine"
-    diagnosis: str = ""
-    ai_findings: str = ""
-    treatment_notes: str = ""
-    doctor_name: str = ""
-    lesion_location: str = ""
-    lesion_size: str = ""
-
-class OverrideRequest(BaseModel):
-    case_id: str
-    clinician_action: int
-
-
-class NotesSaveRequest(BaseModel):
-    case_id: str
-    notes: str
+            os.chmod(credential_file, 0o600)
+        except OSError:  # pragma: no cover - exotic filesystems
+            logger.warning("Could not restrict permissions on %s", credential_file)
+        logger.warning("=" * 64)
+        logger.warning(
+            "Initial admin password written to %s (mode 0600). "
+            "Sign in, change it, then delete the file.", credential_file,
+        )
+        logger.warning("=" * 64)
+    return password
 
 
 # ---------------------------------------------------------------------------
-#  Admin models
+#  Application factory
 # ---------------------------------------------------------------------------
 
-DOCTOR_PERMISSIONS = [
-    "view_patient", "edit_patient", "upload_images",
-    "run_diagnosis", "override_triage", "view_analytics",
-    "view_history", "export_data",
-]
+def create_app(
+    data_dir: Optional[str | Path] = None,
+    model_path: Optional[str] = None,
+    agent_path: Optional[str] = None,
+    initialise_backend: bool = True,
+    demo_mode: Optional[bool] = None,
+) -> FastAPI:
+    store = Store(_data_dir(data_dir))
+    migrate_legacy_json(store, APP_DIR)
 
-DOCTORS_PATH = Path(__file__).parent / "doctors.json"
+    sessions = SessionStore()
+    throttle = LoginThrottle()
+    tracker = FairnessTracker(store, export_path=str(store.data_dir / "case_history.csv"))
+    backend = Backend(store, tracker, model_path=model_path, agent_path=agent_path)
 
+    bootstrap_password = _bootstrap_admin(store)
 
-def _load_doctors() -> dict:
-    if DOCTORS_PATH.exists():
-        try:
-            return json.loads(DOCTORS_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {"admins": [], "doctors": []}
+    if demo_mode is None:
+        demo_mode = os.environ.get("DEMO_MODE", "0") == "1"
 
-def _save_doctors(data: dict):
-    DOCTORS_PATH.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    login_rate_limit = os.environ.get("LOGIN_RATE_LIMIT", "5/minute")
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if demo_mode:
+            # Explicit opt-in only: synthetic cohort, every record flagged
+            # ``simulated``.  Never used for metrics ground truth.
+            from seed_demo import seed_demo_patients
 
-# SECURITY FIX: Remove hardcoded admin password - require ADMIN_BOOTSTRAP_PASSWORD env var or generate secure one-time password
-def _init_admin():
-    data = _load_doctors()
-    if not any(a.get("username") == "admin" for a in data["admins"]):
-        bootstrap_pw = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD")
-        if bootstrap_pw:
-            pw_hash = _hash_password(bootstrap_pw)
-            logger.warning("Admin user created with password from ADMIN_BOOTSTRAP_PASSWORD")
-        else:
-            pw_hash = _hash_password(secrets.token_urlsafe(16))
-            logger.warning("=" * 60)
-            logger.warning("ADMIN BOOTSTRAP PASSWORD GENERATED - SAVE THIS PASSWORD:")
-            logger.warning(pw_hash)
-            logger.warning("=" * 60)
-        data["admins"].append({
-            "id": "admin-001",
-            "username": "admin",
-            "password": pw_hash,
-            "name": "System Administrator",
-        })
-    _migrate_passwords(data)
-    _save_doctors(data)
-
-
-def _seed_demo_patients():
-    patients = _load_patients()
-    if patients:
-        return  # already seeded
-    demo_active = {
-        "id": "PAT-2024-0847",
-        "name": "Sarah Mwangi",
-        "age": "34 yrs (DOB: 1991-03-14)",
-        "gender": "female",
-        "fitz": "IV",
-        "contact": "+254 712 345 678",
-        "history": "3-month history of pigmented lesion on left upper back. Patient reports recent change in shape and intermittent pruritus. No personal or family history of melanoma.",
-        "diagnosis": "melanoma",
-        "body_site": "upper_back",
-        "status": "active",
-        "visits": [
-            {
-                "id": "VIS-20260510-0001",
-                "date": "2026-05-10",
-                "desc": "Initial consult -- lesion mapping & dermoscopic photography. AI flagged asymmetry > 0.7. Recommended 2-week follow-up.",
-                "tag": "followup",
-                "diagnosis": "Superficial Spreading Melanoma (suspected)",
-                "ai_findings": "Asymmetry: 0.82 | Border irregularity: 0.73 | Color variegation: 0.65 | Diameter: 0.44\nABCD criteria: High risk. Triage: Follow-up (2 weeks).",
-                "treatment_notes": "Patient counseled on melanoma warning signs. Dermoscopic photography taken. Scheduled for follow-up in 2 weeks for re-assessment and possible biopsy.",
-                "doctor_name": "Dr. James Doe",
-                "lesion_location": "Left upper back",
-                "lesion_size": "6mm x 4mm"
-            },
-            {
-                "id": "VIS-20260402-0002",
-                "date": "2026-04-02",
-                "desc": "Routine skin check -- no significant findings. ABCD criteria unremarkable.",
-                "tag": "routine",
-                "diagnosis": "No suspicious lesions detected",
-                "ai_findings": "Asymmetry: 0.12 | Border: 0.08 | Color: 0.15 | Diameter: 0.10\nAll concept scores low. Triage: Routine monitoring.",
-                "treatment_notes": "Annual skin check complete. Patient advised on sun protection and monthly self-exams. Return in 12 months.",
-                "doctor_name": "Dr. James Doe",
-                "lesion_location": "Full body",
-                "lesion_size": "N/A"
-            },
-            {
-                "id": "VIS-20251218-0003",
-                "date": "2025-12-18",
-                "desc": "Urgent referral -- rapid-growing nodule on right forearm. Biopsy scheduled but patient deferred.",
-                "tag": "urgent",
-                "diagnosis": "Suspicious nodule (rule out SCC)",
-                "ai_findings": "Asymmetry: 0.91 | Border: 0.88 | Color: 0.79 | Diameter: 0.85\nHigh concern. Triage: Urgent -- Biopsy Recommended.",
-                "treatment_notes": "Biopsy recommended and scheduled. Patient expressed anxiety and deferred procedure. Discussed risks of delay. Prescribed topical corticosteroid for inflammation. Follow-up in 1 week.",
-                "doctor_name": "Dr. Mercy Okonkwo",
-                "lesion_location": "Right forearm, dorsal aspect",
-                "lesion_size": "12mm x 8mm, raised 3mm"
-            }
-        ],
-        "created_at": "2025-12-01T00:00:00+00:00"
-    }
-    demo_completed = {
-        "id": "PAT-2024-0912",
-        "name": "John Kamau",
-        "age": "52 yrs (DOB: 1974-08-22)",
-        "gender": "male",
-        "fitz": "V",
-        "contact": "+254 723 456 789",
-        "history": "Completed treatment for BCC on left cheek. Treated with Mohs surgery -- clear margins confirmed. No recurrence at 6-month follow-up.",
-        "diagnosis": "bcc",
-        "body_site": "face",
-        "status": "completed",
-        "visits": [
-            {
-                "id": "VIS-20251015-0001",
-                "date": "2025-10-15",
-                "desc": "Initial diagnosis -- biopsy-confirmed BCC on left cheek.",
-                "tag": "urgent",
-                "diagnosis": "Basal Cell Carcinoma (confirmed)",
-                "ai_findings": "Nodular BCC with ulceration. Low-risk subtype. Triage: Treatment recommended.",
-                "treatment_notes": "Biopsy performed. Mohs surgery scheduled.",
-                "doctor_name": "Dr. James Doe",
-                "lesion_location": "Left cheek",
-                "lesion_size": "8mm x 6mm"
-            },
-            {
-                "id": "VIS-20251120-0001",
-                "date": "2025-11-20",
-                "desc": "Mohs surgery -- clear margins achieved. Wound closed with linear repair.",
-                "tag": "followup",
-                "diagnosis": "BCC -- completely excised",
-                "ai_findings": "N/A -- surgical specimen",
-                "treatment_notes": "Mohs surgery performed. Clear margins. Patient recovering well.",
-                "doctor_name": "Dr. Mercy Okonkwo",
-                "lesion_location": "Left cheek",
-                "lesion_size": "8mm x 6mm"
-            },
-            {
-                "id": "VIS-20260522-0001",
-                "date": "2026-05-22",
-                "desc": "6-month follow-up -- no signs of recurrence. Patient discharged.",
-                "tag": "routine",
-                "diagnosis": "No recurrence -- treatment complete",
-                "ai_findings": "No suspicious findings. Triage: Routine.",
-                "treatment_notes": "Patient discharged from follow-up. Advised on annual skin checks and sun protection.",
-                "doctor_name": "Dr. James Doe",
-                "lesion_location": "Left cheek",
-                "lesion_size": "N/A"
-            }
-        ],
-        "created_at": "2025-10-10T00:00:00+00:00"
-    }
-    demo_followup = {
-        "id": "PAT-2025-0031",
-        "name": "Grace Achieng",
-        "age": "28 yrs (DOB: 1998-09-05)",
-        "gender": "female",
-        "fitz": "VI",
-        "contact": "+254 734 567 890",
-        "history": "Dysplastic nevus on right shoulder. Scheduled for 3-month follow-up after initial excision. Healing well, no recurrence noted.",
-        "diagnosis": "dysplastic_nevus",
-        "body_site": "right_arm",
-        "status": "followup",
-        "visits": [
-            {"id": "VIS-20260310-0001", "date": "2026-03-10", "desc": "Excision of dysplastic nevus on right shoulder. Clear margins achieved.", "tag": "followup", "diagnosis": "Dysplastic Nevus -- excised", "ai_findings": "Moderate atypia. No melanoma identified.", "treatment_notes": "Excisional biopsy performed. Wound closed primarily. Follow-up in 3 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "5mm x 4mm"},
-            {"id": "VIS-20260610-0001", "date": "2026-06-10", "desc": "3-month follow-up -- wound healed well. No signs of recurrence.", "tag": "routine", "diagnosis": "Healing well -- no recurrence", "ai_findings": "Low risk. No suspicious features.", "treatment_notes": "Patient reassured. Next follow-up in 6 months.", "doctor_name": "Dr. Mercy Okonkwo", "lesion_location": "Right shoulder", "lesion_size": "N/A"}
-        ],
-        "created_at": "2026-03-08T00:00:00+00:00"
-    }
-    demo_consultation = {
-        "id": "PAT-2025-0042",
-        "name": "Peter Omondi",
-        "age": "45 yrs (DOB: 1981-11-30)",
-        "gender": "male",
-        "fitz": "IV",
-        "contact": "+254 745 678 901",
-        "history": "Referred by GP for suspicious lesion on left forearm. Patient reports new growth over past 6 weeks. No prior skin cancer history.",
-        "diagnosis": "scc",
-        "body_site": "left_arm",
-        "status": "consultation",
-        "visits": [
-            {"id": "VIS-20260601-0001", "date": "2026-06-01", "desc": "Initial consultation -- rapid-growing nodule on left forearm. Biopsy scheduled.", "tag": "urgent", "diagnosis": "Suspicious nodule (rule out SCC)", "ai_findings": "Asymmetry: 0.78 | Border: 0.69 | Color: 0.71 | Diameter: 0.82\nHigh concern.", "treatment_notes": "Biopsy scheduled. Patient counseled on SCC risks and treatment options.", "doctor_name": "Dr. James Doe", "lesion_location": "Left forearm, extensor surface", "lesion_size": "10mm x 7mm, raised 2mm"}
-        ],
-        "created_at": "2026-06-01T00:00:00+00:00"
-    }
-    patients.append(demo_active)
-    patients.append(demo_completed)
-    patients.append(demo_followup)
-    patients.append(demo_consultation)
-    _save_patients(patients)
-
-
-class AdminLoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class DoctorCreateRequest(BaseModel):
-    username: str
-    password: str
-    name: str
-    email: str
-    nin: str = ""
-    title: str = "Dermatologist"
-    permissions: dict = Field(default_factory=lambda: {p: True for p in DOCTOR_PERMISSIONS})
-
-
-class DoctorUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    nin: Optional[str] = None
-    title: Optional[str] = None
-    active: Optional[bool] = None
-    permissions: Optional[dict] = None
-    photo: Optional[str] = None
-
-
-class AdminPasswordChangeRequest(BaseModel):
-    current_password: str
-    new_password: str
-
-
-class DoctorResetPasswordRequest(BaseModel):
-    new_password: str
-
-
-class BulkDoctorAction(BaseModel):
-    doctor_ids: List[str]
-    active: bool
-
-
-class PermissionsUpdate(BaseModel):
-    permissions: dict
-
-
-# ---------------------------------------------------------------------------
-#  App factory
-# ---------------------------------------------------------------------------
-
-def create_app() -> FastAPI:
-    # Ensure admin data exists
-    _init_admin()
-    _seed_demo_patients()
+            seeded = await run_in_threadpool(seed_demo_patients, store)
+            if seeded:
+                logger.warning("DEMO_MODE: seeded %d simulated patients (not evaluation data)", seeded)
+        if initialise_backend:
+            await run_in_threadpool(backend.initialise)
+        logger.info("Startup complete: model_ready=%s agent_ready=%s (%s)",
+                    backend.status.model_ready, backend.status.agent_ready, backend.status.reason)
+        yield
+        store.close()
 
     app = FastAPI(
         title="Dermatology AI -- Clinical API",
-        version="2.0.0",
-        description="Backend API for the Dermatology AI Clinical Decision Support Dashboard",
+        version="3.0.0",
+        description=(
+            "Research/educational decision-support prototype. Not a medical device. "
+            "No clinical validation. Model output must never be used for treatment decisions."
+        ),
+        lifespan=lifespan,
     )
 
-    # SECURITY FIX: CORS - restrict origins, methods, headers; never use "*" with credentials
-    allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:7860").split(",")
+    app.state.store = store
+    app.state.sessions = sessions
+    app.state.throttle = throttle
+    app.state.tracker = tracker
+    app.state.backend = backend
+    app.state.bootstrap_password = bootstrap_password
+    app.state.demo_mode = demo_mode
+
+    # -- middleware --------------------------------------------------------
+    allowed_origins = [
+        origin.strip()
+        for origin in os.environ.get("ALLOWED_ORIGINS", "http://localhost:7860").split(",")
+        if origin.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
 
-    # SECURITY FIX: Rate limiting for auth endpoints (5 requests/min per IP)
-    limiter = Limiter(key_func=get_remote_address)
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        # Reject oversized bodies before reading them into memory.
+        try:
+            declared = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared = 0
+        if declared > MAX_REQUEST_SIZE:
+            return JSONResponse({"detail": "Request body too large."}, status_code=413)
+
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; "
+            "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+        )
+        if request.url.scheme == "https":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+    # CSRF: there is no CSRF token, and that is intentional.
+    #
+    # Authentication is a bearer token in the ``Authorization`` header, never a
+    # cookie (``tests/test_s0_2_authz_matrix.py::test_cookie_bearer_is_not_accepted``).
+    # A cross-site page cannot attach that header without a CORS preflight, and
+    # CORS only allows the configured ``ALLOWED_ORIGINS``.  The old per-route
+    # CSRF check therefore added no protection -- it only broke every dashboard
+    # write with a 403.  If cookies are ever introduced, add double-submit CSRF
+    # (or SameSite=Strict) in the same change.  See SECURITY.md section 2.
+    limiter = Limiter(key_func=rate_limit_key)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # SECURITY FIX: Start background session cleanup task
-    @app.on_event("startup")
-    async def startup_event():
-        asyncio.create_task(_cleanup_expired_sessions())
-        logger.info("Session cleanup task started")
-
-    # -----------------------------------------------------------------------
-    #  Lazy backend initialisation
-    # -----------------------------------------------------------------------
-    _backend = None
-
-    def get_backend():
-        nonlocal _backend
-        if _backend is not None:
-            return _backend
-        try:
-            from model import DermatologyCBM, CONCEPT_NAMES
-            from rl_module import PPOAgent, DermTriageEnv, FITZPATRICK_LABELS, TRIAGE_NAMES
-            from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
-            from metrics_tracker import FairnessTracker
-            from main import generate_mock_cases, train_ppo_agent, seed_tracker
-
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            logger.info("Initialising HRNet-CBM model on %s ...", device)
-            model = DermatologyCBM(
-                num_classes=3, num_concepts=7,
-                hrnet_name="hrnet_w18", pretrained_backbone=True,
-                freeze_backbone=False,
-            ).to(device)
-            model = model.float()
-            model.eval()
-
-            logger.info("Initialising PPO agent ...")
-            agent = PPOAgent(state_dim=7 + 6, action_dim=3, lr=3e-4, device=device)
-            cases = generate_mock_cases(num_cases=500)
-            agent_path = "agent_params.pt"
-            if os.path.exists(agent_path):
-                try:
-                    agent.load(agent_path)
-                    logger.info("Loaded saved PPO agent from %s", agent_path)
-                except Exception as e:
-                    logger.warning("Failed to load PPO agent, retraining: %s", e)
-                    env = DermTriageEnv(num_concepts=7)
-                    agent = train_ppo_agent(agent, env, cases, num_episodes=2000)
-                    agent.save(agent_path)
-            else:
-                env = DermTriageEnv(num_concepts=7)
-                agent = train_ppo_agent(agent, env, cases, num_episodes=2000)
-                agent.save(agent_path)
-
-            logger.info("Initialising HITL pipeline ...")
-            hitl = HITLPipeline(agent, num_concepts=7)
-            optimizer = OfflinePolicyOptimizer(agent, learning_rate=5e-5)
-
-            logger.info("Initialising fairness tracker ...")
-            tracker = FairnessTracker(persist_path="case_history.json")
-            seed_tracker(agent, cases, tracker, hitl)
-
-            from ui import AppState
-            app_state = AppState(
-                model=model, ppo_agent=agent, hitl=hitl,
-                offline_optimizer=optimizer, tracker=tracker, device=device,
-            )
-            _backend = app_state
-            logger.info("Backend initialised successfully.")
-        except ImportError as e:
-            logger.warning("Backend modules not available (%s). Running in API-only mode.", e)
-            _backend = None
-        return _backend
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Static files
-    # -----------------------------------------------------------------------
-
+    # -- static ------------------------------------------------------------
     @app.get("/", response_class=HTMLResponse)
-    async def index():
-        html_path = Path(__file__).parent / "dashboard.html"
+    def index():
+        html_path = APP_DIR / "dashboard.html"
         if not html_path.exists():
             return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
         return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
+    def _image_response(name: str):
+        path = APP_DIR / name
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(path)
+
+    @app.get("/dashboard.js", response_class=Response)
+    def dashboard_js():
+        # SECURITY FIX: the dashboard script is a separate file so the page can be
+        # served under ``script-src 'self'`` with no 'unsafe-inline'.
+        js_path = APP_DIR / "dashboard.js"
+        if not js_path.exists():
+            raise HTTPException(status_code=404, detail="Not found")
+        return Response(js_path.read_text(encoding="utf-8"), media_type="application/javascript")
+
     @app.get("/measles_child.jpg")
-    async def get_measles_image():
-        img_path = Path(__file__).parent / "measles_child.jpg"
-        if not img_path.exists():
-            return HTMLResponse(status_code=404)
-        return FileResponse(img_path, media_type="image/jpeg")
+    def measles_image():
+        return _image_response("measles_child.jpg")
 
     @app.get("/bg_vitiligo.jpg")
-    async def get_bg_vitiligo():
-        img_path = Path(__file__).parent / "bg_vitiligo.jpg"
-        if not img_path.exists():
-            return HTMLResponse(status_code=404)
-        return FileResponse(img_path, media_type="image/jpeg")
+    def vitiligo_image():
+        return _image_response("bg_vitiligo.jpg")
 
     @app.get("/bg_acne_skin.jpg")
-    async def get_bg_acne_skin():
-        img_path = Path(__file__).parent / "bg_acne_skin.jpg"
-        if not img_path.exists():
-            return HTMLResponse(status_code=404)
-        return FileResponse(img_path, media_type="image/jpeg")
+    def acne_image():
+        return _image_response("bg_acne_skin.jpg")
 
     @app.get("/robots.txt", response_class=HTMLResponse)
-    async def robots_txt():
-        return """User-agent: *
-Allow: /
-Sitemap: https://dermai.onrender.com/sitemap.xml
-"""
+    def robots():
+        return "User-agent: *\nDisallow: /\n"
 
-    @app.get("/sitemap.xml", response_class=HTMLResponse)
-    async def sitemap_xml():
-        return """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://dermai.onrender.com/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
-"""
-
+    # -- health ------------------------------------------------------------
     @app.get("/api/health")
-    async def health():
-        backend = get_backend()
+    def health():
+        """Liveness only -- must never touch the model or the database."""
+        return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+    @app.get("/api/ready")
+    def ready():
+        status: BackendStatus = backend.status
         return {
-            "status": "healthy",
-            "backend_loaded": backend is not None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "model_ready": status.model_ready,
+            "agent_ready": status.agent_ready,
+            "reason": status.reason,
+            "model_version": status.model_version,
+            "weights_sha256": status.weights_sha256,
+            "device": status.device,
+            "demo_mode": bool(demo_mode),
         }
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Login / Auth
-    # -----------------------------------------------------------------------
-
-    # SECURITY FIX: Rate limit login endpoint (5 requests/min per IP)
+    # -- auth --------------------------------------------------------------
     @app.post("/api/login", response_model=LoginResponse)
-    @limiter.limit("5/minute")
-    async def login(req: LoginRequest, request: Request):
-        if not req.email or not req.password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-        doc_data = _load_doctors()
-        doctor = None
-        for d in doc_data["doctors"]:
-            if d.get("email") == req.email or d.get("username") == req.email.split("@")[0]:
-                if _check_password(req.password, d.get("password", "")):
-                    doctor = d
-                    break
-        if not doctor:
+    @limiter.limit(login_rate_limit)
+    def login(request: Request, payload: LoginRequest):
+        retry = throttle.retry_after(payload.email)
+        if retry:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again later.",
+                                headers={"Retry-After": str(retry)})
+
+        doctor = store.find_user(identifier=payload.email, role="doctor")
+        if doctor is None or not check_password(payload.password, doctor.get("password", "")):
+            throttle.register_failure(payload.email)
+            _audit(store, None, "login_failed", payload.email, outcome="denied")
             raise HTTPException(status_code=401, detail="Invalid email or password.")
-        doctor["last_login"] = datetime.now(timezone.utc).isoformat()
-        _save_doctors(doc_data)
-        name = doctor.get("name", req.email.split("@")[0].replace(".", " ").title())
-        initials = "".join(w[0] for w in name.split()[:2])
+        if not doctor.get("active", True):
+            _audit(store, None, "login_deactivated", doctor.get("username", ""), outcome="denied")
+            raise HTTPException(status_code=403, detail="This account has been deactivated.")
+
+        throttle.reset(payload.email)
+        store.update_user(doctor["id"], {"last_login": datetime.now(timezone.utc).isoformat()})
+        token, session = sessions.create("doctor", doctor)
+        _audit(store, session, "login", doctor.get("username", ""))
         physician = {
-            "name": name,
-            "email": doctor.get("email", req.email),
-            "initials": initials,
-            "title": doctor.get("title", "Board-Certified Dermatologist"),
-            "id": doctor.get("id", ""),
+            "id": doctor["id"],
+            "name": doctor.get("name", ""),
+            "email": doctor.get("email", ""),
+            "title": doctor.get("title", ""),
             "nin": doctor.get("nin", ""),
             "photo": doctor.get("photo", ""),
             "permissions": doctor.get("permissions", {}),
         }
-        token = _create_session({"role": "doctor", **physician})
-        _log_activity(f"Doctor {physician['name']} logged in", actor=physician["name"])
-        return LoginResponse(
-            success=True,
-            token=token,
-            physician=physician,
-            message="Authentication successful.",
-            csrf_token=_sessions[token].get("csrf_token", ""),
-        )
+        return LoginResponse(success=True, token=token, physician=physician,
+                             message="Authentication successful.", sid=session.sid)
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Patient
-    # -----------------------------------------------------------------------
+    @app.post("/api/admin/login")
+    @limiter.limit(login_rate_limit)
+    def admin_login(request: Request, payload: AdminLoginRequest):
+        retry = throttle.retry_after(payload.username)
+        if retry:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again later.",
+                                headers={"Retry-After": str(retry)})
 
+        admin = store.find_user(identifier=payload.username, role="admin")
+        if admin is None or not check_password(payload.password, admin.get("password", "")):
+            throttle.register_failure(payload.username)
+            _audit(store, None, "admin_login_failed", payload.username, outcome="denied")
+            raise HTTPException(status_code=401, detail="Invalid admin credentials.")
+
+        throttle.reset(payload.username)
+        token, session = sessions.create("admin", admin)
+        _audit(store, session, "admin_login", admin.get("username", ""))
+        return {
+            "success": True,
+            "token": token,
+            "sid": session.sid,
+            "admin": {
+                "id": admin["id"],
+                "name": admin.get("name", ""),
+                "username": admin.get("username", ""),
+                "role": "admin",
+                "photo": admin.get("photo", ""),
+            },
+            "message": "Admin authenticated.",
+        }
+
+    @app.post("/api/logout")
+    def logout(request: Request, session: Session = Depends(require_auth),
+               authorization: str = Header("")):
+        sessions.revoke_token(current_token(authorization))
+        _audit(store, session, "logout", session.user.get("name", ""))
+        return {"status": "logged_out"}
+
+    @app.get("/api/me")
+    def me(session: Session = Depends(require_auth)):
+        return {"role": session.role, "user": session.user, "sid": session.sid}
+
+    # -- patients ----------------------------------------------------------
     @app.get("/api/patients")
-    async def list_patients(query: str = "", fitz: str = "", _auth=Depends(require_auth)):
-        patients = _load_patients()
-        if query:
-            q = query.lower()
-            patients = [p for p in patients if q in p.get("name", "").lower() or q in p.get("id", "").lower()]
-        if fitz:
-            patients = [p for p in patients if p.get("fitz", "").lower() == fitz.lower()]
-        return {"patients": patients}
+    def list_patients(
+        session: Session = Depends(require_permission("view_patient")),
+        query: str = Query("", max_length=120),
+        fitz: str = Query("", max_length=4),
+        limit: int = Query(50, ge=1, le=200),
+        offset: int = Query(0, ge=0),
+    ):
+        patients = store.list_patients(query=query, fitz=fitz, limit=limit, offset=offset)
+        _audit(store, session, "list_patients", f"n={len(patients)}")
+        return {"patients": patients, "total": store.count_patients(), "limit": limit, "offset": offset}
 
     @app.get("/api/patients/{patient_id}")
-    async def get_patient(patient_id: str, _auth=Depends(require_auth)):
-        patients = _load_patients()
-        for p in patients:
-            if p["id"] == patient_id:
-                return {"patient": p}
-        raise HTTPException(status_code=404, detail="Patient not found.")
+    def get_patient(patient_id: str, session: Session = Depends(require_permission("view_patient"))):
+        patient = store.get_patient(patient_id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found.")
+        _audit(store, session, "read_patient", patient_id)
+        return {"patient": patient}
 
     @app.post("/api/patients", status_code=201)
-    async def create_patient(req: PatientRequest, _auth=Depends(require_csrf)):
-        print("[DEBUG] create_patient called")
-        patients = _load_patients()
-        new_id = req.id or f"PAT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{len(patients) + 1:04d}"
-        existing_ids = {p["id"] for p in patients}
-        if new_id in existing_ids:
-            max_n = 0
-            today = datetime.now(timezone.utc).strftime('%Y%m%d')
-            for pid in existing_ids:
-                if pid.startswith(f"PAT-{today}-"):
-                    try:
-                        n = int(pid.split("-")[-1])
-                        if n > max_n:
-                            max_n = n
-                    except ValueError:
-                        pass
-            new_id = f"PAT-{today}-{max_n + 1:04d}"
-            while new_id in existing_ids:
-                max_n += 1
-                new_id = f"PAT-{today}-{max_n + 1:04d}"
-        patient = {
-            "id": new_id,
-            "name": req.name,
-            "age": req.age,
-            "gender": req.gender,
-            "fitz": req.fitz,
-            "contact": req.contact,
-            "history": req.history,
-            "diagnosis": req.diagnosis,
-            "body_site": req.body_site,
-            "status": req.status,
-            "visits": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        patients.append(patient)
-        _save_patients(patients)
+    def create_patient(payload: PatientRequest, session: Session = Depends(require_permission("edit_patient"))):
+        patient = store.create_patient(payload.model_dump())
+        _audit(store, session, "create_patient", patient["id"])
         return {"status": "created", "patient": patient}
 
     @app.put("/api/patients/{patient_id}")
-    async def update_patient(patient_id: str, req: PatientRequest, _auth=Depends(require_csrf)):
-        patients = _load_patients()
-        for i, p in enumerate(patients):
-            if p["id"] == patient_id:
-                patients[i] = {
-                    "id": patient_id,
-                    "name": req.name,
-                    "age": req.age,
-                    "gender": req.gender,
-                    "fitz": req.fitz,
-                    "contact": req.contact,
-                    "history": req.history,
-                    "diagnosis": req.diagnosis,
-                    "body_site": req.body_site,
-                    "status": req.status,
-                    "visits": p.get("visits", []),
-                    "created_at": p.get("created_at", datetime.now(timezone.utc).isoformat()),
-                }
-                _save_patients(patients)
-                return {"status": "updated", "patient": patients[i]}
-        raise HTTPException(status_code=404, detail="Patient not found.")
+    def update_patient(patient_id: str, payload: PatientRequest,
+                       session: Session = Depends(require_permission("edit_patient"))):
+        patient = store.update_patient(patient_id, payload.model_dump())
+        if patient is None:
+            raise HTTPException(status_code=404, detail="Patient not found.")
+        _audit(store, session, "update_patient", patient_id)
+        return {"status": "updated", "patient": patient}
 
     @app.delete("/api/patients/{patient_id}")
-    async def delete_patient(patient_id: str, _auth=Depends(require_csrf)):
-        patients = _load_patients()
-        new_list = [p for p in patients if p["id"] != patient_id]
-        if len(new_list) == len(patients):
+    def delete_patient(patient_id: str, session: Session = Depends(require_permission("edit_patient"))):
+        if not store.delete_patient(patient_id):
             raise HTTPException(status_code=404, detail="Patient not found.")
-        _save_patients(new_list)
+        _audit(store, session, "delete_patient", patient_id)
         return {"status": "deleted", "patient_id": patient_id}
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Visits
-    # -----------------------------------------------------------------------
-
+    # -- visits ------------------------------------------------------------
     @app.get("/api/patients/{patient_id}/visits")
-    async def list_visits(patient_id: str, _auth=Depends(require_auth)):
-        patients = _load_patients()
-        for p in patients:
-            if p["id"] == patient_id:
-                return {"visits": p.get("visits", [])}
-        raise HTTPException(status_code=404, detail="Patient not found.")
-
-    @app.get("/api/patients/{patient_id}/visits/{visit_id}")
-    async def get_visit(patient_id: str, visit_id: str, _auth=Depends(require_auth)):
-        patients = _load_patients()
-        for p in patients:
-            if p["id"] == patient_id:
-                for v in p.get("visits", []):
-                    if v.get("id") == visit_id:
-                        return {"visit": v}
-                raise HTTPException(status_code=404, detail="Visit not found.")
-        raise HTTPException(status_code=404, detail="Patient not found.")
+    def list_visits(patient_id: str, session: Session = Depends(require_permission("view_history"))):
+        if store.get_patient(patient_id) is None:
+            raise HTTPException(status_code=404, detail="Patient not found.")
+        return {"visits": store.list_visits(patient_id)}
 
     @app.post("/api/patients/{patient_id}/visits", status_code=201)
-    async def create_visit(patient_id: str, req: VisitRequest, _auth=Depends(require_csrf)):
-        patients = _load_patients()
-        for i, p in enumerate(patients):
-            if p["id"] == patient_id:
-                visits = p.get("visits", [])
-                visit = {
-                    "id": f"VIS-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
-                    "date": req.date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                    "desc": req.desc,
-                    "tag": req.tag,
-                    "diagnosis": req.diagnosis,
-                    "ai_findings": req.ai_findings,
-                    "treatment_notes": req.treatment_notes,
-                    "doctor_name": req.doctor_name,
-                    "lesion_location": req.lesion_location,
-                    "lesion_size": req.lesion_size,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-                visits.append(visit)
-                patients[i]["visits"] = visits
-                _save_patients(patients)
-                return {"status": "created", "visit": visit}
-        raise HTTPException(status_code=404, detail="Patient not found.")
+    def create_visit(patient_id: str, payload: VisitRequest,
+                     session: Session = Depends(require_permission("edit_patient"))):
+        visit = store.add_visit(patient_id, payload.model_dump())
+        if visit is None:
+            raise HTTPException(status_code=404, detail="Patient not found.")
+        _audit(store, session, "create_visit", f"{patient_id}/{visit['id']}")
+        return {"status": "created", "visit": visit}
 
     @app.delete("/api/patients/{patient_id}/visits/{visit_id}")
-    async def delete_visit(patient_id: str, visit_id: str, _auth=Depends(require_csrf)):
-        patients = _load_patients()
-        for i, p in enumerate(patients):
-            if p["id"] == patient_id:
-                visits = p.get("visits", [])
-                new_visits = [v for v in visits if v.get("id") != visit_id]
-                if len(new_visits) == len(visits):
-                    raise HTTPException(status_code=404, detail="Visit not found.")
-                patients[i]["visits"] = new_visits
-                _save_patients(patients)
-                return {"status": "deleted", "visit_id": visit_id}
-        raise HTTPException(status_code=404, detail="Patient not found.")
+    def delete_visit(patient_id: str, visit_id: str,
+                     session: Session = Depends(require_permission("edit_patient"))):
+        if not store.delete_visit(patient_id, visit_id):
+            raise HTTPException(status_code=404, detail="Visit not found.")
+        _audit(store, session, "delete_visit", f"{patient_id}/{visit_id}")
+        return {"status": "deleted", "visit_id": visit_id}
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Diagnosis
-    # -----------------------------------------------------------------------
-
-    # SECURITY FIX: Require authentication on /api/diagnose
+    # -- diagnosis ---------------------------------------------------------
     @app.post("/api/diagnose")
     async def diagnose(
+        request: Request,
         file: UploadFile = File(...),
         fitzpatrick: int = Form(4),
-        _auth=Depends(require_auth),
+        session: Session = Depends(require_permission("run_diagnosis")),
     ):
-        # SECURITY FIX: Harden file upload validation - size cap, magic bytes, PIL bomb protection
-        backend = get_backend()
-        if backend is None:
-            return _mock_diagnosis()
-
-        if fitzpatrick < 1 or fitzpatrick > 6:
+        if not 1 <= fitzpatrick <= 6:
             raise HTTPException(status_code=422, detail="Fitzpatrick type must be between 1 and 6.")
+        if not backend.ready:
+            raise HTTPException(status_code=503, detail={
+                "error": "model_unavailable",
+                "reason": backend.status.reason,
+            })
 
-        # Size cap: reject uploads > 10 MB before processing
-        MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
-        contents = await file.read()
+        contents = await file.read(MAX_UPLOAD_SIZE + 1)
         if len(contents) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
 
-        # Magic bytes validation - reject spoofed content-type
         import filetype
         kind = filetype.guess(contents)
         if kind is None or not kind.mime.startswith("image/"):
-            raise HTTPException(status_code=422, detail="Uploaded file must be a valid image (magic bytes check failed).")
+            raise HTTPException(status_code=422, detail="Uploaded file must be a valid image.")
 
-        import io
         try:
-            img = Image.open(io.BytesIO(contents)).convert("RGB")
-        except Exception as e:
-            logger.warning("Image decode failed: %s", e)
-            raise HTTPException(status_code=422, detail="Invalid or corrupted image file.")
+            with Image.open(python_io.BytesIO(contents)) as handle:
+                handle.verify()
+            image = Image.open(python_io.BytesIO(contents)).convert("RGB")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Image decode failed: %s", exc)
+            raise HTTPException(status_code=422, detail="Invalid or corrupted image file.") from exc
 
-        arr = np.array(img)
+        array = np.array(image)
+        try:
+            result = await run_in_threadpool(backend.diagnose, array, fitzpatrick)
+        except ModelUnavailable as exc:
+            raise HTTPException(status_code=503, detail={
+                "error": "model_unavailable", "reason": str(exc)}) from exc
 
-        from ui import preprocess
-        tensor = preprocess(arr, backend.device)
+        _audit(store, session, "diagnose", result["case_id"],
+               detail=f"fitz={fitzpatrick} class={result['predicted_class']}")
+        client_ip = request.client.host if request.client else "unknown"
+        logger.info("diagnosis case=%s fitz=%s ip=%s", result["case_id"], fitzpatrick, client_ip)
+        return result
 
-        with torch.no_grad():
-            logits, concepts = backend.model(tensor)
-            pred_class = logits.argmax(dim=1).item()
-
-        from model import CONCEPT_NAMES
-        concept_dict = {
-            CONCEPT_NAMES[i]: round(concepts[0, i].item(), 4)
-            for i in range(len(CONCEPT_NAMES))
-        }
-
-        state_vec = np.concatenate([
-            concepts[0].cpu().numpy(),
-            np.eye(6, dtype=np.float32)[fitzpatrick - 1],
-        ])
-        model_action = backend.ppo_agent.evaluate(state_vec)
-
-        from rl_module import TRIAGE_NAMES, FITZPATRICK_LABELS
-        triage_name = TRIAGE_NAMES[model_action]
-
-        case_id = backend.next_case_id()
-        from metrics_tracker import CaseRecord
-        backend.tracker.register_case(CaseRecord(
-            case_id=case_id, fitz_type=fitzpatrick,
-            true_label=pred_class, model_triage=model_action,
-            concepts=concepts[0].cpu().numpy().tolist(),
-        ))
-
-        return {
-            "case_id": case_id,
-            "concepts": concept_dict,
-            "triage": triage_name,
-            "triage_index": model_action,
-            "predicted_class": ["benign", "melanoma", "kaposi_sarcoma"][pred_class],
-            "fitzpatrick": fitzpatrick,
-            "fitzpatrick_label": FITZPATRICK_LABELS[fitzpatrick - 1],
-            # ML FIX: Kaposi sarcoma confidence caveat - no real HAM10000 KS samples
-            "confidence_caveat": (
-                "Kaposi sarcoma class trained on synthetic data only; "
-                "no real HAM10000 KS samples available. "
-                "Prediction unvalidated on real images."
-            ) if pred_class == 2 else None,
-        }
-
-    def _mock_diagnosis():
-        return {
-            "case_id": f"MOCK-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4]}",
-            "concepts": {
-                "asymmetry": 0.82, "border_irregularity": 0.73,
-                "color_variegation": 0.65, "diameter_large": 0.44,
-                "melanin_density": 0.31, "inflammation": 0.58,
-                "ulceration": 0.12,
-            },
-            "triage": "follow_up",
-            "triage_index": 1,
-            "predicted_class": "melanoma",
-            "fitzpatrick": 4,
-            "fitzpatrick_label": "Olive",
-            "confidence_caveat": None,
-        }
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Overrides
-    # -----------------------------------------------------------------------
-
+    # -- overrides / notes -------------------------------------------------
     @app.post("/api/override")
-    async def submit_override(req: OverrideRequest, _auth=Depends(require_csrf)):
-        backend = get_backend()
-        if backend is None:
-            return {"status": "recorded", "case_id": req.case_id, "action": req.clinician_action}
-        backend.tracker.register_override(req.case_id, req.clinician_action)
-        return {"status": "recorded", "case_id": req.case_id, "action": req.clinician_action}
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Notes
-    # -----------------------------------------------------------------------
+    def submit_override(payload: OverrideRequest,
+                        session: Session = Depends(require_permission("override_triage"))):
+        if not tracker.register_override(payload.case_id, payload.clinician_action):
+            raise HTTPException(status_code=404, detail="Unknown case_id.")
+        _audit(store, session, "override", payload.case_id,
+               detail=f"action={payload.clinician_action}")
+        return {"status": "recorded", "case_id": payload.case_id, "action": payload.clinician_action}
 
     @app.post("/api/notes")
-    async def save_notes(req: NotesSaveRequest, _auth=Depends(require_csrf)):
-        notes = _load_notes()
-        notes[req.case_id] = req.notes
-        _save_notes(notes)
-        return {"status": "saved", "case_id": req.case_id}
+    def save_notes(payload: NotesSaveRequest,
+                   session: Session = Depends(require_permission("edit_patient"))):
+        notes = store.get_kv("notes", {}) or {}
+        notes[payload.case_id] = payload.notes
+        store.set_kv("notes", notes)
+        _audit(store, session, "save_notes", payload.case_id)
+        return {"status": "saved", "case_id": payload.case_id}
 
     @app.get("/api/notes/{case_id}")
-    async def get_notes(case_id: str, _auth=Depends(require_auth)):
-        notes = _load_notes()
+    def get_notes(case_id: str, session: Session = Depends(require_permission("view_patient"))):
+        notes = store.get_kv("notes", {}) or {}
+        _audit(store, session, "read_notes", case_id)
         return {"case_id": case_id, "notes": notes.get(case_id, "")}
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Analytics
-    # -----------------------------------------------------------------------
-
+    # -- analytics / history / export --------------------------------------
     @app.get("/api/analytics")
-    async def get_analytics(_auth=Depends(require_auth)):
-        backend = get_backend()
-        if backend is None:
-            return {"metrics": _mock_analytics()}
-        try:
-            metrics = backend.tracker.compute_metrics()
-        except Exception:
-            metrics = _mock_analytics()
-        return {"metrics": metrics}
-
-    def _mock_analytics():
-        return {
-            "total_cases": 487,
-            "overall_accuracy": 0.843,
-            "override_rate": 0.12,
-            "accuracy_gap": 0.027,
-            "legacy_accuracy": 0.872,
-            "target_accuracy": 0.845,
-        }
-
-    # -----------------------------------------------------------------------
-    #  Routes -- History
-    # -----------------------------------------------------------------------
+    def analytics(session: Session = Depends(require_permission("view_analytics"))):
+        return {"metrics": tracker.compute_metrics()}
 
     @app.get("/api/history")
-    async def get_history(query: str = "", fitz_filter: int = 0, limit: int = 50, _auth=Depends(require_auth)):
-        backend = get_backend()
-        if backend is None:
-            return {"cases": _mock_history(limit)}
-        from ui import search_history
-        import pandas as pd
-        df = search_history(query, fitz_filter, backend)
-        if isinstance(df, pd.DataFrame) and "Info" not in df.columns:
-            return {"cases": df.head(limit).to_dict(orient="records")}
-        return {"cases": []}
-
-    def _mock_history(limit=50):
-        try:
-            from rl_module import FITZPATRICK_LABELS, TRIAGE_NAMES
-        except ImportError:
-            FITZPATRICK_LABELS = ["", "Light", "Fair", "Olive", "Brown", "Dark Brown", "Black"]
-            TRIAGE_NAMES = ["routine", "follow_up", "urgent"]
-        import random
-        cases = []
-        for i in range(min(limit, 20)):
-            fitz = random.randint(1, 6)
-            mt = random.randint(0, 2)
-            override = random.random() < 0.12
-            cases.append({
-                "case_id": f"UI-20260522-{i+1:04d}",
-                "date": "2026-05-22",
-                "fitzpatrick": FITZPATRICK_LABELS[fitz - 1],
-                "model_triage": TRIAGE_NAMES[mt],
-                "final_triage": TRIAGE_NAMES[random.randint(0, 2)] if override else TRIAGE_NAMES[mt],
-                "override": override,
+    def history(
+        session: Session = Depends(require_permission("view_history")),
+        query: str = Query("", max_length=120),
+        fitz_filter: int = Query(0, ge=0, le=6),
+        limit: int = Query(50, ge=1, le=200),
+    ):
+        cases = tracker.cases
+        if fitz_filter:
+            cases = [c for c in cases if c.fitz_type == fitz_filter]
+        if query:
+            cases = [c for c in cases if query.lower() in c.case_id.lower()]
+        rows = []
+        for case in cases[-limit:]:
+            final = case.clinician_triage if case.is_override else case.model_triage
+            rows.append({
+                "case_id": case.case_id,
+                "date": case.timestamp[:10],
+                "fitzpatrick": FITZPATRICK_LABELS[case.fitz_type - 1],
+                "model_triage": TRIAGE_NAMES[case.model_triage] if case.model_triage is not None else "",
+                "final_triage": TRIAGE_NAMES[final] if final is not None else "",
+                "override": case.is_override,
+                "ground_truth_confirmed": case.ground_truth_confirmed,
+                "source": case.source,
             })
-        return cases
-
-    # -----------------------------------------------------------------------
-    #  Routes -- System
-    # -----------------------------------------------------------------------
-
-    @app.post("/api/offline-update")
-    async def run_offline_update(_auth=Depends(require_csrf)):
-        backend = get_backend()
-        if backend is None:
-            return {"status": "simulated", "message": "Offline update completed (mock)."}
-        buffer = backend.hitl.correction_buffer
-        if len(buffer) < 2:
-            return {"status": "skipped", "message": "Not enough overrides (need >= 2)."}
-        metrics = backend.optimizer.optimise(buffer)
-        backend.tracker.snapshot("after_offline_update")
-        backend.tracker.save()
-        return {
-            "status": "completed",
-            "policy_loss": metrics.get("policy_loss", "N/A"),
-            "buffer_size": len(buffer),
-        }
+        _audit(store, session, "read_history", f"n={len(rows)}")
+        return {"cases": rows}
 
     @app.get("/api/export")
-    async def export_data(_auth=Depends(require_auth)):
-        backend = get_backend()
-        if backend is None:
-            output = python_io.StringIO()
-            w = csv.writer(output)
-            w.writerow(["case_id", "timestamp", "fitz_type", "true_label", "model_triage", "clinician_triage", "is_override", "reward"])
-            return StreamingResponse(python_io.BytesIO(output.getvalue().encode()), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=case_history.csv"})
-        backend.tracker.export_csv()
-        csv_path = Path(__file__).parent / "case_history.csv"
-        if csv_path.exists():
-            return FileResponse(str(csv_path), media_type="text/csv", filename="case_history.csv")
-        return {"status": "exported", "filename": "case_history.csv"}
+    def export_cases(session: Session = Depends(require_permission("export_data"))):
+        target = Path(store.data_dir) / "case_history.csv"
+        tracker.export_csv(str(target))
+        _audit(store, session, "export_cases", str(target))
+        return FileResponse(str(target), media_type="text/csv", filename="case_history.csv")
 
     @app.post("/api/reset")
-    async def reset_tracker(_auth=Depends(require_csrf)):
-        backend = get_backend()
-        if backend is None:
-            return {"status": "reset"}
-        backend.tracker.cases.clear()
-        backend.tracker._snapshots.clear()
-        backend.tracker.save()
-        return {"status": "reset"}
+    def reset_tracker(session: Session = Depends(require_admin)):
+        removed = tracker.reset()
+        _audit(store, session, "reset_tracker", detail=f"removed={removed}")
+        return {"status": "reset", "removed": removed}
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin
-    # -----------------------------------------------------------------------
+    @app.post("/api/offline-update")
+    def offline_update(session: Session = Depends(require_admin)):
+        # The HITL buffer lives with the model runtime; without an agent there is
+        # nothing to update, and we say so instead of pretending.
+        if not backend.status.agent_ready:
+            raise HTTPException(status_code=503, detail={
+                "error": "agent_unavailable",
+                "reason": backend.status.reason if not backend.status.agent_ready else "agent not loaded",
+            })
+        raise HTTPException(status_code=501, detail="Offline policy optimisation is not exposed by this build.")
 
+    # -- admin: doctors ----------------------------------------------------
     @app.get("/api/admin/permissions")
-    async def get_permissions(_auth=Depends(require_admin)):
+    def list_permission_flags(session: Session = Depends(require_admin)):
         return {"permissions": DOCTOR_PERMISSIONS}
 
-    # SECURITY FIX: Rate limit admin login endpoint (5 requests/min per IP)
-    @app.post("/api/admin/login")
-    @limiter.limit("5/minute")
-    async def admin_login(req: AdminLoginRequest, request: Request):
-        data = _load_doctors()
-        for admin in data["admins"]:
-            if admin["username"] == req.username and _check_password(req.password, admin.get("password", "")):
-                info = {"id": admin["id"], "name": admin["name"], "username": admin["username"], "role": "admin", "photo": admin.get("photo", "")}
-                token = _create_session(info)
-                _log_activity(f"Admin {admin['name']} logged in", actor=admin["name"], level="admin")
-                return {
-                    "success": True,
-                    "token": token,
-                    "admin": info,
-                    "message": "Admin authenticated.",
-                    "csrf_token": _sessions[token].get("csrf_token", ""),
-                }
-        raise HTTPException(status_code=401, detail="Invalid admin credentials.")
-
     @app.get("/api/admin/doctors")
-    async def list_doctors(_auth=Depends(require_admin)):
-        data = _load_doctors()
-        doctors = []
-        for d in data["doctors"]:
-            doc = {k: v for k, v in d.items() if k != "password"}
-            doctors.append(doc)
-        return {"doctors": doctors}
+    def list_doctors(session: Session = Depends(require_admin)):
+        # ``list_users`` already strips password hashes (see storage.public_user).
+        return {"doctors": store.list_users("doctor")}
 
-    @app.post("/api/admin/doctors")
-    async def create_doctor(req: DoctorCreateRequest, _auth=Depends(require_csrf)):
-        try:
-            data = _load_doctors()
-            if any(d["username"] == req.username for d in data["doctors"]):
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": "Username already exists.", "field": "username"}
-                )
-            if any(d["email"] == req.email for d in data["doctors"]):
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": "Email already exists.", "field": "email"}
-                )
-            # SECURITY FIX: Validate password strength
-            valid, msg = _validate_password(req.password)
-            if not valid:
-                return JSONResponse(status_code=400, content={"detail": msg, "field": "password"})
-
-            # SECURITY FIX: Validate password strength
-            valid, msg = _validate_password(req.password)
-            if not valid:
-                return JSONResponse(status_code=400, content={"detail": msg, "field": "password"})
-
-            doctor = {
-                "id": f"doc-{uuid.uuid4().hex[:6]}",
-                "username": req.username,
-                "password": _hash_password(req.password),
-                "name": req.name,
-                "email": req.email,
-                "nin": req.nin,
-                "title": req.title,
-                "active": True,
-                "permissions": req.permissions,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "last_login": None,
-            }
-            data["doctors"].append(doctor)
-            _save_doctors(data)
-            _log_activity(f"Created doctor {req.name} ({req.username})", actor="admin", level="admin")
-            return {"status": "created", "doctor": {k: v for k, v in doctor.items() if k != "password"}}
-        except HTTPException:
-            raise
-        except Exception:
-            logger.exception("Failed to create doctor")
-            return JSONResponse(status_code=500, content={"detail": "Internal server error."})
-
-    @app.get("/api/admin/doctors/{doctor_id}")
-    async def get_doctor(doctor_id: str, _auth=Depends(require_admin)):
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                return {"doctor": {k: v for k, v in d.items() if k != "password"}}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    @app.put("/api/admin/doctors/{doctor_id}")
-    async def update_doctor(doctor_id: str, req: DoctorUpdateRequest, _auth=Depends(require_csrf)):
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                if req.name is not None: d["name"] = req.name
-                if req.email is not None: d["email"] = req.email
-                if req.nin is not None: d["nin"] = req.nin
-                if req.title is not None: d["title"] = req.title
-                if req.active is not None: d["active"] = req.active
-                if req.permissions is not None: d["permissions"] = req.permissions
-                if req.photo is not None: d["photo"] = req.photo
-                _save_doctors(data)
-                return {"status": "updated", "doctor": {k: v for k, v in d.items() if k != "password"}}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    @app.delete("/api/admin/doctors/{doctor_id}")
-    async def deactivate_doctor(doctor_id: str, _auth=Depends(require_csrf)):
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                d["active"] = False
-                _save_doctors(data)
-                return {"status": "deactivated", "doctor_id": doctor_id}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    @app.post("/api/admin/doctors/{doctor_id}/reset-password")
-    async def reset_doctor_password(doctor_id: str, req: DoctorResetPasswordRequest, _auth=Depends(require_csrf)):
-        # SECURITY FIX: Validate password strength
-        valid, msg = _validate_password(req.new_password)
+    @app.post("/api/admin/doctors", status_code=201)
+    def create_doctor(payload: DoctorCreateRequest, session: Session = Depends(require_admin)):
+        if store.username_taken(payload.username):
+            raise HTTPException(status_code=409, detail="Username already exists.")
+        if store.email_taken(payload.email):
+            raise HTTPException(status_code=409, detail="Email already exists.")
+        valid, message = validate_password(payload.password)
         if not valid:
-            return JSONResponse(status_code=400, content={"detail": msg, "field": "new_password"})
+            raise HTTPException(status_code=400, detail=message)
 
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                d["password"] = _hash_password(req.new_password)
-                _save_doctors(data)
-                return {"status": "password_reset", "doctor_id": doctor_id}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    @app.put("/api/admin/doctors/{doctor_id}/permissions")
-    async def save_doctor_permissions(doctor_id: str, req: PermissionsUpdate, _auth=Depends(require_csrf)):
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                d["permissions"] = req.permissions
-                _save_doctors(data)
-                return {"status": "saved", "doctor_id": doctor_id, "permissions": d["permissions"]}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Doctor self-service (update own profile)
-    # -----------------------------------------------------------------------
-
-    @app.put("/api/doctors/me")
-    async def update_self(req: DoctorUpdateRequest, _auth=Depends(require_auth)):
-        doctor_id = _auth.get("id")
-        data = _load_doctors()
-        for d in data["doctors"]:
-            if d["id"] == doctor_id:
-                if req.name is not None: d["name"] = req.name
-                if req.email is not None: d["email"] = req.email
-                if req.nin is not None: d["nin"] = req.nin
-                if req.title is not None: d["title"] = req.title
-                if req.photo is not None: d["photo"] = req.photo
-                _save_doctors(data)
-                return {"status": "updated"}
-        raise HTTPException(status_code=404, detail="Doctor not found.")
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Change own password
-    # -----------------------------------------------------------------------
-
-    @app.post("/api/admin/change-password")
-    async def admin_change_password(req: AdminPasswordChangeRequest, _auth=Depends(require_csrf)):
-        # SECURITY FIX: Validate new password strength
-        valid, msg = _validate_password(req.new_password)
-        if not valid:
-            return JSONResponse(status_code=400, content={"detail": msg, "field": "new_password"})
-
-        data = _load_doctors()
-        admin_id = _auth.get("id")
-        for admin in data["admins"]:
-            if admin["id"] == admin_id and _check_password(req.current_password, admin.get("password", "")):
-                admin["password"] = _hash_password(req.new_password)
-                _save_doctors(data)
-                _log_activity("Admin changed password", actor="admin", level="admin")
-                return {"status": "changed"}
-        raise HTTPException(status_code=403, detail="Current password is incorrect.")
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Bulk doctor actions
-    # -----------------------------------------------------------------------
+        doctor = store.create_user({
+            "role": "doctor",
+            "username": payload.username,
+            "password": hash_password(payload.password),
+            "name": payload.name,
+            "email": payload.email,
+            "nin": payload.nin,
+            "title": payload.title,
+            "active": True,
+            "permissions": payload.permissions,
+        })
+        _audit(store, session, "create_doctor", payload.username)
+        return {"status": "created", "doctor": doctor}
 
     @app.post("/api/admin/doctors/bulk")
-    async def bulk_doctor_action(req: BulkDoctorAction, _auth=Depends(require_csrf)):
-        data = _load_doctors()
-        count = 0
-        for d in data["doctors"]:
-            if d["id"] in req.doctor_ids:
-                d["active"] = req.active
-                count += 1
-        _save_doctors(data)
-        _log_activity(f"Bulk {'activated' if req.active else 'deactivated'} {count} doctor(s)", actor="admin", level="admin")
-        return {"status": "updated", "count": count}
+    def bulk_doctor_action(payload: BulkDoctorAction, session: Session = Depends(require_admin)):
+        updated = 0
+        for doctor_id in payload.doctor_ids:
+            if store.update_user(doctor_id, {"active": payload.active}) is not None:
+                updated += 1
+                if not payload.active:
+                    sessions.revoke_user(doctor_id)
+        _audit(store, session, "bulk_doctor_action",
+               detail=f"active={payload.active} n={updated}")
+        return {"status": "updated", "count": updated}
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Active sessions
-    # -----------------------------------------------------------------------
+    @app.get("/api/admin/doctors/{doctor_id}")
+    def get_doctor(doctor_id: str, session: Session = Depends(require_admin)):
+        doctor = store.get_user(doctor_id)
+        if not doctor or doctor.get("role") != "doctor":
+            raise HTTPException(status_code=404, detail="Doctor not found.")
+        return {"doctor": {k: v for k, v in doctor.items() if k != "password"}}
 
+    @app.put("/api/admin/doctors/{doctor_id}")
+    def update_doctor(doctor_id: str, payload: DoctorUpdateRequest,
+                      session: Session = Depends(require_admin)):
+        doctor = store.get_user(doctor_id)
+        if not doctor or doctor.get("role") != "doctor":
+            raise HTTPException(status_code=404, detail="Doctor not found.")
+        changes = payload.model_dump(exclude_none=True)
+        if "email" in changes and store.email_taken(changes["email"]) and \
+                changes["email"].lower() != (doctor.get("email") or "").lower():
+            raise HTTPException(status_code=409, detail="Email already exists.")
+        updated = store.update_user(doctor_id, changes)
+        if changes.get("active") is False:
+            sessions.revoke_user(doctor_id)
+        _audit(store, session, "update_doctor", doctor_id,
+               detail=",".join(sorted(changes.keys())))
+        return {"status": "updated", "doctor": updated}
+
+    @app.delete("/api/admin/doctors/{doctor_id}")
+    def deactivate_doctor(doctor_id: str, session: Session = Depends(require_admin)):
+        doctor = store.get_user(doctor_id)
+        if not doctor or doctor.get("role") != "doctor":
+            raise HTTPException(status_code=404, detail="Doctor not found.")
+        store.update_user(doctor_id, {"active": False})
+        revoked = sessions.revoke_user(doctor_id)
+        _audit(store, session, "deactivate_doctor", doctor_id, detail=f"sessions_revoked={revoked}")
+        return {"status": "deactivated", "doctor_id": doctor_id, "sessions_revoked": revoked}
+
+    @app.post("/api/admin/doctors/{doctor_id}/reset-password")
+    def reset_doctor_password(doctor_id: str, payload: DoctorResetPasswordRequest,
+                              session: Session = Depends(require_admin)):
+        doctor = store.get_user(doctor_id)
+        if not doctor or doctor.get("role") != "doctor":
+            raise HTTPException(status_code=404, detail="Doctor not found.")
+        valid, message = validate_password(payload.new_password)
+        if not valid:
+            raise HTTPException(status_code=400, detail=message)
+        store.update_user(doctor_id, {"password": hash_password(payload.new_password)})
+        sessions.revoke_user(doctor_id)
+        _audit(store, session, "reset_doctor_password", doctor_id)
+        return {"status": "password_reset", "doctor_id": doctor_id}
+
+    @app.put("/api/admin/doctors/{doctor_id}/permissions")
+    def save_doctor_permissions(doctor_id: str, payload: PermissionsUpdate,
+                                session: Session = Depends(require_admin)):
+        doctor = store.get_user(doctor_id)
+        if not doctor or doctor.get("role") != "doctor":
+            raise HTTPException(status_code=404, detail="Doctor not found.")
+        updated = store.update_user(doctor_id, {"permissions": payload.permissions})
+        _audit(store, session, "update_permissions", doctor_id)
+        return {"status": "saved", "doctor_id": doctor_id, "permissions": updated["permissions"]}
+
+    @app.put("/api/doctors/me")
+    def update_self(payload: DoctorUpdateRequest, session: Session = Depends(require_auth)):
+        if session.role != "doctor":
+            raise HTTPException(status_code=403, detail="Only doctor accounts have a profile.")
+        allowed = {"name", "email", "nin", "title", "photo"}
+        changes = {k: v for k, v in payload.model_dump(exclude_none=True).items() if k in allowed}
+        if not changes:
+            raise HTTPException(status_code=400, detail="No editable fields supplied.")
+        if "email" in changes and store.email_taken(changes["email"]):
+            raise HTTPException(status_code=409, detail="Email already exists.")
+        store.update_user(session.user_id, changes)
+        _audit(store, session, "update_self", session.user_id)
+        return {"status": "updated"}
+
+    @app.post("/api/admin/change-password")
+    def admin_change_password(payload: AdminPasswordChangeRequest,
+                              session: Session = Depends(require_admin)):
+        admin = store.get_user(session.user_id)
+        if admin is None or not check_password(payload.current_password, admin.get("password", "")):
+            _audit(store, session, "change_password", outcome="denied")
+            raise HTTPException(status_code=403, detail="Current password is incorrect.")
+        valid, message = validate_password(payload.new_password)
+        if not valid:
+            raise HTTPException(status_code=400, detail=message)
+        store.update_user(session.user_id, {"password": hash_password(payload.new_password)})
+        _audit(store, session, "change_password", "admin")
+        return {"status": "changed"}
+
+    # -- admin: sessions / activity / exports ------------------------------
     @app.get("/api/admin/sessions")
-    async def list_sessions(_auth=Depends(require_admin)):
-        now = datetime.now(timezone.utc)
-        active = []
-        expired = []
-        for token, sess in list(_sessions.items()):
-            expires = sess.get("expires_at")
-            if expires and now > datetime.fromisoformat(expires):
-                expired.append(token)
-            else:
-                active.append({"name": sess.get("name"), "role": sess.get("role"), "expires_at": sess.get("expires_at")})
-        for t in expired:
-            del _sessions[t]
-        return {"active_sessions": active, "count": len(active)}
+    def list_sessions(session: Session = Depends(require_admin)):
+        return {"active_sessions": sessions.list_active()}
 
-    @app.post("/api/admin/sessions/{token}/revoke")
-    async def revoke_session(token: str, authorization: str = Header(""), _auth=Depends(require_csrf)):
-        current_token = authorization.replace("Bearer ", "") if authorization else ""
-        if token == current_token:
+    @app.post("/api/admin/sessions/{sid}/revoke")
+    def revoke_session(sid: str, session: Session = Depends(require_admin)):
+        if sid == session.sid:
             raise HTTPException(status_code=400, detail="Cannot revoke your own session.")
-        if token in _sessions:
-            del _sessions[token]
-            return {"status": "revoked"}
-        raise HTTPException(status_code=404, detail="Session not found.")
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Activity log with filtering
-    # -----------------------------------------------------------------------
+        if not sessions.revoke_sid(sid):
+            raise HTTPException(status_code=404, detail="Session not found.")
+        _audit(store, session, "revoke_session", sid)
+        return {"status": "revoked", "sid": sid}
 
     @app.get("/api/admin/activity")
-    async def get_activity(query: str = "", level: str = "", _auth=Depends(require_admin)):
-        entries = _load_activity()[-200:]
-        if query:
-            q = query.lower()
-            entries = [e for e in entries if q in e.get("event", "").lower() or q in e.get("actor", "").lower()]
-        if level:
-            entries = [e for e in entries if e.get("level", "") == level]
-        return {"activity": entries[-50:]}
-
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Patient CSV export
-    # -----------------------------------------------------------------------
+    def activity(
+        session: Session = Depends(require_admin),
+        query: str = Query("", max_length=120),
+        level: str = Query("", max_length=16),
+        limit: int = Query(50, ge=1, le=200),
+    ):
+        return {"activity": store.list_audit(query=query, level=level, limit=limit)[:50]}
 
     @app.get("/api/admin/patients/export")
-    async def export_patients_csv(_auth=Depends(require_admin)):
-        patients = _load_patients()
-        output = python_io.StringIO()
-        w = csv.writer(output)
-        w.writerow(["ID", "Name", "Age", "Gender", "Fitzpatrick", "Contact", "Diagnosis", "Body Site", "Status", "Visit Count"])
-        for p in patients:
-            w.writerow([
-                p.get("id", ""), p.get("name", ""), p.get("age", ""),
-                p.get("gender", ""), p.get("fitz", ""), p.get("contact", ""),
-                p.get("diagnosis", ""), p.get("body_site", ""), p.get("status", ""),
-                len(p.get("visits", [])),
+    def export_patients(session: Session = Depends(require_admin)):
+        patients = store.list_patients(limit=10_000)
+        _buffer = python_io.StringIO()
+        writer = csv.writer(_buffer)
+        writer.writerow(["ID", "Name", "Age", "Gender", "Fitzpatrick", "Contact",
+                         "Diagnosis", "Body Site", "Status", "Visit Count"])
+        for patient in patients:
+            writer.writerow([
+                patient.get("id", ""), patient.get("name", ""), patient.get("age", ""),
+                patient.get("gender", ""), patient.get("fitz", ""), patient.get("contact", ""),
+                patient.get("diagnosis", ""), patient.get("body_site", ""),
+                patient.get("status", ""), len(patient.get("visits", [])),
             ])
+        _audit(store, session, "export_patients", f"n={len(patients)}")
         return StreamingResponse(
-            python_io.BytesIO(output.getvalue().encode("utf-8")),
+            python_io.BytesIO(_buffer.getvalue().encode("utf-8")),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=patients.csv"},
         )
 
-    # -----------------------------------------------------------------------
-    #  Routes -- Admin: Analytics data for charts
-    # -----------------------------------------------------------------------
-
     @app.get("/api/admin/analytics-data")
-    async def admin_analytics_data(_auth=Depends(require_admin)):
-        patients = _load_patients()
-        diagnoses = {}
-        fitz_counts = {}
+    def admin_analytics_data(session: Session = Depends(require_admin)):
+        patients = store.list_patients(limit=10_000)
+        diagnoses: dict[str, int] = {}
+        fitz_counts: dict[str, int] = {}
         triage_counts = {"routine": 0, "followup": 0, "urgent": 0}
         status_counts = {"active": 0, "followup": 0, "consultation": 0, "completed": 0}
-        for p in patients:
-            d = p.get("diagnosis", "unknown")
-            diagnoses[d] = diagnoses.get(d, 0) + 1
-            f = p.get("fitz", "Unknown")
-            fitz_counts[f] = fitz_counts.get(f, 0) + 1
-            s = p.get("status", "active")
-            status_counts[s] = status_counts.get(s, 0) + 1
-            for v in p.get("visits", []):
-                t = v.get("tag", "routine")
-                if t in triage_counts:
-                    triage_counts[t] += 1
+        for patient in patients:
+            diagnosis = patient.get("diagnosis", "unknown")
+            diagnoses[diagnosis] = diagnoses.get(diagnosis, 0) + 1
+            fitz = patient.get("fitz", "Unknown")
+            fitz_counts[fitz] = fitz_counts.get(fitz, 0) + 1
+            status = patient.get("status", "active")
+            status_counts[status] = status_counts.get(status, 0) + 1
+            for visit in patient.get("visits", []):
+                tag = visit.get("tag", "routine")
+                if tag in triage_counts:
+                    triage_counts[tag] += 1
         return {
             "diagnosis_distribution": [{"label": k, "value": v} for k, v in sorted(diagnoses.items())],
             "fitzpatrick_distribution": [{"label": k, "value": v} for k, v in sorted(fitz_counts.items())],
@@ -1415,31 +841,14 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
     return app
 
 
-# ---------------------------------------------------------------------------
-#  Entry point
-# ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
     import argparse
-    import asyncio
 
     parser = argparse.ArgumentParser(description="Dermatology AI Dashboard Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Bind address")
-    parser.add_argument("--port", type=int, default=7860, help="Port number")
-    parser.add_argument("--reload", action="store_true", help="Auto-reload on file changes")
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 7860)))
+    parser.add_argument("--reload", action="store_true")
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(message)s",
-    )
-
-    app = create_app()
-    logger.info("Dermatology AI Dashboard server starting on %s:%d", args.host, args.port)
-
-    try:
-        uvicorn.run(app, host=args.host, port=args.port, reload=args.reload)
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        logger.info("Server shut down gracefully.")
-    except SystemExit:
-        pass
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    uvicorn.run(create_app(), host=args.host, port=args.port, reload=args.reload)
