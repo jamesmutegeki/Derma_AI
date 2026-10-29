@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "placeholder",
+  "note": "No frozen checkpoint ships with this repository. Run scripts/freeze_model.py after training to populate sha256/bytes and point status at a real artefact. Every number that appears in a poster, slide or document must be quoted from the referenced evaluation report.",
+  "checkpoint": {
+    "path_env": "MODEL_CHECKPOINT_PATH",
+    "filename": null,
+    "sha256": null,
+    "bytes": null
+  },
+  "architecture": {
+    "name": "DermatologyCBM",
+    "backbone": "hrnet_w18",
+    "num_classes": 3,
+    "class_names": ["benign", "melanoma", "kaposi_sarcoma"],
+    "num_concepts": 7,
+    "concept_names": [
+      "asymmetry",
+      "border",
+      "color",
+      "diameter",
+      "melanin",
+      "inflammation",
+      "ulceration"
+    ]
+  },
+  "preprocessing": {
+    "module": "transforms.build_transform",
+    "mode_at_serving": "eval",
+    "image_size": 224,
+    "melanin_normalization": true
+  },
+  "training": {
+    "dataset": null,
+    "split": null,
+    "seed": null,
+    "epochs": null,
+    "git_commit": null,
+    "date": null
+  },
+  "evaluation": {
+    "report": null,
+    "metrics": null
+  }
+}

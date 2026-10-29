@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, cite it as below. Model weights and datasets have their own terms."
+title: "Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis"
+abstract: >-
+  Research prototype for dermatology decision support: a concept-bottleneck CNN
+  (HRNet-W18 backbone) with Grad-CAM/Integrated-Gradients explanations, a
+  contextual-bandit triage agent and a clinician-in-the-loop review workflow.
+  Not a medical device; no clinical validation.
+type: software
+license: MIT
+repository-code: "https://github.com/jamesmutegeki/Derma_AI"
+version: "2.0.0"
+date-released: "2026-10-30"
+keywords:
+  - dermatology
+  - concept-bottleneck-model
+  - explainable-ai
+  - fairness
+  - reinforcement-learning
+authors:
+  - name: "Derma-AI project contributors"
+  # TODO(maintainer): add individual authors with ORCIDs before publication.
+preferred-citation:
+  type: unpublished
+  title: "Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis"
+  note: >-
+    Manuscript in preparation. Do not cite any performance figure until the
+    model manifest references a frozen evaluation report.

@@ -454,6 +454,12 @@ class Store:
                 (utcnow(), actor, role, action, target, outcome, detail),
             )
 
+    def purge_audit_before(self, iso_timestamp: str) -> int:
+        """Delete audit rows older than ``iso_timestamp``. Returns rows removed."""
+        with self._tx() as conn:
+            cursor = conn.execute("DELETE FROM audit WHERE ts < ?", (iso_timestamp,))
+            return cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
     def list_audit(self, query: str = "", level: str = "", limit: int = 200) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(

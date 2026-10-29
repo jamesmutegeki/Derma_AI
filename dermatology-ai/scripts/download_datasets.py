@@ -34,8 +34,11 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
-# Target directory inside your project
-PROJECT_DATA_DIR = Path(r"D:\Dermatology_AI\datasets")
+# Target directory inside the repository (override with --data-dir).
+# Previously hard-coded to D:\Dermatology_AI\datasets, which created a bogus
+# directory on Linux/macOS and made the script unusable off Windows.
+PROJECT_DATA_DIR = Path(os.environ.get("DERMA_DATA_DIR",
+                                       Path(__file__).resolve().parents[1] / "datasets"))
 PROJECT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -319,7 +322,7 @@ def main():
     print("\n" + "=" * 60)
     print(f"✅ Done. Datasets at: {PROJECT_DATA_DIR}")
     print("\nNext steps:")
-    print("  1. Check which folders have data: dir D:\\Dermatology_AI\\datasets")
+    print(f"  1. Check which folders have data: ls {PROJECT_DATA_DIR}")
     print("  2. For image-only ISIC/Fitzpatrick/DDI data, use the ISIC Archive or request forms")
     print("     (Kaggle is excluded per project preference)")
     print("  3. Update datasetEquity.py csv_path to point to your data")

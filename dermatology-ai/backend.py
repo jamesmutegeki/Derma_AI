@@ -15,6 +15,7 @@ and every inference call raises :class:`ModelUnavailable`.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -52,6 +53,41 @@ class BackendStatus:
         return asdict(self)
 
 
+MANIFEST_ENV = "MODEL_MANIFEST_PATH"
+DEFAULT_MANIFEST = Path(__file__).resolve().parent / "model_manifest.json"
+
+
+def load_manifest(path: str | Path | None = None) -> Optional[dict]:
+    """Load the model manifest, or ``None`` when there is none.
+
+    A malformed manifest is a hard error inside :meth:`Backend._initialise`,
+    never a silently ignored file.
+    """
+    candidate = Path(path) if path else Path(os.environ.get(MANIFEST_ENV, DEFAULT_MANIFEST))
+    if not candidate.is_file():
+        return None
+    return json.loads(candidate.read_text(encoding="utf-8"))
+
+
+def manifest_error(manifest: Optional[dict], sha256: str, num_classes: int | None = None) -> str:
+    """Return a human-readable reason the checkpoint is not the frozen artefact.
+
+    Empty string means "consistent" (or no manifest to check against).
+    """
+    if not manifest:
+        return ""
+    expected = (manifest.get("checkpoint") or {}).get("sha256")
+    if expected and expected != sha256:
+        return (f"checkpoint hash mismatch: manifest expects {expected[:12]}..., "
+                f"file is {sha256[:12]}...")
+    if manifest.get("status") == "frozen" and not expected:
+        return "manifest is marked frozen but records no checkpoint hash"
+    expected_classes = (manifest.get("architecture") or {}).get("num_classes")
+    if num_classes is not None and expected_classes is not None and int(expected_classes) != int(num_classes):
+        return (f"checkpoint has {num_classes} classes, manifest describes {expected_classes}")
+    return ""
+
+
 def file_sha256(path: str | Path) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -77,6 +113,7 @@ class Backend:
         self.device_name = device
         self.num_concepts = num_concepts
 
+        self.manifest_path = os.environ.get(MANIFEST_ENV) or str(DEFAULT_MANIFEST)
         self._lock = threading.Lock()
         self._initialising = False
         self.status = BackendStatus(reason="not initialised")
@@ -136,10 +173,24 @@ class Backend:
 
         try:
             sha = file_sha256(checkpoint)
+            manifest = load_manifest(self.manifest_path)
+
+            # ML FIX: verify the hash *before* unpickling, so a file that is not the
+            # frozen artefact is never even parsed.  Before this check any file at
+            # MODEL_CHECKPOINT_PATH was served as "the model", which made every
+            # reported number unattributable.
+            problem = manifest_error(manifest, sha)
+            if problem:
+                raise ValueError(f"rejected by {Path(self.manifest_path).name}: {problem}")
+
             state = torch.load(str(checkpoint), map_location="cpu", weights_only=True)
             if "classifier.weight" not in state:
                 raise ValueError("checkpoint has no 'classifier.weight'; not a DermatologyCBM state_dict")
             num_classes = int(state["classifier.weight"].shape[0])
+
+            problem = manifest_error(manifest, sha, num_classes)
+            if problem:
+                raise ValueError(f"rejected by {Path(self.manifest_path).name}: {problem}")
 
             from model import DermatologyCBM
 
@@ -162,7 +213,8 @@ class Backend:
                 model_ready=True,
                 agent_ready=False,
                 reason="ok",
-                model_version=f"{checkpoint.name}@{sha[:12]}",
+                model_version=(f"{(manifest or {}).get('checkpoint', {}).get('filename') or checkpoint.name}"
+                               f"@{sha[:12]}"),
                 weights_sha256=sha,
                 device=str(self.device),
             )

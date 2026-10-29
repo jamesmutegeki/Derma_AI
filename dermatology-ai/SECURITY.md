@@ -102,8 +102,10 @@ hand-maintained list to forget to update.
 
 ### Retention and backup policy (draft -- requires IRB/legal sign-off)
 
-Not yet in force. It is written down here so that the gap is explicit rather
-than implicit.
+**Draft -- not yet in force.** It is written down here so that the gap is
+explicit rather than implicit, and it is enforced mechanically by
+`scripts/purge_records.py` (retention) and `scripts/backup_db.py --verify`
+(backup). Approval by the data controller is still required.
 
 | Item | Retention | Disposal |
 | --- | --- | --- |
@@ -152,10 +154,11 @@ Both the retention period and the backup target require IRB approval.
 
 ## 7. CI guards
 
-`scripts/ci_grep.sh` fails the build if the strings `hipaa`, `256-bit`, `84.3`,
-`0.843`, `admin123` or `Doctor123!` appear in shipped code (`.py`, `.html`,
-`.js`, `.json`, `.yaml`). It also fails on `_mock_*`/`_fake_*` clinical payload
-helpers.
+`scripts/ci_grep.sh` fails the build if any of the review's fabricated claims,
+compliance claims or historical default credentials appear in shipped code
+(`.py`, `.html`, `.js`, `.json`, `.yaml`). The exact patterns live in the script
+itself -- they are not repeated here, because this document is scanned by the
+same guard. It also fails on `_mock_*`/`_fake_*` clinical payload helpers.
 
 Excluded from the scan, deliberately:
 
@@ -163,19 +166,22 @@ Excluded from the scan, deliberately:
 * `*.md` -- review and brief documents quote the findings they describe;
 * `notebooks/*.ipynb` -- removed; only the `.py` sources are kept.
 
-Test suite: `python -m pytest` from the application directory (69 tests at the
-time of writing, covering Sprint 0 items S0-1..S0-7).
+Test suite: `python -m pytest` from the application directory (125 tests,
+covering Sprint 0 items S0-1..S0-7, Sprint 1 items S1-1..S1-5 and Sprint 2 items
+S2-1..S2-4). The operational procedures live in `docs/OPERATIONS.md`.
 
 ---
 
 ## 8. Known gaps / before real patient data
 
-1. **S1-1** and **S2-4** must be complete.
-2. An approved **retention and backup policy** (section 4 above is a draft).
-3. **IRB / ethics sign-off** for the Ugandan cohort, including the data-sharing
+1. **S1-1** -- a frozen model manifest; the current one is a placeholder.
+2. **S2-4** -- the runbook in `docs/OPERATIONS.md`, reviewed and signed.
+3. An approved **retention and backup policy** (section 4 is still a draft),
+   enforced by `scripts/purge_records.py` and `scripts/backup_db.py --verify`.
+4. **IRB / ethics sign-off** for the Ugandan cohort, including the data-sharing
    question.
-4. Encryption at rest and a tested restore.
-5. A penetration test and a documented incident-response contact.
+5. Encryption at rest and a tested restore drill.
+6. A penetration test and a named incident-response contact.
 
 Until all five are done, use synthetic or fully de-identified data only.
 

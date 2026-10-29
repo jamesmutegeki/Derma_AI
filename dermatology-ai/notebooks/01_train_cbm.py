@@ -10,10 +10,11 @@ Pipeline (mirrors the section-01 walkthrough exactly):
     fair   : fairness audit (per-Fitzpatrick accuracy + critical-miss rates)
     all    : split -> passion -> train -> ppo -> fair
 
-Run from D:\\Dermatology_AI (set UTF-8 first on Windows):
-    $env:PYTHONIOENCODING="utf-8"
-    python notebooks\\01_train_cbm.py --phase all
-    python notebooks\\01_train_cbm.py --phase smoke       # quick sanity check
+Run from the repository root (paths are resolved relative to this file, so the
+working directory does not matter):
+
+    python dermatology-ai/notebooks/01_train_cbm.py --phase all
+    python dermatology-ai/notebooks/01_train_cbm.py --phase smoke   # sanity check
 """
 
 from __future__ import annotations

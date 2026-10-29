@@ -342,6 +342,8 @@ for f, desc in files:
     row[1].text = desc
 
 # Save
-output_path = r'D:\Dermatology_AI\docs\reports\project_update_report.docx'
-doc.save(output_path)
+from pathlib import Path as _Path
+output_path = _Path(__file__).resolve().parent / 'docs' / 'reports' / 'project_update_report.docx'
+output_path.parent.mkdir(parents=True, exist_ok=True)
+doc.save(str(output_path))
 print(f'Report saved to {output_path}')

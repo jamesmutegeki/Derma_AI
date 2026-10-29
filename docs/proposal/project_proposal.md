@@ -83,7 +83,7 @@ Specific sub-objectives:
 | **eSkinHealth (2025)** | ~8k | NTDs (leprosy, yaws, Buruli ulcer) | Predominantly IV–VI | Open (arXiv/GitHub) | Directly targets sub-Saharan prevalent diseases |
 | **Fitzpatrick-17k (2019–2023)** | 17k | 114 labels (broad taxonomy) | Full I–VI distribution | Public (GitHub/HF) | Standard benchmark for skin-tone-aware models |
 | **HAM10000 (2018–2024)** | 10k | 7 (melanoma vs. benign) | Mostly I–III (limited dark skin) | Public (Zenodo/Kaggle) | Frequently combined with darker-skin datasets |
-| **DDI (2023–2024)** | 12k | 30+ | ~35% IV–VI | Request (Stanford AIMI) | Curated for balanced ethnic representation |
+| **DDI (2023)** | 656 | 3 | 208 I–II / 241 III–IV / 207 V–VI | Request (Stanford AIMI), DOI 10.71718/kqee-3z39 | Pathologically confirmed; best-characterised dark-skin benchmark despite its size |
 | **SCIN (2024)** | 25k | 100+ | ~30% dark-skin images | Open (HF/GitHub) | Globally representative, fine-grained taxonomy |
 | **Mendeley Skin Disease (2023)** | 3k | 12 | No explicit Fitzpatrick tags (visual: many darker tones) | Open CC-BY (Mendeley) | Quick prototyping with African images |
 

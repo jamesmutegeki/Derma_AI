@@ -30,6 +30,7 @@ import logging
 import os
 import secrets
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,6 +92,7 @@ from schemas import (
     PermissionsUpdate,
     VisitRequest,
 )
+from logging_setup import configure_logging
 from storage import Store, migrate_legacy_json
 
 # SECURITY: bound PIL's decompression-bomb protection globally.
@@ -130,6 +132,21 @@ def _audit(store: Store, session: Optional[Session], action: str, target: str = 
         outcome=outcome,
         detail=detail,
     )
+
+
+def _age_band(age: str) -> str:
+    """Reduce a free-text age (``"34 yrs (DOB: ...)"``) to a decade band."""
+    digits = "".join(ch if ch.isdigit() else " " for ch in str(age)).split()
+    if not digits:
+        return ""
+    try:
+        years = int(digits[0])
+    except ValueError:
+        return ""
+    if years < 0 or years > 130:
+        return ""
+    low = (years // 10) * 10
+    return f"{low}-{low + 9}"
 
 
 def _generate_password(length: int = 20) -> str:
@@ -206,6 +223,7 @@ def create_app(
     initialise_backend: bool = True,
     demo_mode: Optional[bool] = None,
 ) -> FastAPI:
+    configure_logging()
     store = Store(_data_dir(data_dir))
     migrate_legacy_json(store, APP_DIR)
 
@@ -280,7 +298,17 @@ def create_app(
         if declared > MAX_REQUEST_SIZE:
             return JSONResponse({"detail": "Request body too large."}, status_code=413)
 
-        response = await call_next(request)
+        # Correlation id: echoed back so a clinician can quote it in a bug
+        # report, and logged instead of the URL query string (which may hold ids).
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        finally:
+            elapsed_ms = (time.perf_counter() - started) * 1000
+        response.headers["X-Request-ID"] = request_id
+        logger.info("request id=%s method=%s path=%s status=%s duration_ms=%.1f",
+                    request_id, request.method, request.url.path, response.status_code, elapsed_ms)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
@@ -377,7 +405,9 @@ def create_app(
         doctor = store.find_user(identifier=payload.email, role="doctor")
         if doctor is None or not check_password(payload.password, doctor.get("password", "")):
             throttle.register_failure(payload.email)
-            _audit(store, None, "login_failed", payload.email, outcome="denied")
+            # PHI/PII: the attempted identifier is not recorded -- an audit trail
+            # must not become a list of patient or staff email addresses.
+            _audit(store, None, "login_failed", target="<redacted>", outcome="denied")
             raise HTTPException(status_code=401, detail="Invalid email or password.")
         if not doctor.get("active", True):
             _audit(store, None, "login_deactivated", doctor.get("username", ""), outcome="denied")
@@ -782,6 +812,23 @@ def create_app(
         _audit(store, session, "revoke_session", sid)
         return {"status": "revoked", "sid": sid}
 
+    @app.get("/api/admin/ops/summary")
+    def ops_summary(session: Session = Depends(require_admin)):
+        """Operational snapshot for monitoring. Counts only -- never patient data."""
+        db_path = Path(store.db_path)
+        return {
+            "patients": store.count_patients(),
+            "cases": len(store.list_cases()),
+            "doctors": len(store.list_users("doctor")),
+            "active_sessions": len(sessions),
+            "audit_rows": len(store.list_audit(limit=10_000)),
+            "db_bytes": db_path.stat().st_size if db_path.exists() else 0,
+            "model_ready": backend.status.model_ready,
+            "agent_ready": backend.status.agent_ready,
+            "demo_mode": bool(demo_mode),
+            "server_time": datetime.now(timezone.utc).isoformat(),
+        }
+
     @app.get("/api/admin/activity")
     def activity(
         session: Session = Depends(require_admin),
@@ -793,19 +840,24 @@ def create_app(
 
     @app.get("/api/admin/patients/export")
     def export_patients(session: Session = Depends(require_admin)):
+        # PHI: the export is de-identified.  Direct identifiers (name, phone
+        # contact, free-text history) are never written to a CSV that leaves the
+        # server; age is reduced to a decade band.
         patients = store.list_patients(limit=10_000)
         _buffer = python_io.StringIO()
         writer = csv.writer(_buffer)
-        writer.writerow(["ID", "Name", "Age", "Gender", "Fitzpatrick", "Contact",
-                         "Diagnosis", "Body Site", "Status", "Visit Count"])
+        writer.writerow(["ID", "AgeBand", "Gender", "Fitzpatrick", "Diagnosis",
+                         "Body Site", "Status", "Visit Count", "Simulated"])
         for patient in patients:
             writer.writerow([
-                patient.get("id", ""), patient.get("name", ""), patient.get("age", ""),
-                patient.get("gender", ""), patient.get("fitz", ""), patient.get("contact", ""),
+                patient.get("id", ""), _age_band(patient.get("age", "")),
+                patient.get("gender", ""), patient.get("fitz", ""),
                 patient.get("diagnosis", ""), patient.get("body_site", ""),
                 patient.get("status", ""), len(patient.get("visits", [])),
+                "yes" if patient.get("simulated") else "no",
             ])
-        _audit(store, session, "export_patients", f"n={len(patients)}")
+        _audit(store, session, "export_patients", f"n={len(patients)}",
+               detail="deidentified=true")
         return StreamingResponse(
             python_io.BytesIO(_buffer.getvalue().encode("utf-8")),
             media_type="text/csv",

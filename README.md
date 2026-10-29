@@ -7,9 +7,56 @@ Collection of my web applications and software projects.
 ## Projects
 
 - [**Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis**](./dermatology-ai/) — AI-powered dermatology triage and diagnosis support system with clinician-in-the-loop (HITL) reinforcement learning.
-- [**Explainable Dermatology AI Poster**](./dermatology-ai/poster.html/)
+- [**Explainable Dermatology AI Poster**](./dermatology-ai/poster.html)
 
 
+
+## Status
+
+_Last updated 2026-10-30. Nothing here is a clinical claim; see
+`dermatology-ai/MODEL_CARD.md` and `dermatology-ai/REMEDIATION_STATUS.md`._
+
+**Available**
+
+- FastAPI clinical API and dashboard (`dermatology-ai/server.py`, `dashboard.html`)
+  with Bearer auth, per-route authorization, SQLite storage and an audit trail.
+- Concept-bottleneck model code (`model.py`), single train/serve preprocessing
+  pipeline (`transforms.py`), fairness metrics over clinician-confirmed cases
+  (`metrics_tracker.py`), contextual-bandit triage agent (`rl_module.py`).
+- 80+ automated tests and a CI guard (`dermatology-ai/scripts/ci_grep.sh`) that
+  fails on fabricated claims or shipped default credentials.
+- Evaluation scripts that run end-to-end in `--smoke` mode and write a JSON
+  report (`run_evaluation_ham.py`, `run_evaluation_passion.py`).
+
+**Missing**
+
+- **No trained checkpoint is distributed.** `MODEL_CHECKPOINT_PATH` is unset by
+  default, so `/api/diagnose` answers 503 by design; `/api/ready` says why.
+- No validated accuracy, AUROC or fairness measurement. `model_manifest.json` is
+  a `placeholder`; nothing may be quoted until it references a frozen report.
+- No dataset is included (HAM10000, PASSION and DDI each have their own terms).
+- No encryption at rest, no tested restore, no IRB approval -- so **no real
+  patient data** may be loaded yet (`dermatology-ai/SECURITY.md` §8).
+
+**Broken / known limitations**
+
+- The legacy Gradio UI (`python main.py --ui`) is optional and needs `gradio`
+  installed plus a real checkpoint.
+- Fitzpatrick IV-VI performance is unmeasured; HAM10000 is overwhelmingly light-
+  skinned and the model performs no out-of-distance detection.
+- `atypical_lesion` exists only in the triage catalogue, not as a vision class.
+
+## Quick start
+
+```bash
+cd dermatology-ai
+pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env            # optional; every variable is documented there
+python main.py --dashboard      # http://localhost:7860  (first run prints where
+                                # the generated admin password was written)
+python -m pytest -q             # full suite
+bash scripts/ci_grep.sh         # claim/credential guard
+```
 
 # Derma_AI — Agent Task Instructions
 
@@ -17,8 +64,12 @@ Collection of my web applications and software projects.
 
 ## 📋 Execution Protocol (READ IN ORDER — DO NOT SKIP)
 
-**Step 1 — Read `AGENTS.md` first.**
-Locate and read the `AGENTS.md` file in the repository root before doing anything else. This file defines the agent's operating rules, constraints, and conventions. Do not proceed until it has been fully read and understood.
+**Step 1 — Read the current state first.**
+Read `dermatology-ai/REMEDIATION_STATUS.md` (what is done, with the acceptance
+test that proves it), then `CODE_REVIEW.md` (the findings this work is closing)
+and `dermatology-ai/SECURITY.md` (the security and data-handling rules). The
+file this step used to reference never existed, so it now points at the
+three documents above.
 
 **Step 2 — Read this `README.md` in full.**
 Understand the project context, goals, and the complete task list below before touching any code or files.

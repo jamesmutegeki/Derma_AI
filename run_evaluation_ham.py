@@ -1,211 +1,212 @@
 #!/usr/bin/env python3
-"""Evaluation of the CBM checkpoint on a 20% hold-out of the HAM10000 dataset.
+"""Evaluate the CBM checkpoint on a held-out HAM10000 split.
 
-The script:
-  1. Loads the pretrained CBM checkpoint (`dermatology-ai/model_checkpoints/cbm_3class.pt`).
-  2. Builds a deterministic 80/20 train-val split (seed 42) using the original HAM10000 CSV.
-  3. Runs inference on the validation set.
-  4. Prints overall accuracy, per-class precision/recall/F1, AUROC (one-vs-rest) and the confusion matrix.
+Fixes over the previous version (which could not run at all):
 
-Prerequisites: a Python environment with the dependencies listed in
-`dermatology-ai/requirements.txt` (torch, timm, albumentations, scikit-learn, etc.).
+* ``Subset`` is imported (it was an undefined name, so ``--smoke`` never worked);
+* preprocessing comes from :func:`transforms.build_transform` -- the same
+  pipeline the server uses, so evaluation cannot drift from training;
+* the checkpoint is verified against ``model_manifest.json`` before loading;
+* ``--json`` writes a machine-readable report, and only a report produced from
+  frozen weights is marked ``valid`` -- those are the only numbers a poster or
+  paper may quote.
+
+Examples
+--------
+    python run_evaluation_ham.py --data-dir dermatology-ai/datasets/ham10000 \
+        --ckpt /secure/models/cbm_3class.pt --json reports/eval_ham.json
+
+    python run_evaluation_ham.py --smoke          # plumbing check, invalid results
 """
 
+from __future__ import annotations
+
+import argparse
 import os
 import sys
-import random
-import argparse
-import pandas as pd
+from collections import defaultdict
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from sklearn.metrics import (
     accuracy_score,
-    precision_recall_fscore_support,
     confusion_matrix,
+    precision_recall_fscore_support,
     roc_auc_score,
 )
-import numpy as np
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from torch.utils.data import DataLoader, Subset
 
-# Project imports
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dermatology-ai'))
-from datasetEquity import DermDataset, MultiSourceDermDataset
-from model import DermatologyCBM
-from samplesEquity import MelaninNormalization
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "dermatology-ai"))
+sys.path.insert(0, os.path.join(HERE, "dermatology-ai", "scripts"))
 
-
-class EvalTransform:
-    """Wrapper to make albumentations work with DermDataset's PIL image input."""
-    def __init__(self, transform):
-        self.transform = transform
-
-    def __call__(self, pil_img):
-        out = self.transform(image=np.array(pil_img.convert("RGB")))
-        return out["image"]
+from eval_common import (  # noqa: E402
+    CLASS_NAMES,
+    build_report,
+    env_checkpoint,
+    load_verified_model,
+    make_synthetic_dataset,
+    write_report,
+)
+from datasetEquity import DermDataset, MultiSourceDermDataset  # noqa: E402
+from transforms import build_transform  # noqa: E402
 
 
-def build_dataset(csv_path, data_root):
-    base_transform = A.Compose([
-        MelaninNormalization(),
-        A.Resize(224, 224),
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        ToTensorV2(),
-    ])
-    transform = EvalTransform(base_transform)
+def build_dataset(csv_path: str, data_root: str, flat: bool = False):
+    transform = build_transform("eval")
+    if flat:
+        return DermDataset(csv_path=csv_path, img_dir=data_root, transform=transform)
     return MultiSourceDermDataset(csv_path=csv_path, data_root=data_root, transform=transform)
 
 
-def assert_no_train_val_overlap(train_csv, val_csv):
-    """Assert that train and val splits have zero row overlap."""
-    train_df = pd.read_csv(train_csv)
-    val_df = pd.read_csv(val_csv)
-    train_ids = set(train_df['image_id'].astype(str))
-    val_ids = set(val_df['image_id'].astype(str))
-    overlap = train_ids & val_ids
+def assert_no_train_val_overlap(train_csv: str, val_csv: str) -> None:
+    """Fail loudly if the hold-out shares images with the training split."""
+    train_df, val_df = pd.read_csv(train_csv), pd.read_csv(val_csv)
+    overlap = set(train_df["image_id"].astype(str)) & set(val_df["image_id"].astype(str))
     if overlap:
-        raise AssertionError(f"Train/Val overlap detected: {len(overlap)} shared image_ids: {list(overlap)[:10]}...")
-    print(f"[OK] Verified zero train/val overlap (train={len(train_ids)}, val={len(val_ids)})")
+        raise AssertionError(
+            f"train/val overlap: {len(overlap)} shared image_ids, e.g. {list(overlap)[:5]}"
+        )
+    print(f"[OK] zero train/val overlap (train={len(train_df)}, val={len(val_df)})")
 
 
-def deterministic_val_split(dataset, seed=42, train_frac=0.80):
-    random.seed(seed)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
+def deterministic_val_split(dataset, seed: int = 42, train_frac: float = 0.80):
+    """Deterministic hold-out when the dataset arrives unsplit."""
+    rng = np.random.default_rng(seed)
+    indices = rng.permutation(len(dataset))
     split = int(train_frac * len(indices))
-    val_idx = indices[split:]
-    return Subset(dataset, val_idx)
+    return Subset(dataset, indices[split:].tolist())
 
 
 def evaluate(model, loader, device):
-    all_labels = []
-    all_preds = []
-    all_probs = []
+    labels, preds, probs = [], [], []
     model.eval()
     with torch.no_grad():
-        for imgs, labels, _ in loader:
-            imgs = imgs.to(device)
-            logits, _ = model(imgs)
-            probs = F.softmax(logits, dim=1)
-            preds = torch.argmax(probs, dim=1)
-            all_labels.extend(labels.cpu().numpy())
-            all_preds.extend(preds.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())
-    acc = accuracy_score(all_labels, all_preds)
-    prec, rec, f1, _ = precision_recall_fscore_support(
-        all_labels, all_preds, average=None, labels=[0, 1, 2]
+        for images, batch_labels, _fitz in loader:
+            logits, _concepts = model(images.to(device))
+            batch_probs = F.softmax(logits, dim=1)
+            labels.extend(batch_labels.cpu().numpy().tolist())
+            preds.extend(torch.argmax(batch_probs, dim=1).cpu().numpy().tolist())
+            probs.extend(batch_probs.cpu().numpy().tolist())
+
+    precision, recall, f1, support = precision_recall_fscore_support(
+        labels, preds, labels=[0, 1, 2], zero_division=0
     )
-    conf = confusion_matrix(all_labels, all_preds, labels=[0, 1, 2])
     auroc = []
-    for i in range(3):
-        y_true = [1 if l == i else 0 for l in all_labels]
-        y_score = [p[i] for p in all_probs]
+    for index in range(3):
+        y_true = [1 if label == index else 0 for label in labels]
+        y_score = [row[index] for row in probs]
         try:
-            auc = roc_auc_score(y_true, y_score)
+            auroc.append(roc_auc_score(y_true, y_score))
         except ValueError:
-            auc = float('nan')
-        auroc.append(auc)
-    return acc, prec, rec, f1, auroc, conf
+            auroc.append(float("nan"))
+
+    metrics = {
+        "n": len(labels),
+        "accuracy": accuracy_score(labels, preds),
+        "per_class": {
+            CLASS_NAMES[i]: {
+                "precision": float(precision[i]),
+                "recall": float(recall[i]),
+                "f1": float(f1[i]),
+                "support": int(support[i]),
+                "auroc": float(auroc[i]),
+            }
+            for i in range(3)
+        },
+        "confusion_matrix": confusion_matrix(labels, preds, labels=[0, 1, 2]).tolist(),
+    }
+    return metrics
 
 
-def evaluate_per_fitzpatrick(model, loader, device):
-    """Evaluate per-Fitzpatrick skin type (HAM10000 uses placeholder Fitzpatrick=3)."""
-    from collections import defaultdict
-    fitz_labels = defaultdict(list)
-    fitz_preds = defaultdict(list)
-    fitz_probs = defaultdict(list)
-
+def evaluate_per_fitzpatrick(model, loader, device) -> dict:
+    labels, preds = defaultdict(list), defaultdict(list)
     model.eval()
     with torch.no_grad():
-        for imgs, labels, fitz in loader:
-            imgs = imgs.to(device)
-            logits, _ = model(imgs)
-            probs = F.softmax(logits, dim=1)
-            preds = torch.argmax(probs, dim=1)
+        for images, batch_labels, fitz in loader:
+            logits, _ = model(images.to(device))
+            batch_preds = torch.argmax(F.softmax(logits, dim=1), dim=1)
+            for label, pred, f in zip(batch_labels.cpu().numpy(),
+                                      batch_preds.cpu().numpy(),
+                                      fitz.cpu().numpy()):
+                labels[int(f)].append(int(label))
+                preds[int(f)].append(int(pred))
 
-            for l, p, pr, f in zip(labels.cpu().numpy(), preds.cpu().numpy(), probs.cpu().numpy(), fitz.cpu().numpy()):
-                fitz_labels[int(f)].append(l)
-                fitz_preds[int(f)].append(p)
-                fitz_probs[int(f)].append(pr)
-
-    print("\n=== Per-Fitzpatrick Evaluation (HAM10000 uses placeholder Fitz=3) ===")
-    class_names = ['benign', 'melanoma', 'kaposi_sarcoma']
-    for fitz in range(1, 7):
-        if fitz not in fitz_labels or len(fitz_labels[fitz]) == 0:
+    out = {}
+    for fitz_type in range(1, 7):
+        if not labels.get(fitz_type):
             continue
-        labels = fitz_labels[fitz]
-        preds = fitz_preds[fitz]
-        probs = fitz_probs[fitz]
-        n = len(labels)
-        acc = accuracy_score(labels, preds)
-        print(f"\n  Fitzpatrick Type {fitz} (n={n}):")
-        print(f"    Accuracy: {acc:.4f}")
-        prec, rec, f1, _ = precision_recall_fscore_support(
-            labels, preds, average=None, labels=[0, 1, 2]
-        )
-        for i, name in enumerate(class_names):
-            if i < len(prec):
-                print(f"    {name:15s} – Prec: {prec[i]:.4f}  Rec: {rec[i]:.4f}  F1: {f1[i]:.4f}")
+        out[str(fitz_type)] = {
+            "n": len(labels[fitz_type]),
+            "accuracy": float(accuracy_score(labels[fitz_type], preds[fitz_type])),
+        }
+    return out
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Evaluate CBM on HAM10000 (20% hold-out)')
-    parser.add_argument('--data-dir', default='dermatology-ai/datasets/ham10000', help='Root folder containing HAM10000 CSV and images')
-    parser.add_argument('--ckpt', default='dermatology-ai/model_checkpoints/smoke_cbm.pt', help='Path to CBM checkpoint')
-    parser.add_argument('--batch-size', type=int, default=32)
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Evaluate CBM on a HAM10000 hold-out")
+    parser.add_argument("--data-dir", default="dermatology-ai/datasets/ham10000")
+    parser.add_argument("--ckpt", default=env_checkpoint())
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--json", default=None, help="Write a JSON report to this path")
+    parser.add_argument("--smoke", action="store_true",
+                        help="Run on a synthetic dataset with random weights (invalid results)")
+    parser.add_argument("--split-seed", type=int, default=42)
     args = parser.parse_args()
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'Using device: {device}')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-    # Load model - smoke_cbm.pt is 2-class (binary: benign/melanoma)
-    # Check checkpoint to determine num_classes
-    state = torch.load(args.ckpt, map_location=device, weights_only=True)
-    num_classes = 2 if 'classifier.weight' in state and state['classifier.weight'].shape[0] == 2 else 3
-    print(f'Detected model classes: {num_classes}')
+    if args.smoke:
+        csv_path = str(make_synthetic_dataset(Path(args.data_dir) / "smoke"))
+        dataset = build_dataset(csv_path, os.path.dirname(csv_path), flat=True)
+        split_note = "synthetic smoke dataset (unsplit)"
+    else:
+        val_csv = os.path.join(args.data_dir, "val_meta.csv")
+        train_csv = os.path.join(args.data_dir, "train_meta.csv")
+        if os.path.isfile(val_csv):
+            if os.path.isfile(train_csv):
+                assert_no_train_val_overlap(train_csv, val_csv)
+            dataset = build_dataset(val_csv, args.data_dir)
+            split_note = "pre-split val_meta.csv"
+        else:
+            all_csv = os.path.join(args.data_dir, "metadata.csv")
+            if not os.path.isfile(all_csv):
+                raise FileNotFoundError(
+                    f"no val_meta.csv or metadata.csv under {args.data_dir}; "
+                    "run scripts/download_datasets.py first"
+                )
+            full = build_dataset(all_csv, args.data_dir)
+            dataset = deterministic_val_split(full, seed=args.split_seed)
+            split_note = f"deterministic 80/20, seed {args.split_seed}"
 
-    model = DermatologyCBM(
-        num_classes=num_classes,
-        num_concepts=7,
-        hrnet_name='hrnet_w18',
-        pretrained_backbone=True,
-        freeze_backbone=False,
-    ).to(device)
-    model.load_state_dict(state)
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    print(f"Evaluating {len(dataset)} images ({split_note})")
 
-    # Build dataset - use the pre-split validation metadata
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, 'dermatology-ai', 'datasets', 'val_meta.csv')
-    train_csv_path = os.path.join(base_dir, 'dermatology-ai', 'datasets', 'train_meta.csv')
-    data_root = os.path.join(base_dir, 'dermatology-ai', 'datasets')
-    if not os.path.isfile(csv_path):
-        raise FileNotFoundError(f'CSV not found at {csv_path}')
-    
-    # ML FIX: Assert zero train/val overlap
-    assert_no_train_val_overlap(train_csv_path, csv_path)
-    
-    full_ds = build_dataset(csv_path, data_root)
-    val_loader = DataLoader(full_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    model, provenance = load_verified_model(args.ckpt, device, allow_random=args.smoke)
+    metrics = evaluate(model, loader, device)
+    per_fitz = evaluate_per_fitzpatrick(model, loader, device)
 
-    # Evaluate
-    acc, prec, rec, f1, auroc, conf = evaluate(model, val_loader, device)
+    print("\n=== Evaluation ===")
+    print(f"n = {metrics['n']}")
+    print(f"Overall accuracy: {metrics['accuracy']:.4f}")
+    for name, row in metrics["per_class"].items():
+        print(f"  {name:15s} prec={row['precision']:.4f} rec={row['recall']:.4f} "
+              f"f1={row['f1']:.4f} auroc={row['auroc']:.4f} n={row['support']}")
+    print("Confusion matrix (rows=true, cols=pred):")
+    for row in metrics["confusion_matrix"]:
+        print("  ", row)
+    if per_fitz:
+        print("Per-Fitzpatrick accuracy:", per_fitz)
 
-    print('\n=== HAM10000 evaluation (20% hold-out) ===')
-    print(f'Overall accuracy: {acc:.4f}')
-    class_names = ['benign', 'melanoma', 'kaposi_sarcoma']
-    for i, name in enumerate(class_names):
-        print(
-            f'  {name:15s} – Prec: {prec[i]:.4f}  Rec: {rec[i]:.4f}  '
-            f'F1: {f1[i]:.4f}  AUROC: {auroc[i]:.4f}'
-        )
-    print('\nConfusion matrix (rows=true, cols=pred):')
-    print(conf)
-
-    # Per-Fitzpatrick evaluation
-    evaluate_per_fitzpatrick(model, val_loader, device)
+    report = build_report(dataset="HAM10000", split=split_note, provenance=provenance,
+                          metrics=metrics, per_fitzpatrick=per_fitz, smoke=args.smoke)
+    write_report(args.json, report)
+    return 0
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    raise SystemExit(main())

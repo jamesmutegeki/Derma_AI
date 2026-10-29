@@ -9,7 +9,7 @@ Run the gate:
 ```bash
 cd dermatology-ai
 pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest -q          # 69 passed
+python -m pytest -q          # 125 passed
 bash scripts/ci_grep.sh      # OK: no fabricated claims, no default credentials, no mock payloads
 ```
 
@@ -45,13 +45,45 @@ draft retention/backup policy), `scripts/ci_grep.sh`, pinned
 | P0-8 `admin123` / `Doctor123!` | removed everywhere; deny-list assembled at runtime; CI grep |
 | P0-9 fabricated metrics | `FairnessTracker` computes from confirmed cases; no literal figures |
 | P1-13 poster compliance claims | replaced with prototype/no-BAA wording; class renamed `disclaimer-badge` |
+| P1 eval scripts unrunnable | `run_evaluation_ham.py` / `run_evaluation_passion.py` rewritten; `--smoke` proven in CI |
+| P1 Windows-only paths | removed from `download_datasets.py`, `create_report.py`, notebook |
+| P1 PHI in plaintext / in exports | de-identified CSV export, no identifiers in audit, redaction filter on logs |
 
 ---
 
 ## Sprint 1 -- model and data integrity
 
-*(next; see the sprint plan)*
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S1-1** (gate) | Model artefact is verifiable and documented: hash-checked manifest, honest model card, no unattributable weights | `tests/test_s1_1_model_artefact.py` (11 tests) | done |
+| **S1-2** | Evaluation scripts run end-to-end and record their own provenance | `tests/test_s1_2_eval_scripts.py` (6 tests) | done |
+| **S1-3** | PHI stays put: no identifiers in audit, logs or exports | `tests/test_s1_3_phi_handling.py` (5 tests) | done |
+| **S1-4** | Documentation is truthful: DDI corrected, no fabricated figures, README reports status | `tests/test_s1_4_docs_truthfulness.py` (7 tests) | done |
+| **S1-5** | Repo is deployable and CI-checked | `tests/test_s1_5_repo_hygiene.py` (4 tests) | done |
+
+Resolution of the review's P1 findings: eval scripts (`Subset`, phantom
+`dermatology_ai` package) rewritten around `scripts/eval_common.py`; PHI removed
+from audit rows, failed-login records and CSV exports; Windows-only paths
+replaced with repo-relative ones; DDI corrected to 656 images / 570 patients with
+its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
+`.github/workflows/ci.yml` and a working `render.yaml` added.
 
 ## Sprint 2 -- operations
 
-*(next)*
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S2-1** | Operable: request ids, safe access logs, credential redaction, monitoring summary | `tests/test_s2_1_operability.py` (12 tests) | done |
+| **S2-2** | Backups are verified and actually restore | `tests/test_s2_2_backup_restore.py` (6 tests) | done |
+| **S2-3** | Retention policy is enforceable | `tests/test_s2_3_retention.py` (3 tests) | done |
+| **S2-4** (gate) | Runbook: monitoring, incident response, rollback, go-live checklist | `tests/test_s2_4_operations_runbook.py` (5 tests) | done |
+
+## Gate before real patient data
+
+| Gate item | State |
+| --- | --- |
+| S1-1 frozen manifest + model card | **not met** -- `model_manifest.json` is `placeholder`; no trained checkpoint exists in the repository |
+| S2-4 runbook | **met** (document); the checklist itself is unsigned |
+| Written retention/backup policy | **draft** in `SECURITY.md` §4 -- needs data-controller approval |
+| IRB / ethics sign-off | **not met** -- outside the code |
+
+Until all four are met: synthetic or fully de-identified data only.

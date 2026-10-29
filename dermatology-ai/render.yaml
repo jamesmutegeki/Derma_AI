@@ -1,9 +1,47 @@
+# Render blueprint for the Derma-AI research dashboard.
+#
+# Two things make this deployable where the previous file was not:
+#   * ``rootDir`` -- requirements.txt and main.py live in dermatology-ai/, not at
+#     the repository root;
+#   * a persistent disk -- SQLite storage on an ephemeral filesystem lost every
+#     patient record on each restart.
+#
+# The model checkpoint is NOT baked into the image (weights are not distributed).
+# Set MODEL_CHECKPOINT_PATH to a file on the disk, or /api/diagnose returns 503.
 services:
   - type: web
     name: dermai
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py --dashboard
+    runtime: python
+    plan: starter
+    region: frankfurt
+    rootDir: dermatology-ai
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python main.py --dashboard --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: derma-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: DATA_DIR
+        value: /var/data
       - key: PORT
-        value: 10000
+        value: "10000"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Required for real inference; leave unset to serve 503s honestly.
+      - key: MODEL_CHECKPOINT_PATH
+        sync: false
+      - key: AGENT_CHECKPOINT_PATH
+        sync: false
+      # Comma-separated list; never "*".
+      - key: ALLOWED_ORIGINS
+        value: https://dermai.onrender.com
+      # 1 when behind Render's proxy, so rate limiting keys on the client IP.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOGIN_RATE_LIMIT
+        value: 5/minute
+      - key: ADMIN_EMAIL
+        sync: false
