@@ -39,3 +39,20 @@ _verify_*
 # OS
 .DS_Store
 Thumbs.db
+
+# Project-specific artifacts to ignore (clean repo for orchestrator run)
+.claude-flow/
+.swarm/
+.~lock.Dermatology_AI_Uganda_Roadmap.pdf\#
+.~lock.Student Midsemester Research Guidelines and Sample Doc.pdf\#
+Publishing and Reporting/
+Resources/
+dermatology-ai/datasets/
+dermatology-ai/deliverables/
+dermatology-ai/model_checkpoints/
+docs/.~lock.Project_Explained.pdf\#
+docs/papers/architecture_diagram.aux
+docs/papers/architecture_diagram.log
+docs/reports/.~lock.project_update_report.docx\#
+ruvector.db
+wkhtmltox_0.12.6-1.focal_amd64.deb
