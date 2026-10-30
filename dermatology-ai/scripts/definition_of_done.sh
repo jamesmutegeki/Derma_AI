@@ -102,3 +102,4 @@ fi
 echo "DEFINITION OF DONE: satisfied for the scope implemented in this branch."
 echo "Not satisfied (by design): S1-1 frozen weights, S2-4 signature, approved"
 echo "retention policy, IRB sign-off -- see docs/OPERATIONS.md section 6."
+echo "Options for each are laid out in docs/GATE_OPTIONS.md."

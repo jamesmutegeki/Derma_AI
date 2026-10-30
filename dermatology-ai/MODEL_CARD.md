@@ -42,8 +42,15 @@ Known dataset facts:
   (Fitzpatrick I-II: 208, III-IV: 241, V-VI: 207), pathologically confirmed,
   DOI `10.71718/kqee-3z39`. Earlier documents in this repository described DDI as
   "12k images, 30+ classes"; that was wrong and has been corrected.
-* **PASSION** -- Ugandan cohort, accessed separately under its own data-use
-  agreement.
+* **PASSION** -- *not used.* The published cohort is 4,901 images / 1,653
+  patients from four paediatric conditions (atopic dermatitis, dermatophytosis,
+  scabies, impetigo) in Cote d'Ivoire, Malawi, Tanzania and Madagascar, released
+  under an access agreement. Access requests are unanswered as of 2026-10-30, so
+  nothing in this project depends on it. See `docs/DATASET_CARD_PASSION.md`.
+* **SCIN** -- *planned*, for tone-stratified evaluation only. Public,
+  tone-labelled (self-reported and dermatologist-estimated Fitzpatrick, plus
+  Monk), but a US crowdsourced population with no melanoma/KS cohort. See
+  `docs/DATASET_CARD_SCIN.md`.
 
 ## Evaluation
 
@@ -64,7 +71,7 @@ Metrics that the code *computes* (once cases exist):
 ## Ethical considerations and limitations
 
 1. **Skin-tone coverage is unproven.** HAM10000 is overwhelmingly light-skinned;
-   performance on Fitzpatrick IV-VI is unknown until measured on DDI/PASSION.
+   performance on Fitzpatrick IV-VI is unknown until measured on DDI and SCIN.
 2. **No demographic or clinical metadata** is used; the model sees an image only.
 3. **Three classes are not a diagnosis.** Melanoma vs benign vs Kaposi sarcoma
    is a triage prompt for a clinician, not a pathology result.

@@ -9,7 +9,7 @@ Run the gate:
 ```bash
 cd dermatology-ai
 pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest -q          # 133 passed
+python -m pytest -q          # 139 passed
 bash scripts/ci_grep.sh      # OK: no fabricated claims, no default credentials, no mock payloads
 ```
 
@@ -91,6 +91,22 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | --- | --- | --- | --- |
 | **S3-1** | Remaining P2/P3 findings: upload cap while streaming, no login timing oracle, atomic agent saves, dashboard returns to login on 401, documentation placeholders removed, dataset cards + CONTRIBUTING added, `.gitignore` cleaned, unused imports removed | `tests/test_s3_1_cleanup.py` (8 tests) | done |
 
+## Sprint 4 -- dataset substitution and gate options
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S4-1** | Any external dermatology dataset can be converted into the training format without editing training code, with every input row accounted for and no invented labels or Fitzpatrick values | `tests/test_s4_1_dataset_adapter.py` (6 tests) | done |
+| **S4-2** | PASSION dependency resolved on paper: card corrected to the published figures and marked unavailable; alternatives assessed and recommended | `docs/DATASET_CARD_PASSION.md`, `docs/DATASET_ALTERNATIVES.md`, `docs/DATASET_CARD_SCIN.md` | done |
+| **S4-3** | The four unsatisfied gates are presented as decisions with cost and consequences, not left as a 503 | `docs/GATE_OPTIONS.md` | done |
+
+## Scope decisions
+
+| Date | Decision | Effect |
+| --- | --- | --- |
+| 2026-10-30 | **The triage module stays.** It is part of the product (API `triage*` fields, `TRUE_LABEL_TO_TRIAGE`, dashboard panel, `metrics_tracker` triage maths, poster and docs). | Review item **P2-12 is withdrawn**; the branch name `pre-triage-removal` is historical and does not describe the code |
+| 2026-10-30 | PASSION is treated as **unavailable** after unanswered access requests | Nothing in the pipeline depends on it; SCIN is the recommended substitute for the evaluation role only |
+| 2026-10-30 | The three-class head is **not** redefined to fit whichever dataset is to hand | Mapped-label cohorts (SCIN, eSkinHealth) are used for tone-stratified evaluation, never as malignancy benchmarks |
+
 ## Gate before real patient data
 
 | Gate item | State |
@@ -101,3 +117,10 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | IRB / ethics sign-off | **not met** -- outside the code |
 
 Until all four are met: synthetic or fully de-identified data only.
+
+**These four are decisions, not code.** `docs/GATE_OPTIONS.md` lays out, for each
+one, the options available, their cost, what they unblock and which is
+recommended; the recommended minimum is `1A + 2A + 3A + 4A` (train and freeze a
+real checkpoint; self-sign the runbook with a stated single-reviewer scope;
+adopt the retention policy with a review date; obtain a "not human-subjects"
+exemption for public-data work).

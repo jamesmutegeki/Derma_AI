@@ -1,0 +1,9 @@
+{
+  "_comment": "DDI ships three pathologically confirmed groups. Only the malignant group can be related to this project's classes; the benign and non-neoplastic groups are mapped to 'skip' unless a clinician relabels them, because 'benign' in DDI is not the same construct as HAM10000 'benign'.",
+  "malignant": "melanoma",
+  "benign": "skip",
+  "non-neoplastic": "skip",
+  "non_neoplastic": "skip",
+  "melanoma": "melanoma",
+  "kaposi sarcoma": "kaposi_sarcoma"
+}

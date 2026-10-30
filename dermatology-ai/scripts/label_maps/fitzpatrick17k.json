@@ -1,0 +1,13 @@
+{
+  "_comment": "Fitzpatrick17k has 114 atlas labels of varying provenance. Only labels that map cleanly onto the three classes are enabled; everything else is skipped so the class statistics stay meaningful. Add entries deliberately, with a citation.",
+  "melanoma": "melanoma",
+  "kaposi sarcoma": "kaposi_sarcoma",
+  "nevus": "skip",
+  "basal cell carcinoma": "skip",
+  "squamous cell carcinoma": "skip",
+  "seborrheic keratosis": "skip",
+  "actinic keratosis": "skip",
+  "eczema": "skip",
+  "psoriasis": "skip",
+  "acne": "skip"
+}

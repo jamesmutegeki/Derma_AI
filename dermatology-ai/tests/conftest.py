@@ -10,7 +10,6 @@ application is deployed as a flat directory of modules, not as a package.
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 from pathlib import Path
