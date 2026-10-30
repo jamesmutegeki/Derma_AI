@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 from datasetEquity import DermDataset, MultiSourceDermDataset
 from model import NUM_CONCEPTS
 from transforms import build_transform
-from rl_module import Case, DermTriageEnv, PPOAgent, Rollout, TRUE_LABEL_TO_TRIAGE, TRIAGE_NAMES
+from rl_module import Case, DermTriageEnv, PPOAgent, Rollout, TRUE_LABEL_TO_TRIAGE
 
 # ---------------------------------------------------------------------------
 # Paths / constants

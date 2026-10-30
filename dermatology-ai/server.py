@@ -69,12 +69,11 @@ from auth import (
     require_permission,
     validate_password,
 )
-from backend import Backend, BackendStatus, ModelUnavailable, file_sha256
+from backend import Backend, BackendStatus, ModelUnavailable
 from constants import (
     DOCTOR_PERMISSIONS,
     FITZPATRICK_LABELS,
     TRIAGE_NAMES,
-    TRUE_LABEL_TO_TRIAGE,
 )
 from metrics_tracker import FairnessTracker
 from schemas import (
@@ -132,6 +131,11 @@ def _audit(store: Store, session: Optional[Session], action: str, target: str = 
         outcome=outcome,
         detail=detail,
     )
+
+
+#: A real bcrypt hash of a throw-away value.  Verifying against it keeps login
+#: timing flat for identifiers that do not exist.
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(24))
 
 
 def _age_band(age: str) -> str:
@@ -403,7 +407,10 @@ def create_app(
                                 headers={"Retry-After": str(retry)})
 
         doctor = store.find_user(identifier=payload.email, role="doctor")
-        if doctor is None or not check_password(payload.password, doctor.get("password", "")):
+        # SECURITY FIX: always spend the same bcrypt work, even for an unknown
+        # identifier, so response time cannot be used to enumerate accounts.
+        password_ok = check_password(payload.password, (doctor or {}).get("password") or _DUMMY_HASH)
+        if doctor is None or not password_ok:
             throttle.register_failure(payload.email)
             # PHI/PII: the attempted identifier is not recorded -- an audit trail
             # must not become a list of patient or staff email addresses.
@@ -438,7 +445,8 @@ def create_app(
                                 headers={"Retry-After": str(retry)})
 
         admin = store.find_user(identifier=payload.username, role="admin")
-        if admin is None or not check_password(payload.password, admin.get("password", "")):
+        password_ok = check_password(payload.password, (admin or {}).get("password") or _DUMMY_HASH)
+        if admin is None or not password_ok:
             throttle.register_failure(payload.username)
             _audit(store, None, "admin_login_failed", payload.username, outcome="denied")
             raise HTTPException(status_code=401, detail="Invalid admin credentials.")

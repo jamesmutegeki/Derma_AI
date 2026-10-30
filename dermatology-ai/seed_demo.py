@@ -12,8 +12,6 @@ digit, symbol).
 
 from __future__ import annotations
 
-import json
-import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 

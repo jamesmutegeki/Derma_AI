@@ -71,7 +71,7 @@ Specific sub-objectives:
 | **ViT-B/L** | AUC ~0.96–0.98 (large ISIC splits, IN-21k pretrain) | Global self-attention | Needs large data, high compute | [5, 6] |
 | **Swin-T/B** | AUC ~0.97 (ISIC-2020, DermNet-2023) | Hierarchical windows = efficiency + accuracy | Complex implementation | [6, 7] |
 | **Hybrid Conv-Transformer (SkinFormer, ConvNeXt-V2)** | AUC ~0.98 (largest public collections) | Conv inductive bias + transformer global reasoning | Very large, data-hungry | [7, 8] |
-| **HRNet-W18** (this work) | AUC ~0.95–0.97 (multi-resolution) | Preserves fine-grained spatial detail; multi-scale feature pyramids | Less common in dermatology literature | [9] |
+| **HRNet-W18** (this work) | AUC not yet measured (see `MODEL_CARD.md`) | Preserves fine-grained spatial detail; multi-scale feature pyramids | Less common in dermatology literature | [9] |
 
 **Why HRNet-W18?** The Concept Bottleneck requires high-resolution feature maps for concept localization (asymmetry, border, ulceration). HRNet's parallel multi-resolution branches maintain spatial fidelity better than single-path CNNs or ViTs, making it uniquely suited for concept-level interpretability.
 

@@ -18,10 +18,8 @@ qualification.
 
 from __future__ import annotations
 
-import json
 import logging
-import random
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
@@ -32,7 +30,6 @@ from rl_module import (
     PPOAgent,
     Rollout,
     fairness_weighted_reward,
-    TRUE_LABEL_TO_TRIAGE,
 )
 
 logger = logging.getLogger(__name__)

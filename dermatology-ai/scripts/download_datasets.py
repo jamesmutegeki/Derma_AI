@@ -32,7 +32,6 @@ import sys
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 # Target directory inside the repository (override with --data-dir).
 # Previously hard-coded to D:\Dermatology_AI\datasets, which created a bogus

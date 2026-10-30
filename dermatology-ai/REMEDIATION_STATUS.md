@@ -9,7 +9,7 @@ Run the gate:
 ```bash
 cd dermatology-ai
 pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest -q          # 125 passed
+python -m pytest -q          # 133 passed
 bash scripts/ci_grep.sh      # OK: no fabricated claims, no default credentials, no mock payloads
 ```
 
@@ -48,6 +48,14 @@ draft retention/backup policy), `scripts/ci_grep.sh`, pinned
 | P1 eval scripts unrunnable | `run_evaluation_ham.py` / `run_evaluation_passion.py` rewritten; `--smoke` proven in CI |
 | P1 Windows-only paths | removed from `download_datasets.py`, `create_report.py`, notebook |
 | P1 PHI in plaintext / in exports | de-identified CSV export, no identifiers in audit, redaction filter on logs |
+| P2-3 upload ordering | streamed `read(MAX+1)`, magic bytes, `Image.verify()` then reopen |
+| P2-4 dead code / unused imports | dead paths deleted with the rewrite; 19 unused imports removed (ruff F401 clean) |
+| P2-7 tracker maths | empty Fitz groups masked, unknown `case_id` -> 404, `/api/reset` admin-only |
+| P2-10 docs integrity | placeholders replaced with procedure, unmeasured HRNet claim removed |
+| P2-11 missing artefacts | LICENSE, MODEL_CARD, 3 dataset cards, CITATION.cff, SECURITY.md, CONTRIBUTING.md |
+| P3 login enumeration | bcrypt always executed, even for unknown identifiers |
+| P3 non-atomic agent save | temp file + `os.replace`, previous checkpoint preserved on failure |
+| P3 session expiry in UI | single `handleUnauthorized()` path returns to the login overlay |
 
 ---
 
@@ -76,6 +84,12 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S2-2** | Backups are verified and actually restore | `tests/test_s2_2_backup_restore.py` (6 tests) | done |
 | **S2-3** | Retention policy is enforceable | `tests/test_s2_3_retention.py` (3 tests) | done |
 | **S2-4** (gate) | Runbook: monitoring, incident response, rollback, go-live checklist | `tests/test_s2_4_operations_runbook.py` (5 tests) | done |
+
+## Sprint 3 -- review leftovers (P2/P3)
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S3-1** | Remaining P2/P3 findings: upload cap while streaming, no login timing oracle, atomic agent saves, dashboard returns to login on 401, documentation placeholders removed, dataset cards + CONTRIBUTING added, `.gitignore` cleaned, unused imports removed | `tests/test_s3_1_cleanup.py` (8 tests) | done |
 
 ## Gate before real patient data
 

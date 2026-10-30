@@ -71,24 +71,29 @@ All occurrences of the old name were replaced with the new title across:
 
 ---
 
-## Phase 5 – Testing results
-### 5.1 HAM10000 (20 % hold‑out)
-Run the script `run_evaluation.py` (provided in the repo) to obtain the exact numbers.  After you run it, replace the placeholder block below with the output you receive.
+## Phase 5 – Testing results
 
+**No performance result has been measured yet.** This section deliberately
+contains no numbers, because every figure must trace to a frozen artefact (see
+`dermatology-ai/MODEL_CARD.md` and `dermatology-ai/model_manifest.json`).
+
+How to produce a real result:
+
+```bash
+# 1. evaluate with a checkpoint that passes the manifest hash check
+python run_evaluation_ham.py     --data-dir <ham10000> --ckpt <weights.pt> --json reports/eval_ham.json
+python run_evaluation_passion.py --data-dir <passion>  --ckpt <weights.pt> --json reports/eval_passion.json
+
+# 2. freeze the report into the manifest (it refuses smoke / invalid reports)
+python dermatology-ai/scripts/freeze_model.py --checkpoint <weights.pt> \
+    --dataset HAM10000 --split "80/20, seed 42" --seed 42 --epochs <n> \
+    --git-commit <sha> --metrics-report reports/eval_ham.json
 ```
---- HAM10000 evaluation output goes here ---
-```
 
-### 5.2 PASSION for Dermatology (20 % hold‑out)
-Run the script `run_evaluation_passion.py` (added to the repository) after you have downloaded and extracted the PASSION dataset as described in its docstring.  The script will print the same set of metrics for the African‑focused data.
-
-```
---- PASSION evaluation output goes here ---
-```
-
-*If you encounter any issues running the scripts (e.g., missing packages), see the installation instructions in the scripts’ headers.*
-
----
+Until step 2 has been run, `model_manifest.json` stays `status: placeholder` and
+**no accuracy, AUROC, fairness-gap or override-rate figure may be quoted** in a
+poster, slide, README or paper. `run_evaluation_*.py --smoke` exists only to prove
+the pipeline runs; its reports are written with `valid: false`.
 
 ## Phase 6 – Disclaimers (added throughout the project)
 **Disclaimer:** This tool is for research and educational purposes only. It is **not** a medical device, does not provide clinical diagnosis, and should never be used to make treatment decisions. Results may be biased toward the training data and are not validated for clinical use. Always consult a qualified dermatologist or physician.

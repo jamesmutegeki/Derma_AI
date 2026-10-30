@@ -21,16 +21,8 @@ srv_test.txt
 doctors.json
 patients.json
 
-# Debug / test scripts
-_check_*
-_debug_*
-_find_*
-_full_test*
-_quick_test*
-_run_tests*
-_smoke_test*
-_test_*
-_verify_*
+# Scratch scripts live in scripts/dev/ (which is ignored); do not litter the root.
+scripts/dev/
 
 # IDE
 .vscode/

@@ -46,7 +46,7 @@ What is new / under investigation: The combination of concept-bottleneck interpr
 
 COMPLETED PROGRESS TO DATE (EVIDENCE-BASED)
 Verified completed activities (distinguish from planned):
-- Repository restructuring completed (git a7ede08; 6f10c41 fixed ID/path bugs); duplicate root files removed; scripts organized; datasets/deliverables/notebooks/model_checkpoints consolidated under dermatology-ai/.
+- Repository restructuring completed (git a7ede08; 6f10c41 fixed ID/path bugs); duplicate root files removed; scripts organized; datasets, notebooks and model checkpoints consolidated under dermatology-ai/.
 - Concept-bottleneck model implemented (dermatology-ai/model.py; 7 concepts, 3 classes, 6 Fitzpatrick types).
 - RL / HITL pipeline implemented (rl_module.py Case class; hitl_pipeline.py feedback loop; main.py synthetic case generator with Fitzpatrick-weighted sampling).
 - Gradio UI launcher complete (dermatology-ai/ui.py; main.py --ui --share).
@@ -101,7 +101,7 @@ EVIDENCE ATTACHED / AVAILABLE
 - Source code: dermatology-ai/ (main.py, server.py, ui.py, model.py, hitl_pipeline.py, rl_module.py, metrics_tracker.py)
 - Datasets: dermatology-ai/datasets/ (HAM10000 images, Fitzpatrick17k CSV, ISIC subsets, synthetic)
 - Models / checkpoints: dermatology-ai/model_checkpoints/ (smoke_cbm.pt); agent_params.pt
-- Reports / posters: dermatology-ai/poster.html; slides.html; deliverables/Dermatology_AI_Video_Script.pdf
+- Reports / posters: dermatology-ai/poster.html; dermatology-ai/slides.html (the video-script PDF was not carried over)
 - Notebook: dermatology-ai/notebooks/01_train_cbm.ipynb
 - Roadmap / background: Dermatology_AI_Uganda_Roadmap.pdf (root)
 - Project tracking: MILESTONES.md (root); git log (commits 05b2921 through 18981b2)

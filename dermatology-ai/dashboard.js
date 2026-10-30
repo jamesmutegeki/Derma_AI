@@ -34,7 +34,28 @@ async function api(url, options = {}) {
   const headers = { ...options.headers };
   if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
   if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-  return fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) handleUnauthorized();
+  return response;
+}
+
+// Sessions last 8 hours (auth.SESSION_TTL). Without this, every click after
+// expiry failed with a generic alert instead of returning to the login screen.
+let _expiryNotified = false;
+function handleUnauthorized() {
+  if (_expiryNotified) return;
+  _expiryNotified = true;
+  state.token = '';
+  state.user = { name: '', title: '', initials: '', permissions: {} };
+  const adminDash = document.getElementById('adminDashboard');
+  if (adminDash) { adminDash.style.display = 'none'; adminDash.classList.remove('visible'); }
+  const dash = document.getElementById('dashboard');
+  if (dash) { dash.style.display = 'none'; dash.classList.remove('visible'); }
+  const overlay = document.getElementById('loginOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+  const message = document.getElementById('loginError');
+  if (message) message.textContent = 'Session expired. Please sign in again.';
+  setTimeout(() => { _expiryNotified = false; }, 2000);
 }
 
 // ==================== DOM REFS ====================

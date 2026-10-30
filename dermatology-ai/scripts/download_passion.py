@@ -18,8 +18,6 @@ After download, this script will:
 4. Map PASSION's 12 disease classes to our 3-class schema (benign, melanoma, kaposi_sarcoma)
 """
 
-import os
-import sys
 import zipfile
 import tarfile
 import shutil

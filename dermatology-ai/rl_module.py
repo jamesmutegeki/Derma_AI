@@ -35,10 +35,7 @@ from torch.distributions import Categorical
 # ---------------------------------------------------------------------------
 
 from constants import (  # noqa: E402  (after the dataclass/typing imports above)
-    FITZPATRICK_LABELS,
     NUM_FITZ_TYPES,
-    TRIAGE_NAMES,
-    TRUE_LABEL_NAMES,
     TRUE_LABEL_TO_TRIAGE,
 )
 
@@ -382,10 +379,28 @@ class PPOAgent:
     _compute_gae = _compute_advantages
 
     def save(self, path: str):
-        torch.save({
-            "network_state_dict": self.network.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-        }, path)
+        """Write the agent atomically: temp file in the same directory, then rename.
+
+        A crash mid-``torch.save`` used to leave a truncated file that made the
+        next ``load()`` fail at boot, so the triage agent silently disappeared.
+        """
+        import os
+        import tempfile
+        from pathlib import Path
+
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        handle, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=".tmp")
+        os.close(handle)
+        try:
+            torch.save({
+                "network_state_dict": self.network.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+            }, tmp_name)
+            os.replace(tmp_name, target)
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
 
     def load(self, path: str):
         checkpoint = torch.load(path, map_location=self.device, weights_only=True)
