@@ -1,0 +1,10 @@
+{
+  "_comment": "HAM10000 (dx) -> this project's classes. nv/bkl/df are the benign groups; mel is the only malignant group that maps cleanly. bcc, akiec and vasc are excluded rather than folded into 'benign': bcc and akiec are malignant/pre-malignant, and vasc is a vascular lesion that is not Kaposi sarcoma. NOTE: HAM10000 contains no Kaposi sarcoma images at all, so 'kaposi_sarcoma' has no training source here -- see docs/TRAINING.md section 2b before training a three-class head.",
+  "nv": "benign",
+  "bkl": "benign",
+  "df": "benign",
+  "mel": "melanoma",
+  "bcc": "skip",
+  "akiec": "skip",
+  "vasc": "skip"
+}

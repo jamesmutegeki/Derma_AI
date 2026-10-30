@@ -100,12 +100,20 @@ hand-maintained list to forget to update.
 * Logs must not contain patient identifiers, tokens or password material. The
   bootstrap path logs a file path, never a secret.
 
-### Retention and backup policy (draft -- requires IRB/legal sign-off)
+### Retention and backup policy
 
-**Draft -- not yet in force.** It is written down here so that the gap is
-explicit rather than implicit, and it is enforced mechanically by
-`scripts/purge_records.py` (retention) and `scripts/backup_db.py --verify`
-(backup). Approval by the data controller is still required.
+**In force from 2026-10-30.** Approved by the project owner as data controller
+for this prototype (gate option **3A**, `docs/GATE_OPTIONS.md`); next review due
+**2027-01-28** (90 days), or earlier if the data scope changes. It is enforced
+mechanically by `scripts/purge_records.py` (retention, dry-run by default) and
+`scripts/backup_db.py --verify` (backup and restore drill).
+
+The approval is scoped: it covers **synthetic and fully de-identified data
+only**, which is all this prototype may hold until the IRB exemption in
+`docs/IRB_EXEMPTION_REQUEST.md` is determined and, for any real patient data,
+full ethics approval is granted. The "research, post-IRB" row below therefore
+remains prospective and must be re-approved against the actual protocol before
+it is used.
 
 | Item | Retention | Disposal |
 | --- | --- | --- |
@@ -176,10 +184,13 @@ S2-1..S2-4). The operational procedures live in `docs/OPERATIONS.md`.
 
 1. **S1-1** -- a frozen model manifest; the current one is a placeholder.
 2. **S2-4** -- the runbook in `docs/OPERATIONS.md`, reviewed and signed.
-3. An approved **retention and backup policy** (section 4 is still a draft),
-   enforced by `scripts/purge_records.py` and `scripts/backup_db.py --verify`.
-4. **IRB / ethics sign-off** for the Ugandan cohort, including the data-sharing
-   question.
+3. ~~An approved retention and backup policy~~ -- **closed 2026-10-30**: section
+   4 is in force, scoped to synthetic/de-identified data, with a 90-day review.
+   Enforcement remains `scripts/purge_records.py` and
+   `scripts/backup_db.py --verify`.
+4. **IRB / ethics sign-off.** An exemption determination has been prepared
+   (`docs/IRB_EXEMPTION_REQUEST.md`); until it is decided, the status is
+   "request prepared -- determination pending", not "approved".
 5. Encryption at rest and a tested restore drill.
 6. A penetration test and a named incident-response contact.
 

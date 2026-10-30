@@ -97,6 +97,7 @@ def convert(args) -> dict:
     if not images_root.is_dir():
         raise SystemExit(f"images root not found: {images_root}")
 
+    group_column = getattr(args, "group_column", None)
     output = Path(args.output)
     images_out = output / "images"
     images_out.mkdir(parents=True, exist_ok=True)
@@ -148,14 +149,18 @@ def convert(args) -> dict:
             fitz = normalise_fitz(row.get(args.fitz_column, "") if args.fitz_column else "")
             fitz_counts[fitz] += 1
             class_counts[target] += 1
-            rows_out.append({
+            record = {
                 "image_id": image_id,
                 "label": target,
                 "fitzpatrick_type": fitz,
                 "source": args.source or source_csv.stem,
-                "source_path": relative,
-                "_row": row_number,
-            })
+            }
+            if group_column:
+                # Kept so training can split by lesion/patient rather than by
+                # image; several images of one lesion across train/val inflate
+                # every metric that touches them.
+                record["group_id"] = (row.get(group_column) or "").strip()
+            rows_out.append(record)
 
     if not rows_out:
         raise SystemExit(
@@ -164,7 +169,10 @@ def convert(args) -> dict:
         )
 
     with (output / "metadata.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["image_id", "label", "fitzpatrick_type", "source"])
+        fields = ["image_id", "label", "fitzpatrick_type", "source"]
+        if group_column:
+            fields.append("group_id")
+        writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         for row in rows_out:
             writer.writerow({key: row[key] for key in writer.fieldnames})
@@ -201,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image-column", default="image_id")
     parser.add_argument("--label-column", default="label")
     parser.add_argument("--fitz-column", default="fitzpatrick_type")
+    parser.add_argument("--group-column", default=None,
+                        help="column holding a lesion/patient id, passed through as group_id")
     parser.add_argument("--source-template", default=None,
                         help="optional preset name (scin|ddi|fitzpatrick17k) to print the "
                              "documented column assumptions and exit")

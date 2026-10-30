@@ -1,7 +1,14 @@
 # Gate options: the four items between here and `/api/diagnose`
 
 **Date:** 2026-10-30
-**Status:** decision document. Nothing here is implemented until you pick.
+**Status:** pathway `1A 2A 3A 4A` approved 2026-10-30. Current state:
+
+| Gate | Approved | State on 2026-10-30 |
+| --- | --- | --- |
+| 1 -- frozen weights | 1A | **Pipeline implemented and tested** (`scripts/train_model.py`, 10 tests). No checkpoint yet: the images are not reachable from this environment, and no obtainable dataset here contains Kaposi sarcoma (`docs/TRAINING.md` §2b) -- that is the open decision |
+| 2 -- runbook | 2A | **Closed** -- signed in `docs/OPERATIONS.md` §6 with the single-reviewer limitation stated |
+| 3 -- retention policy | 3A | **Closed** -- in force from 2026-10-30, scoped to synthetic/de-identified data, review due 2027-01-28 |
+| 4 -- IRB | 4A | **Prepared** -- `docs/IRB_EXEMPTION_REQUEST.md` needs four fields filled and a submission; pending is not approved |
 **Why this file exists:** `scripts/definition_of_done.sh` reports four
 unsatisfied gates, and `/api/diagnose` returns **503** because of them. Rather
 than leave that as a permanent wall, this document lays out, for each gate, the
@@ -99,14 +106,14 @@ compute).
 
 ---
 
-## Decision needed from you
+## Decisions still open
 
-1. Gate 1: **A / B / C**? (A is recommended; B needs a checkpoint you trust.)
-2. Gate 2: **A / B / C**?
-3. Gate 3: **A / B / C**?
-4. Gate 4: **A / B / C / D**?
+1. **Kaposi sarcoma** (`docs/TRAINING.md` §2b): obtain a cohort, serve two
+   classes (breaking API change), or record the gap and ship a demonstration-only
+   checkpoint. Training refuses to guess.
+2. **IRB**: fill `[institution]`, `[department]`, `[supervisor]`, `[email]` in
+   `docs/IRB_EXEMPTION_REQUEST.md`, submit, and attach the determination.
 
-Reply with any combination (e.g. `1A 2A 3A 4A`) and the work will be done
-test-first, with `scripts/definition_of_done.sh` re-run afterwards. Until then,
-the four items stay listed as unmet in `REMEDIATION_STATUS.md` -- which is the
-correct state, not an oversight.
+Everything else in this document has been either executed or prepared, and
+`scripts/definition_of_done.sh` reports only S1-1 and the IRB determination as
+outstanding -- which is the correct state, not an oversight.

@@ -100,8 +100,8 @@ means: synthetic or fully de-identified data only.
 | # | Item | Evidence | Owner | Date |
 | --- | --- | --- | --- | --- |
 | 1 | **S1-1** frozen model manifest + model card, no placeholder | `model_manifest.json` `status: frozen`; `MODEL_CARD.md` | ML lead | |
-| 2 | **S2-4** this runbook reviewed, incident path agreed | this document, signed | Eng lead | |
-| 3 | **Retention and backup policy** approved | `SECURITY.md` §4, no longer marked "draft" | Data controller | |
+| 2 | **S2-4** this runbook reviewed, incident path agreed | this document, signed (below) | J. Mutegeki | 2026-10-30 |
+| 3 | **Retention and backup policy** approved | `SECURITY.md` §4, in force 2026-10-30 | J. Mutegeki | 2026-10-30 |
 | 4 | **IRB / ethics approval** for the cohort, including data-sharing | approval letter on file | PI | |
 | 5 | Encryption at rest + tested restore | §2 drill recorded | Ops | |
 | 6 | Penetration test of the API | report, findings closed | Security | |
@@ -109,6 +109,22 @@ means: synthetic or fully de-identified data only.
 | 8 | `bash scripts/ci_grep.sh` clean | CI run link | Eng | |
 | 9 | Named incident contact and escalation path | §5 | Eng lead | |
 | 10 | Model limitations communicated to users | `MODEL_CARD.md` + in-app disclaimer | PI | |
+
+### Signature
+
+| Field | Value |
+| --- | --- |
+| Signed by | J. Mutegeki, project owner and sole engineer |
+| Date | 2026-10-30 |
+| Scope | Runbook items 2 and 9: the procedure above is the one to follow, and the escalation path in §5 is agreed |
+| Review basis | **Single-engineer self-review. This runbook has not been independently audited**; that limitation is recorded here rather than implied away |
+| Next review | 2027-01-28, or on any change to the deployment, the data scope or the incident path |
+
+Signing item 2 does **not** sign items 1, 3, 4, 6 or 10 as evidence of anything
+they do not have: item 1 needs a frozen checkpoint, item 4 needs an IRB
+determination, item 6 needs a penetration test that has not been performed.
+Until those are checked, the rule at the top of this section stands -- synthetic
+or fully de-identified data only.
 
 ## 7. Rollback
 

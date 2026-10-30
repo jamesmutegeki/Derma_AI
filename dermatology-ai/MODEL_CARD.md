@@ -19,6 +19,10 @@ be used to make, confirm or delay a diagnosis or treatment decision.**
 * Concept head: 7 concepts -- asymmetry, border, colour, diameter, melanin,
   inflammation, ulceration.
 * Classifier: 3 classes -- `benign`, `melanoma`, `kaposi_sarcoma`.
+  **Training-data gap (2026-10-30):** no obtainable public dataset in this
+  project contains Kaposi sarcoma images, so the third class currently has no
+  training source. `scripts/train_model.py` refuses to train a class with no
+  examples; see `docs/TRAINING.md` §2b for the three ways forward.
 * Explanation: Grad-CAM on the last convolutional block; Integrated Gradients is
   reported as an **approximation** because `MelaninNormalization` is
   non-differentiable (see `model.py`).

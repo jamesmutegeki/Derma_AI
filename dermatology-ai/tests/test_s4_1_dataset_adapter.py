@@ -170,3 +170,28 @@ def test_dataset_cards_cover_every_supported_source(app_dir):
         text = (app_dir / "docs" / name).read_text(encoding="utf-8").lower()
         assert "licence" in text or "license" in text
         assert "fitzpatrick" in text
+
+
+def test_group_ids_are_passed_through_when_requested(app_dir, raw_dataset, tmp_path):
+    """Several images of one lesion must stay linkable so training can split by
+    lesion -- otherwise the validation set leaks into the training set."""
+    import csv as _csv
+
+    rows = [
+        {"file": "c1.jpg", "dx": "melanoma", "fst": "5", "lesion": "L1"},
+        {"file": "c2.jpg", "dx": "eczema", "fst": "4", "lesion": "L1"},
+    ]
+    raw = _write_csv(tmp_path / "raw" / "grouped.csv", rows,
+                     ["file", "dx", "fst", "lesion"])
+    out = tmp_path / "out_grouped"
+    result = _run(
+        app_dir,
+        "--input", str(raw), "--images-root", str(raw_dataset["images"]),
+        "--image-column", "file", "--label-column", "dx", "--fitz-column", "fst",
+        "--label-map", str(raw_dataset["map"]), "--output", str(out),
+        "--group-column", "lesion", "--source", "scin-test",
+    )
+    assert result.returncode == 0, result.stderr
+    converted = list(_csv.DictReader((out / "metadata.csv").open()))
+    assert {row["group_id"] for row in converted} == {"L1"}
+    assert len(converted) == 2

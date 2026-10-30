@@ -98,6 +98,9 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S4-1** | Any external dermatology dataset can be converted into the training format without editing training code, with every input row accounted for and no invented labels or Fitzpatrick values | `tests/test_s4_1_dataset_adapter.py` (6 tests) | done |
 | **S4-2** | PASSION dependency resolved on paper: card corrected to the published figures and marked unavailable; alternatives assessed and recommended | `docs/DATASET_CARD_PASSION.md`, `docs/DATASET_ALTERNATIVES.md`, `docs/DATASET_CARD_SCIN.md` | done |
 | **S4-3** | The four unsatisfied gates are presented as decisions with cost and consequences, not left as a 503 | `docs/GATE_OPTIONS.md` | done |
+| **S4-5** | Training actually produces the artefact S1-1 needs: group-aware split (no lesion leakage), per-tone metrics that omit empty groups, and a smoke run that trains but cannot be frozen | `tests/test_s4_4_training_pipeline.py` (10 tests) | done |
+| **S4-6** | The PASSION helper no longer describes a dataset that does not exist, and cannot impute a skin type | `tests/test_s4_2_passion_script.py` (6 tests) | done |
+| **S4-4** | Approved pathway `1A 2A 3A 4A`: runbook signed with an explicit review basis, retention policy in force, exemption request prepared -- and no fabricated metadata left in the PASSION helper | `tests/test_s4_3_gate_signoff.py`, `tests/test_s4_2_passion_script.py` | done (gates 2, 3) / prepared (gate 4) |
 
 ## Scope decisions
 
@@ -111,10 +114,10 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 
 | Gate item | State |
 | --- | --- |
-| S1-1 frozen manifest + model card | **not met** -- `model_manifest.json` is `placeholder`; no trained checkpoint exists in the repository |
-| S2-4 runbook | **met** (document); the checklist itself is unsigned |
-| Written retention/backup policy | **draft** in `SECURITY.md` §4 -- needs data-controller approval |
-| IRB / ethics sign-off | **not met** -- outside the code |
+| S1-1 frozen manifest + model card | **not met -- pipeline ready, artefact not produced.** `scripts/train_model.py` trains and freezes under the rules that make the gate mean something (group-aware split, no invented provenance, smoke reports cannot be frozen). What blocks the actual run: HAM10000 images are served from `dataverse.harvard.edu`, which this development sandbox cannot reach, and **no obtainable public dataset here contains Kaposi sarcoma** (`docs/TRAINING.md` §2b) |
+| S2-4 runbook | **met** -- signed 2026-10-30 in `docs/OPERATIONS.md` §6, with the review basis stated plainly: single-engineer self-review, **no independent audit** |
+| Written retention/backup policy | **met** -- in force from 2026-10-30 (`SECURITY.md` §4), scoped to synthetic/de-identified data, review due 2027-01-28, enforced by `purge_records.py` and `backup_db.py --verify` |
+| IRB / ethics sign-off | **request prepared -- determination pending.** `docs/IRB_EXEMPTION_REQUEST.md` is submission-ready (four bracketed fields to fill). Pending is not approved, and is not recorded as such |
 
 Until all four are met: synthetic or fully de-identified data only.
 

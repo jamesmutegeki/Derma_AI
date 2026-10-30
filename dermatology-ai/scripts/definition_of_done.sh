@@ -100,6 +100,7 @@ if (( fail > 0 )); then
   exit 1
 fi
 echo "DEFINITION OF DONE: satisfied for the scope implemented in this branch."
-echo "Not satisfied (by design): S1-1 frozen weights, S2-4 signature, approved"
-echo "retention policy, IRB sign-off -- see docs/OPERATIONS.md section 6."
-echo "Options for each are laid out in docs/GATE_OPTIONS.md."
+echo "Not satisfied (by design): S1-1 frozen weights, IRB determination."
+echo "S2-4 (signed 2026-10-30) and the retention policy (in force 2026-10-30)"
+echo "are closed; see docs/OPERATIONS.md section 6 and docs/TRAINING.md."
+echo "The remaining two are tracked in docs/GATE_OPTIONS.md and docs/IRB_EXEMPTION_REQUEST.md."

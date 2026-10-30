@@ -1,320 +1,207 @@
 #!/usr/bin/env python3
+"""Locate a downloaded PASSION for Dermatology archive and convert it.
+
+What this script does **not** do, deliberately:
+
+* it does not carry a label map -- PASSION's four published conditions (atopic
+  dermatitis, dermatophytosis, scabies, impetigo) do not correspond to this
+  project's ``benign`` / ``melanoma`` / ``kaposi_sarcoma`` classes, so any
+  mapping is a research decision that must be made by a person and written to a
+  JSON file, not guessed here;
+* it does not impute a Fitzpatrick value -- a source that omits skin type
+  produces ``fitzpatrick_type = 0`` ("unknown") and is counted in the report;
+* it does not download anything unless you give it a URL, because access to
+  PASSION is granted individually and the project currently has none.
+
+Previous versions of this file assumed twelve classes (naevus, seborrhoeic
+keratosis, melanoma, Kaposi sarcoma, BCC, SCC, ...) and defaulted a missing
+Fitzpatrick value to 3. Neither was true of PASSION; both were removed on
+2026-10-30 (see ``docs/DATASET_CARD_PASSION.md``). For the same reason there is
+no ``scripts/label_maps/passion.json``: shipping one would imply the mapping is
+known.
+
+Usage
+-----
+    # After the PASSION team grants access and sends an archive:
+    python scripts/download_passion.py --archive ~/Downloads/passion.zip \\
+        --label-map my_passion_map.json \\
+        --output datasets/passion
+
+    # Or from a URL, with the token in the environment (never in source):
+    PASSION_TOKEN=... python scripts/download_passion.py \\
+        --url https://.../passion.zip --label-map my_passion_map.json \\
+        --output datasets/passion
+
+    # Show the documented facts and exit:
+    python scripts/download_passion.py --info
+
+Access state (2026-10-30): requests to https://passionderm.github.io/ are
+unanswered, so nothing in this repository depends on PASSION. The replacement
+analysis is in ``docs/DATASET_ALTERNATIVES.md``.
 """
-PASSION for Dermatology Dataset Download Script
 
-Prerequisites:
-1. Register at https://passionderm.github.io/ with academic email
-2. After approval, you'll receive download credentials (typically a direct download link or API token)
-3. Update the DOWNLOAD_URL and AUTH_TOKEN below with your credentials
+from __future__ import annotations
 
-The dataset should contain:
-- metadata.csv with columns: image_id, label, fitzpatrick_type (1-6), and optionally disease_type
-- images/ directory with JPEG files named <image_id>.jpg
-
-After download, this script will:
-1. Extract the archive
-2. Validate the structure
-3. Create a standardized metadata CSV compatible with DermDataset
-4. Map PASSION's 12 disease classes to our 3-class schema (benign, melanoma, kaposi_sarcoma)
-"""
-
-import zipfile
-import tarfile
+import argparse
+import os
 import shutil
+import sys
+import tarfile
+import tempfile
+import zipfile
 from pathlib import Path
-import pandas as pd
-import requests
-from tqdm import tqdm
 
-# ============================================================
-# CONFIGURATION - UPDATE THESE AFTER REGISTRATION
-# ============================================================
-# Option 1: Direct download URL (if provided after registration)
-DOWNLOAD_URL = "https://passionderm.github.io/download/passion_dataset.zip"  # PLACEHOLDER - UPDATE THIS
+APP_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# Option 2: If using an API token
-AUTH_TOKEN = ""  # PLACEHOLDER - UPDATE IF NEEDED
+import prepare_dataset  # noqa: E402  (sibling script, imported by path)
 
-# Target directory
-DATA_ROOT = Path(__file__).parent.parent / "datasets" / "passion"
-METADATA_CSV = DATA_ROOT / "metadata.csv"
-IMAGES_DIR = DATA_ROOT / "images"
-
-# PASSION class mapping to our 3-class schema
-# PASSION has 12 disease categories. Map them as follows:
-# ML FIX: Exclude BCC/SCC (malignant) from benign class - they are filtered out
-CLASS_MAPPING = {
-    # Benign conditions
-    "nevus": "benign",
-    "seborrheic_keratosis": "benign",
-    "lentigo": "benign",
-    "dermatofibroma": "benign",
-    "vascular_lesion": "benign",
-    # Malignant melanoma
-    "melanoma": "melanoma",
-    # Kaposi sarcoma (if present in PASSION)
-    "kaposi_sarcoma": "kaposi_sarcoma",
-    # ML FIX: BCC and SCC are MALIGNANT - exclude from benign class
-    # These will be filtered out and logged (see standardize_metadata)
-    # "basal_cell_carcinoma": "benign",  # EXCLUDED - malignant
-    # "squamous_cell_carcinoma": "benign",  # EXCLUDED - malignant
-    "actinic_keratosis": "benign",
-    "eczema": "benign",
-    "psoriasis": "benign",
+ACCESS_URL = "https://passionderm.github.io/"
+FACTS = {
+    "full_name": "PASSION for Dermatology",
+    "access": f"Access-controlled release, request via {ACCESS_URL}",
+    "access_state": "unanswered as of 2026-10-30",
+    "size": "4,901 images from 1,653 patients (MICCAI 2024, arXiv:2411.04584)",
+    "labels": ["atopic dermatitis", "dermatophytosis", "scabies", "impetigo"],
+    "skin_types": "IV-VI",
+    "sites": ["Cote d'Ivoire", "Malawi", "Tanzania", "Madagascar"],
+    "classes_in_this_project": "none -- the four conditions are not benign/melanoma/kaposi_sarcoma",
+    "licence": "PASSION access agreement; ethics approval per project; not redistributable",
 }
 
-# Classes to exclude (malignant but not melanoma/KS)
-EXCLUDED_CLASSES = {"basal_cell_carcinoma", "squamous_cell_carcinoma"}
 
-# ============================================================
+def _safe_extract(archive: Path, destination: Path) -> None:
+    """Extract without allowing members to escape `destination`."""
+    destination.mkdir(parents=True, exist_ok=True)
+    destination_resolved = destination.resolve()
 
+    if archive.suffix.lower() == ".zip":
+        with zipfile.ZipFile(archive) as bundle:
+            for member in bundle.namelist():
+                target = (destination / member).resolve()
+                if not str(target).startswith(str(destination_resolved)):
+                    raise SystemExit(f"refusing to extract {member!r}: escapes the target directory")
+            bundle.extractall(destination)
+        return
 
-def download_with_progress(url: str, dest: Path, token: str = ""):
-    """Download file with progress bar."""
-    headers = {}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if tarfile.is_tarfile(archive):
+        with tarfile.open(archive) as bundle:
+            members = []
+            for member in bundle.getmembers():
+                target = (destination / member.name).resolve()
+                if not str(target).startswith(str(destination_resolved)):
+                    raise SystemExit(f"refusing to extract {member.name!r}: escapes the target directory")
+                if member.issym() or member.islnk():
+                    raise SystemExit(f"refusing to extract link {member.name!r}")
+                members.append(member)
+            bundle.extractall(destination, members=members)
+        return
 
-    response = requests.get(url, headers=headers, stream=True)
-    response.raise_for_status()
-
-    total_size = int(response.headers.get("content-length", 0))
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(dest, "wb") as f, tqdm(
-        total=total_size, unit="B", unit_scale=True, desc=dest.name
-    ) as pbar:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
-                pbar.update(len(chunk))
-
-
-def extract_archive(archive_path: Path, extract_to: Path):
-    """Extract zip or tar.gz archive."""
-    print(f"Extracting {archive_path} to {extract_to}...")
-    extract_to.mkdir(parents=True, exist_ok=True)
-
-    if archive_path.suffix == ".zip":
-        with zipfile.ZipFile(archive_path, "r") as zf:
-            zf.extractall(extract_to)
-    elif archive_path.suffix in [".gz", ".tgz", ".tar.gz"]:
-        with tarfile.open(archive_path, "r:gz") as tf:
-            tf.extractall(extract_to)
-    elif archive_path.suffix == ".tar":
-        with tarfile.open(archive_path, "r:") as tf:
-            tf.extractall(extract_to)
-    else:
-        raise ValueError(f"Unsupported archive format: {archive_path.suffix}")
+    raise SystemExit(f"unsupported archive format: {archive.name} (expected .zip or .tar*)")
 
 
-def find_metadata_and_images(root: Path):
-    """Find metadata CSV and images directory in extracted archive."""
-    # Common patterns
-    metadata_candidates = list(root.rglob("*metadata*.csv")) + list(root.rglob("*labels*.csv"))
-    images_dirs = [d for d in root.rglob("images") if d.is_dir()] + [d for d in root.rglob("img") if d.is_dir()]
-
-    if not metadata_candidates:
-        raise FileNotFoundError(f"No metadata CSV found in {root}")
-    if not images_dirs:
-        raise FileNotFoundError(f"No images directory found in {root}")
-
-    # Use the first match (usually there's only one)
-    metadata_path = metadata_candidates[0]
-    images_dir = images_dirs[0]
-
-    print(f"Found metadata: {metadata_path}")
-    print(f"Found images dir: {images_dir}")
-
-    return metadata_path, images_dir
-
-
-def standardize_metadata(metadata_path: Path, output_path: Path):
-    """Convert PASSION metadata to our standard format."""
-    df = pd.read_csv(metadata_path)
-    print(f"Original columns: {df.columns.tolist()}")
-    print(f"Original shape: {df.shape}")
-    print(f"Unique labels: {df['label'].unique() if 'label' in df.columns else 'N/A'}")
-
-    # Try to find the right columns
-    # PASSION might have: image_id, diagnosis, fitzpatrick, disease_type, etc.
-    id_col = None
-    label_col = None
-    fitz_col = None
-
-    for col in df.columns:
-        col_lower = col.lower()
-        if "id" in col_lower or "image" in col_lower:
-            id_col = col
-        if "label" in col_lower or "diagnosis" in col_lower or "disease" in col_lower or "class" in col_lower:
-            label_col = col
-        if "fitz" in col_lower or "skin" in col_lower or "type" in col_lower:
-            fitz_col = col
-
-    if not id_col or not label_col:
-        raise ValueError(f"Could not identify ID and label columns. Columns: {df.columns.tolist()}")
-
-    # Create standardized dataframe
-    std_df = pd.DataFrame()
-    std_df["image_id"] = df[id_col].astype(str)
-    # Map labels, keeping original for exclusion logic
-    std_df["_original_label"] = df[label_col].astype(str)
-    std_df["label"] = std_df["_original_label"].map(CLASS_MAPPING)
-
-    # Handle Fitzpatrick
-    if fitz_col and fitz_col in df.columns:
-        std_df["fitzpatrick_type"] = df[fitz_col].astype(int).clip(1, 6)
-    else:
-        # Try to infer from other columns or use default
-        print("WARNING: No Fitzpatrick column found. Using default type 3.")
-        std_df["fitzpatrick_type"] = 3
-
-    # Check for unmapped labels (excluding explicitly excluded classes)
-    unmapped = std_df[std_df["label"].isna()]["_original_label"].unique()
-    if len(unmapped) > 0:
-        print(f"WARNING: Unmapped labels (will be dropped): {unmapped}")
-        print("Update CLASS_MAPPING in this script to include them.")
-        std_df = std_df.dropna(subset=["label"])
-
-    # ML FIX: Exclude BCC/SCC (malignant) from benign class
-    excluded_mask = std_df["_original_label"].isin(EXCLUDED_CLASSES)
-    excluded_count = excluded_mask.sum()
-    if excluded_count > 0:
-        print(f"ML FIX: Excluding {excluded_count} samples with malignant labels {EXCLUDED_CLASSES} from benign class")
-        std_df = std_df[~excluded_mask].copy()
-
-    # Ensure image files exist
-    print("Verifying image files...")
-    missing = []
-    for img_id in std_df["image_id"]:
-        img_path = IMAGES_DIR / f"{img_id}.jpg"
-        if not img_path.exists():
-            # Try other extensions
-            found = False
-            for ext in [".jpeg", ".png", ".JPG", ".JPEG", ".PNG"]:
-                if (IMAGES_DIR / f"{img_id}{ext}").exists():
-                    found = True
-                    break
-            if not found:
-                missing.append(img_id)
-
-    if missing:
-        print(f"WARNING: {len(missing)} images not found. First 10: {missing[:10]}")
-        std_df = std_df[~std_df["image_id"].isin(missing)]
-
-    # Save standardized metadata
-    std_df.to_csv(output_path, index=False)
-    print(f"Standardized metadata saved to {output_path}")
-    print(f"Shape: {std_df.shape}")
-    print(f"Label distribution:\n{std_df['label'].value_counts()}")
-    print(f"Fitzpatrick distribution:\n{std_df['fitzpatrick_type'].value_counts().sort_index()}")
-
-    return std_df
-
-
-def create_train_val_split(metadata_path: Path, train_frac: float = 0.8, seed: int = 42):
-    """Create stratified train/val split."""
-    df = pd.read_csv(metadata_path)
-
-    from sklearn.model_selection import train_test_split
-
-    train_df, val_df = train_test_split(
-        df,
-        train_size=train_frac,
-        random_state=seed,
-        stratify=df[["label", "fitzpatrick_type"]]
+def _find_layout(root: Path) -> tuple[Path, Path]:
+    csv_files = sorted(root.rglob("*.csv"))
+    if not csv_files:
+        raise SystemExit(f"no CSV found inside the archive ({root})")
+    metadata = next(
+        (path for path in csv_files if "metadata" in path.name.lower()),
+        csv_files[0],
     )
-
-    train_path = metadata_path.parent / "train_meta.csv"
-    val_path = metadata_path.parent / "val_meta.csv"
-
-    train_df.to_csv(train_path, index=False)
-    val_df.to_csv(val_path, index=False)
-
-    print(f"Train: {len(train_df)} samples -> {train_path}")
-    print(f"Val: {len(val_df)} samples -> {val_path}")
-    print(f"Train label dist:\n{train_df['label'].value_counts()}")
-    print(f"Val label dist:\n{val_df['label'].value_counts()}")
+    image_dirs = [path for path in root.rglob("*") if path.is_dir()
+                  and path.name.lower() in {"images", "img", "image"}]
+    if not image_dirs:
+        # Images may sit next to the CSV without a dedicated directory.
+        image_dirs = [metadata.parent]
+    return metadata, image_dirs[0]
 
 
-def main():
-    print("=" * 60)
-    print("PASSION for Dermatology Dataset Setup")
-    print("=" * 60)
+def _download(url: str, destination: Path) -> Path:
+    import urllib.request
 
-    # Check if already downloaded
-    if METADATA_CSV.exists() and IMAGES_DIR.exists():
-        print(f"Dataset already exists at {DATA_ROOT}")
-        response = input("Re-download and overwrite? (y/N): ").strip().lower()
-        if response != "y":
-            print("Skipping download.")
-            return
+    token = os.environ.get("PASSION_TOKEN", "").strip()
+    request = urllib.request.Request(url)  # noqa: S310 -- operator-supplied URL
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with urllib.request.urlopen(request, timeout=60) as response, destination.open("wb") as handle:  # noqa: S310
+        shutil.copyfileobj(response, handle)
+    return destination
 
-    # Check configuration
-    if "PLACEHOLDER" in DOWNLOAD_URL:
-        print("\n⚠️  CONFIGURATION REQUIRED")
-        print("Please register at: https://passionderm.github.io/")
-        print("After approval, update DOWNLOAD_URL and AUTH_TOKEN in this script.")
-        print("\nThen re-run this script.")
-        return
 
-    # Download
-    archive_path = DATA_ROOT / "passion_dataset.zip"
-    print(f"\nDownloading from {DOWNLOAD_URL}...")
-    try:
-        download_with_progress(DOWNLOAD_URL, archive_path, AUTH_TOKEN)
-    except Exception as e:
-        print(f"Download failed: {e}")
-        print("Please check your DOWNLOAD_URL and AUTH_TOKEN.")
-        return
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Convert a downloaded PASSION archive into this project's training layout",
+    )
+    parser.add_argument("--archive", help="local .zip/.tar archive provided by the PASSION team")
+    parser.add_argument("--url", help="direct download URL; token read from $PASSION_TOKEN")
+    parser.add_argument("--label-map", help="JSON label map (required; no default is shipped)")
+    parser.add_argument("--output", required=False, help="destination directory")
+    parser.add_argument("--image-column", default="image_id")
+    parser.add_argument("--label-column", default="label")
+    parser.add_argument("--fitz-column", default="fitzpatrick_type")
+    parser.add_argument("--source", default="passion")
+    parser.add_argument("--info", action="store_true", help="print the documented facts and exit")
+    args = parser.parse_args(argv)
 
-    # Extract
-    try:
-        extract_dir = DATA_ROOT / "extracted"
-        extract_archive(archive_path, extract_dir)
-    except Exception as e:
-        print(f"Extraction failed: {e}")
-        return
+    import json
 
-    # Find metadata and images
-    try:
-        meta_path, img_dir = find_metadata_and_images(extract_dir)
-    except Exception as e:
-        print(f"Could not locate dataset files: {e}")
-        return
+    if args.info:
+        print(json.dumps(FACTS, indent=2))
+        return 0
 
-    # Move images to standard location
-    if img_dir != IMAGES_DIR:
-        print(f"Moving images to {IMAGES_DIR}...")
-        if IMAGES_DIR.exists():
-            shutil.rmtree(IMAGES_DIR)
-        shutil.move(str(img_dir), str(IMAGES_DIR))
+    if not args.archive and not args.url:
+        print("PASSION is access-controlled and has not been provided to this project.")
+        print(f"  request access at: {ACCESS_URL} (state: {FACTS['access_state']})")
+        print(f"  documented cohort: {FACTS['size']}")
+        print(f"  labels: {', '.join(FACTS['labels'])}")
+        print(f"  three-class head: {FACTS['classes_in_this_project']}")
+        print("Re-run with --archive <file> once access is granted, or --info for details.")
+        return 2
 
-    # Standardize metadata
-    try:
-        standardize_metadata(meta_path, METADATA_CSV)
-    except Exception as e:
-        print(f"Metadata standardization failed: {e}")
-        return
+    if not args.label_map:
+        print("refusing to convert: --label-map is required.")
+        print("PASSION's four conditions do not map onto benign/melanoma/kaposi_sarcoma,")
+        print("so the mapping must be written deliberately, not assumed.")
+        return 2
 
-    # Create train/val split
-    try:
-        create_train_val_split(METADATA_CSV)
-    except Exception as e:
-        print(f"Split creation failed: {e}")
-        return
+    if not args.output:
+        print("refusing to convert: --output is required.")
+        return 2
 
-    # Cleanup
-    shutil.rmtree(extract_dir, ignore_errors=True)
-    archive_path.unlink(missing_ok=True)
+    with tempfile.TemporaryDirectory(prefix="passion-") as workspace:
+        if args.archive:
+            archive = Path(args.archive).expanduser()
+            if not archive.is_file():
+                raise SystemExit(f"archive not found: {archive}")
+        else:
+            print(f"downloading from {args.url} ...")
+            archive = _download(args.url, Path(workspace) / "passion-archive")
 
-    print("\n✅ PASSION dataset ready!")
-    print(f"  Metadata: {METADATA_CSV}")
-    print(f"  Images: {IMAGES_DIR}")
-    print(f"  Train split: {DATA_ROOT / 'train_meta.csv'}")
-    print(f"  Val split: {DATA_ROOT / 'val_meta.csv'}")
+        extract_dir = Path(workspace) / "extracted"
+        _safe_extract(archive, extract_dir)
+        metadata_csv, images_dir = _find_layout(extract_dir)
+        print(f"metadata: {metadata_csv}")
+        print(f"images:   {images_dir}")
+
+        report = prepare_dataset.convert(argparse.Namespace(
+            input=str(metadata_csv),
+            images_root=str(images_dir),
+            output=args.output,
+            label_map=args.label_map,
+            source=args.source,
+            image_column=args.image_column,
+            label_column=args.label_column,
+            fitz_column=args.fitz_column,
+        ))
+
+    print(f"converted {report['rows_out']}/{report['rows_in']} rows -> {args.output}")
+    print(f"  classes: {report['class_counts']}")
+    print(f"  fitzpatrick: {report['fitzpatrick_counts']}  (0 = not provided by the source)")
+    if report["unmapped_labels"]:
+        print(f"  unmapped: {report['unmapped_labels'][:10]}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
