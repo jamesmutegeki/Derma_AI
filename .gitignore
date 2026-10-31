@@ -40,3 +40,11 @@ derma.db-shm
 INITIAL_ADMIN_PASSWORD.txt
 .pytest_cache/
 .ruff_cache/
+
+# Training artefacts and downloaded corpora (never commit data or weights)
+dermatology-ai/datasets/
+dermatology-ai/runs/
+datasets/
+runs/
+*.pt
+*.pth

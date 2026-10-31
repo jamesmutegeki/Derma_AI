@@ -347,6 +347,30 @@ def create_app(
             return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
         return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
+    # Brand assets. Public by design (a login screen cannot require a token to
+    # show its own logo), so the surface is pinned to one directory, a suffix
+    # allow-list and a resolve() check: no traversal, no dotfiles, no HTML.
+    ASSET_DIR = APP_DIR / "assets"
+    ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
+
+    @app.get("/assets/{name}")
+    def asset(name: str):
+        if "/" in name or "\\" in name or name.startswith("."):
+            raise HTTPException(status_code=404, detail="Not found")
+        path = (ASSET_DIR / name).resolve()
+        if not str(path).startswith(str(ASSET_DIR.resolve())):
+            raise HTTPException(status_code=404, detail="Not found")
+        if path.suffix.lower() not in ASSET_SUFFIXES or not path.is_file():
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(path)
+
+    @app.get("/favicon.ico")
+    def favicon():
+        path = ASSET_DIR / "favicon.png"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(path, media_type="image/png")
+
     def _image_response(name: str):
         path = APP_DIR / name
         if not path.exists():

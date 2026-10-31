@@ -32,6 +32,8 @@ PUBLIC_PATHS = {
     "/measles_child.jpg",
     "/bg_vitiligo.jpg",
     "/bg_acne_skin.jpg",
+    "/assets/{name}",
+    "/favicon.ico",
     "/api/health",
     "/api/ready",
     "/api/login",

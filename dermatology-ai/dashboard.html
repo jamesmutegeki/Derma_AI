@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <!-- Disclaimer: This tool is for research and educational purposes only. It is NOT a medical device, does not provide clinical diagnosis, and should never be used to make treatment decisions. Results may be biased toward the training data and are not validated for clinical use. Always consult a qualified dermatologist or physician. -->
 
-<title>Derma-AI</title>
+<title>Dermatology System</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
 <meta name="description" content="Derma-AI is a secure, AI-powered clinical decision support system for dermatology. Assists clinicians with lesion analysis, triage recommendations, and patient management.">
 <meta name="keywords" content="dermatology, AI, clinical decision support, skin lesion analysis, dermoscopy, medical AI, dermatologist, skin cancer detection">
 <meta name="robots" content="index, follow">
@@ -107,7 +108,7 @@ body {
 .login-logo {
   display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
 }
-.login-logo svg { width: 40px; height: 40px; }
+.login-logo img { width: 40px; height: 40px; }
 .login-logo h1 { font-size: 1.35rem; font-weight: 700; color: var(--text); }
 .login-subtitle { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 32px; }
 .form-group { margin-bottom: 20px; }
@@ -214,7 +215,7 @@ body {
   margin-bottom: 24px; padding: 0 4px;
 }
 .dash-header-left { display: flex; align-items: center; gap: 14px; }
-.dash-header-left svg.logo { width: 36px; height: 36px; }
+.dash-header-left img.logo { width: 36px; height: 36px; }
 .dash-header-left h1 { font-size: 1.25rem; font-weight: 700; color: var(--text); }
 .dash-header-left .badge {
   font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
@@ -946,14 +947,8 @@ select,
 <div id="loginOverlay">
   <div class="login-card">
     <div class="login-logo">
-      <svg viewBox="0 0 40 40" fill="none">
-        <rect width="40" height="40" rx="10" fill="url(#lg)"/>
-        <path d="M20 10c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18a8 8 0 110-16 8 8 0 010 16z" fill="rgba(255,255,255,0.2)"/>
-        <circle cx="20" cy="20" r="5" fill="white"/>
-        <path d="M20 8v4M20 28v4M8 20h4M28 20h4M12.93 12.93l2.83 2.83M24.24 24.24l2.83 2.83M12.93 27.07l2.83-2.83M24.24 15.76l2.83-2.83" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
-      </svg>
-      <h1>Derma-AI</h1>
+      <img src="/assets/logo-mark.png" alt="Dermatology System" width="40" height="40">
+      <h1>Dermatology System</h1>
     </div>
     <p class="login-subtitle">Secure Clinical Decision Support System</p>
 
@@ -1012,12 +1007,7 @@ select,
   <!-- Header -->
   <header class="dash-header">
     <div class="dash-header-left">
-      <svg class="logo" viewBox="0 0 40 40" fill="none">
-        <rect width="40" height="40" rx="10" fill="url(#lg2)"/>
-        <path d="M20 10c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18a8 8 0 110-16 8 8 0 010 16z" fill="rgba(255,255,255,0.2)"/>
-        <circle cx="20" cy="20" r="5" fill="white"/>
-        <defs><linearGradient id="lg2" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
-      </svg>
+      <img class="logo" src="/assets/logo-mark.png" alt="Dermatology System" width="36" height="36">
       <h1>Dermatology AI</h1>
       <span class="badge">Clinical Decision Support</span>
     </div>
@@ -1513,13 +1503,7 @@ Plan:
 <div id="adminDashboard">
   <header class="dash-header">
     <div class="dash-header-left">
-      <svg class="logo" viewBox="0 0 40 40" fill="none">
-        <rect width="40" height="40" rx="10" fill="url(#lg3)"/>
-        <path d="M20 10c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18a8 8 0 110-16 8 8 0 010 16z" fill="rgba(255,255,255,0.2)"/>
-        <circle cx="20" cy="20" r="5" fill="white"/>
-        <path d="M20 8v4M20 28v4M8 20h4M28 20h4M12.93 12.93l2.83 2.83M24.24 24.24l2.83 2.83M12.93 27.07l2.83-2.83M24.24 15.76l2.83-2.83" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        <defs><linearGradient id="lg3" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
-      </svg>
+      <img class="logo" src="/assets/logo-mark.png" alt="Dermatology System" width="36" height="36">
       <h1>Dermatology AI Admin</h1>
       <span class="badge" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">Administrator</span>
     </div>

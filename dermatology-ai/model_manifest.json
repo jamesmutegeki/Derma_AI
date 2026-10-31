@@ -2,6 +2,10 @@
   "schema_version": 1,
   "status": "placeholder",
   "note": "No frozen checkpoint ships with this repository. Run scripts/freeze_model.py after training to populate sha256/bytes and point status at a real artefact. Every number that appears in a poster, slide or document must be quoted from the referenced evaluation report.",
+  "serving": {
+    "enabled": false,
+    "reason": "No checkpoint is frozen; and gate 1A is paused until a Kaposi sarcoma cohort is obtained (see docs/TRAINING.md)."
+  },
   "checkpoint": {
     "path_env": "MODEL_CHECKPOINT_PATH",
     "filename": null,
@@ -12,7 +16,11 @@
     "name": "DermatologyCBM",
     "backbone": "hrnet_w18",
     "num_classes": 3,
-    "class_names": ["benign", "melanoma", "kaposi_sarcoma"],
+    "class_names": [
+      "benign",
+      "melanoma",
+      "kaposi_sarcoma"
+    ],
     "num_concepts": 7,
     "concept_names": [
       "asymmetry",

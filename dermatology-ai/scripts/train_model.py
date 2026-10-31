@@ -15,6 +15,11 @@ does that, under three rules:
    the same split. HAM10000 has several images per lesion, and splitting them
    across train/val inflates every metric it touches.
 
+Freezing is **held from serving by default** (``--serve`` overrides it): gate 1A
+was paused on 2026-10-31 because the third class has no training data, so a
+frozen artefact is produced for measurement and kept out of ``/api/diagnose``
+until a Kaposi sarcoma cohort changes that.
+
 A ``--smoke`` run trains on a handful of images to exercise the code path. Its
 report is marked ``valid: false``, and it **cannot** be frozen -- so no
 manifest, and no serving, can ever be produced from it.
@@ -369,6 +374,8 @@ def freeze(args, result: dict) -> int:
     ]
     if provenance.get("git_commit"):
         command += ["--git-commit", provenance["git_commit"]]
+    if not args.serve:
+        command += ["--no-serve", "--hold-reason", args.hold_reason]
     print("freezing:", " ".join(command))
     completed = subprocess.run(command, capture_output=True, text=True)
     print(completed.stdout.strip())
@@ -403,6 +410,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split", default=None, help="split description recorded in provenance")
     parser.add_argument("--freeze", action="store_true", help="freeze into model_manifest.json")
     parser.add_argument("--manifest", default=None, help="manifest path (default: app root)")
+    parser.add_argument("--serve", action="store_true",
+                        help="allow the frozen artefact to be served. Off by default: "
+                             "gate 1A is paused until a Kaposi sarcoma cohort exists")
+    parser.add_argument("--hold-reason", default=(
+        "Kaposi sarcoma cohort pending (gate 1A paused 2026-10-31)"))
     parser.add_argument("--smoke", action="store_true",
                         help="code-path test only; the report is valid=false and cannot be frozen")
     parser.add_argument("--no-pretrained", dest="pretrained", action="store_false",

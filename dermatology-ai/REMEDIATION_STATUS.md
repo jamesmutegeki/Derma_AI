@@ -102,19 +102,29 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S4-6** | The PASSION helper no longer describes a dataset that does not exist, and cannot impute a skin type | `tests/test_s4_2_passion_script.py` (6 tests) | done |
 | **S4-4** | Approved pathway `1A 2A 3A 4A`: runbook signed with an explicit review basis, retention policy in force, exemption request prepared -- and no fabricated metadata left in the PASSION helper | `tests/test_s4_3_gate_signoff.py`, `tests/test_s4_2_passion_script.py` | done (gates 2, 3) / prepared (gate 4) |
 
+## Sprint 5 -- brand, and the pause on gate 1A
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S5-1** | One logo everywhere: the approved navy/coral artwork replaces the three drifting SVG marks on the login card, both headers, the slides and the poster; assets are served from one pinned directory | `tests/test_s5_1_branding.py` (8 tests) | done |
+| **S5-2** | The pause on gate 1A is enforced by the code, not by prose: a frozen artefact can be held out of service, and the API reports why | `tests/test_s5_2_serving_hold.py` (5 tests) | done |
+| **S5-3** | The T4 procedure is one script that refuses partial downloads and cannot silently produce a servable model | `scripts/train_on_t4.sh --check`, `bash -n` in CI | done |
+
 ## Scope decisions
 
 | Date | Decision | Effect |
 | --- | --- | --- |
 | 2026-10-30 | **The triage module stays.** It is part of the product (API `triage*` fields, `TRUE_LABEL_TO_TRIAGE`, dashboard panel, `metrics_tracker` triage maths, poster and docs). | Review item **P2-12 is withdrawn**; the branch name `pre-triage-removal` is historical and does not describe the code |
 | 2026-10-30 | PASSION is treated as **unavailable** after unanswered access requests | Nothing in the pipeline depends on it; SCIN is the recommended substitute for the evaluation role only |
+| 2026-10-31 | **Gate 1A is paused** until a Kaposi sarcoma cohort is obtained. No checkpoint may be served in the meantime; a frozen artefact is allowed for measurement only, with `serving.enabled = false` | `/api/diagnose` keeps returning 503 with the hold reason; `train_model.py` holds by default; closing the pause requires a KS cohort that converts to a non-zero class count |
+| 2026-10-31 | The approved logo (navy/coral emblem + "DERMATOLOGY SYSTEM") replaces every previous mark | One asset set in `assets/`, served from `/assets/`; the system is branded **Dermatology System** |
 | 2026-10-30 | The three-class head is **not** redefined to fit whichever dataset is to hand | Mapped-label cohorts (SCIN, eSkinHealth) are used for tone-stratified evaluation, never as malignancy benchmarks |
 
 ## Gate before real patient data
 
 | Gate item | State |
 | --- | --- |
-| S1-1 frozen manifest + model card | **not met -- pipeline ready, artefact not produced.** `scripts/train_model.py` trains and freezes under the rules that make the gate mean something (group-aware split, no invented provenance, smoke reports cannot be frozen). What blocks the actual run: HAM10000 images are served from `dataverse.harvard.edu`, which this development sandbox cannot reach, and **no obtainable public dataset here contains Kaposi sarcoma** (`docs/TRAINING.md` §2b) |
+| S1-1 frozen manifest + model card | **paused 2026-10-31 at the owner's instruction** until a Kaposi sarcoma cohort exists. **not met -- pipeline ready, artefact not produced.** `scripts/train_model.py` trains and freezes under the rules that make the gate mean something (group-aware split, no invented provenance, smoke reports cannot be frozen). What blocks the actual run: HAM10000 images are served from `dataverse.harvard.edu`, which this development sandbox cannot reach, and **no obtainable public dataset here contains Kaposi sarcoma** (`docs/TRAINING.md` §2b) |
 | S2-4 runbook | **met** -- signed 2026-10-30 in `docs/OPERATIONS.md` §6, with the review basis stated plainly: single-engineer self-review, **no independent audit** |
 | Written retention/backup policy | **met** -- in force from 2026-10-30 (`SECURITY.md` §4), scoped to synthetic/de-identified data, review due 2027-01-28, enforced by `purge_records.py` and `backup_db.py --verify` |
 | IRB / ethics sign-off | **request prepared -- determination pending.** `docs/IRB_EXEMPTION_REQUEST.md` is submission-ready (four bracketed fields to fill). Pending is not approved, and is not recorded as such |

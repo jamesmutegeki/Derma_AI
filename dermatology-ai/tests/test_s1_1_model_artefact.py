@@ -93,6 +93,10 @@ def test_backend_refuses_a_checkpoint_that_fails_the_manifest(tmp_path, monkeypa
     frozen = json.loads(json.dumps(manifest))
     frozen["checkpoint"]["sha256"] = "0" * 64
     frozen["status"] = "frozen"
+    # This test is about hash verification, so the artefact must be *servable*;
+    # the shipped template carries the gate-1A serving hold, which is exercised
+    # separately in tests/test_s5_2_serving_hold.py.
+    frozen["serving"] = {"enabled": True, "reason": None}
     manifest_path = tmp_path / "model_manifest.json"
     manifest_path.write_text(json.dumps(frozen), encoding="utf-8")
 

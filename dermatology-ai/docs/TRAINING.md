@@ -54,7 +54,24 @@ Notes:
 * Read `datasets/ham10000/conversion_report.json` before training. If the
   row count or class counts look wrong, stop there -- do not train and hope.
 
-## 2b. The third class has no training data -- read this before training
+## 2b. DECISION 2026-10-31: gate 1A is PAUSED until a Kaposi sarcoma cohort exists
+
+**The owner's instruction:** *"pause and freeze until the KS cohort is obtained."*
+
+What that means in this repository:
+
+| | State |
+| --- | --- |
+| Kaposi sarcoma class strategy | **Frozen.** No decision has been taken between "three classes with an untrained head", "two served classes" and "wait for data" -- and none may be taken implicitly by a training run |
+| Training a three-class head | **Blocked by default.** `scripts/train_model.py` refuses when a class has no examples; `--allow-untrained-classes` is the only way through, and it records the gap in the report |
+| A frozen artefact | **Permitted** for measurement, but it is frozen with `"serving": {"enabled": false}` and `/api/diagnose` stays **503** with the hold reason. `train_model.py` holds by default; `--serve` is an explicit override |
+| Closing the pause | A Kaposi sarcoma cohort, under an approved protocol, that converts to a non-zero `kaposi_sarcoma` count in `conversion_report.json` |
+
+The hold is enforced in code (`backend.py` returns before it touches the
+checkpoint) and tested in `tests/test_s5_2_serving_hold.py`, so it survives a
+forgotten flag or a well-meaning operator.
+
+### The original analysis
 
 HAM10000 contains **no Kaposi sarcoma images** (its seven categories are nv,
 mel, bkl, bcc, akiec, vasc, df). Neither does SCIN, and DDI's malignant group is
@@ -79,6 +96,32 @@ training examples, and prints the three legitimate ways forward:
 This is a decision for the owner, not something to paper over. Until it is made,
 S1-1 stays open -- and that is the correct state, because the alternative is a
 checkpoint that silently cannot do part of its job.
+
+## 2c. Train on a T4 (or Colab)
+
+The whole procedure is one script:
+
+```bash
+bash scripts/train_on_t4.sh --check    # environment + plan, downloads nothing
+bash scripts/train_on_t4.sh            # ~3 GB download, convert, train, freeze (held)
+```
+
+It downloads HAM10000 from the Harvard Dataverse, refuses to continue below
+9,000 images or 8,000 converted rows, converts with `--group-column lesion_id`,
+trains, freezes with the serving hold, and prints the metrics plus the manifest
+state. On Colab:
+
+```
+!git clone https://github.com/jamesmutegeki/Derma_AI.git
+%cd Derma_AI
+!bash dermatology-ai/scripts/train_on_t4.sh
+```
+
+then download `dermatology-ai/runs/<date>/report.json` and
+`dermatology-ai/model_manifest.json` and commit them **without** the checkpoint
+(the weights go to the deployment secret store, not to git).
+
+Overrides: `EPOCHS=6 IMG_SIZE=224 BATCH_SIZE=32 PYTHON=/usr/bin/python3`.
 
 ## 3. Train
 

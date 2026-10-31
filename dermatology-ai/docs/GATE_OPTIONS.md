@@ -5,7 +5,7 @@
 
 | Gate | Approved | State on 2026-10-30 |
 | --- | --- | --- |
-| 1 -- frozen weights | 1A | **Pipeline implemented and tested** (`scripts/train_model.py`, 10 tests). No checkpoint yet: the images are not reachable from this environment, and no obtainable dataset here contains Kaposi sarcoma (`docs/TRAINING.md` §2b) -- that is the open decision |
+| 1 -- frozen weights | 1A | **PAUSED 2026-10-31** until a Kaposi sarcoma cohort exists (see `docs/TRAINING.md` §2b); pipeline implemented, tested, and held from serving | Pipeline implemented and tested (`scripts/train_model.py`, 10 tests). No checkpoint yet: the images are not reachable from this environment, and no obtainable dataset here contains Kaposi sarcoma (`docs/TRAINING.md` §2b) -- that is the open decision |
 | 2 -- runbook | 2A | **Closed** -- signed in `docs/OPERATIONS.md` §6 with the single-reviewer limitation stated |
 | 3 -- retention policy | 3A | **Closed** -- in force from 2026-10-30, scoped to synthetic/de-identified data, review due 2027-01-28 |
 | 4 -- IRB | 4A | **Prepared** -- `docs/IRB_EXEMPTION_REQUEST.md` needs four fields filled and a submission; pending is not approved |

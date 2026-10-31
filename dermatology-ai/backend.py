@@ -154,6 +154,20 @@ class Backend:
         self.device = torch.device(self.device_name or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.status.device = str(self.device)
 
+        # A frozen artefact can be deliberately withheld from serving -- the
+        # current case is gate 1A: the weights exist, but the third class has no
+        # training data until a Kaposi sarcoma cohort is obtained, so nothing is
+        # allowed to answer a diagnosis request.  Checked before the checkpoint
+        # is touched, so a held manifest never even opens the file.
+        manifest = load_manifest(self.manifest_path)
+        serving = (manifest or {}).get("serving") or {}
+        if serving.get("enabled") is False:
+            reason = serving.get("reason") or "serving is disabled in the model manifest"
+            self.status = BackendStatus(reason=f"model serving is on hold: {reason}",
+                                        device=str(self.device))
+            logger.warning("Model unavailable: %s", self.status.reason)
+            return
+
         if not self.model_path:
             self.status = BackendStatus(
                 reason="MODEL_CHECKPOINT_PATH is not set; no model weights were loaded",

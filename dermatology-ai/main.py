@@ -152,7 +152,11 @@ def run_ui(share: bool = False) -> None:
         model_version=f"{Path(model_path).name}@{file_sha256(model_path)[:12]}",
         weights_sha256=file_sha256(model_path),
     )
-    create_ui(app_state).launch(share=share, server_name="0.0.0.0", server_port=7860)
+    favicon = APP_DIR / "assets" / "favicon.png"
+    create_ui(app_state).launch(
+        share=share, server_name="0.0.0.0", server_port=7860,
+        favicon_path=str(favicon) if favicon.is_file() else None,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -82,6 +82,11 @@ def build_manifest(args) -> dict:
             )
         manifest["evaluation"] = {"report": str(report), "metrics": metrics}
 
+    manifest["serving"] = {
+        "enabled": bool(args.serve),
+        "reason": None if args.serve else (args.hold_reason or "serving disabled by the operator"),
+    }
+
     complete = all(provenance.get(key) not in (None, "", []) for key in REQUIRED_PROVENANCE)
     manifest["status"] = "frozen" if complete else "placeholder"
     if not complete:
@@ -106,6 +111,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--git-commit", default=None)
     parser.add_argument("--date", default=None, help="ISO date of training (default: today)")
+    parser.add_argument("--serve", dest="serve", action="store_true", default=True,
+                        help="allow the frozen artefact to be served (default)")
+    parser.add_argument("--no-serve", dest="serve", action="store_false",
+                        help="freeze the artefact but hold it out of serving; "
+                             "the API keeps returning 503 with --hold-reason")
+    parser.add_argument("--hold-reason", default=None,
+                        help="why serving is held (shown by /api/ready and /api/diagnose)")
     parser.add_argument("--metrics-report", default=None,
                         help="JSON report produced by run_evaluation_*.py --json")
     args = parser.parse_args(argv)

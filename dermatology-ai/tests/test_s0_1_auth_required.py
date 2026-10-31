@@ -43,6 +43,7 @@ def test_public_allowlist_matches_installed_routes(app):
     expected = {
         "/", "/dashboard.js", "/robots.txt",
         "/measles_child.jpg", "/bg_vitiligo.jpg", "/bg_acne_skin.jpg",
+        "/assets/{name}", "/favicon.ico",
         "/api/health", "/api/ready", "/api/login", "/api/admin/login",
         "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc",
     }
