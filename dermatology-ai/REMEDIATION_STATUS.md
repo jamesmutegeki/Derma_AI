@@ -110,6 +110,13 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S5-2** | The pause on gate 1A is enforced by the code, not by prose: a frozen artefact can be held out of service, and the API reports why | `tests/test_s5_2_serving_hold.py` (5 tests) | done |
 | **S5-3** | The T4 procedure is one script that refuses partial downloads and cannot silently produce a servable model | `scripts/train_on_t4.sh --check`, `bash -n` in CI | done |
 
+## Sprint 6 -- ingesting a real corpus
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S6-1** | A local HAM10000 copy is verified before training: complete, joined, grouped, and matching the published class counts -- on a subset the counts are not applied, because five images are not evidence | `tests/test_s5_4_ingest.py` (8 tests) | done |
+| **S6-2** | Conversion can hardlink instead of copying, so a 2.7 GB corpus is not doubled, and a release mirror can be pulled and checked in one command | `scripts/fetch_and_verify_ham10000.sh`, `prepare_dataset.py --link` | done |
+
 ## Scope decisions
 
 | Date | Decision | Effect |

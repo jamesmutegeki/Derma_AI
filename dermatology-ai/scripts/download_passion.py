@@ -193,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
             image_column=args.image_column,
             label_column=args.label_column,
             fitz_column=args.fitz_column,
+            link="copy",
         ))
 
     print(f"converted {report['rows_out']}/{report['rows_in']} rows -> {args.output}")

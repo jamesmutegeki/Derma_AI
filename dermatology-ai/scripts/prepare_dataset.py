@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import shutil
 import sys
 from collections import Counter
@@ -49,6 +50,21 @@ APP_DIR = Path(__file__).resolve().parents[1]
 LABEL_MAP_DIR = APP_DIR / "scripts" / "label_maps"
 CLASSES = ("benign", "melanoma", "kaposi_sarcoma")
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+
+
+def _place(source: Path, destination: Path, mode: str) -> None:
+    if destination.exists():
+        destination.unlink()
+    if mode == "hardlink":
+        try:
+            os.link(source, destination)
+            return
+        except OSError:
+            pass  # different filesystem, or a filesystem without hard links
+    elif mode == "symlink":
+        destination.symlink_to(source.resolve())
+        return
+    shutil.copyfile(source, destination)
 
 
 def load_label_map(path: str | Path) -> dict[str, str]:
@@ -98,6 +114,7 @@ def convert(args) -> dict:
         raise SystemExit(f"images root not found: {images_root}")
 
     group_column = getattr(args, "group_column", None)
+    link_mode = getattr(args, "link", "copy")
     output = Path(args.output)
     images_out = output / "images"
     images_out.mkdir(parents=True, exist_ok=True)
@@ -144,7 +161,10 @@ def convert(args) -> dict:
                 continue
 
             image_id = Path(relative).with_suffix("").name.replace(" ", "_")
-            shutil.copyfile(image_path, images_out / f"{image_id}{image_path.suffix.lower()}")
+            # `hardlink` matters for big corpora: HAM10000 is ~2.7 GB and a copy
+            # doubles it for no benefit. It falls back to a copy across
+            # filesystems, so the option is safe to pass anywhere.
+            _place(image_path, images_out / f"{image_id}{image_path.suffix.lower()}", link_mode)
 
             fitz = normalise_fitz(row.get(args.fitz_column, "") if args.fitz_column else "")
             fitz_counts[fitz] += 1
@@ -209,6 +229,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image-column", default="image_id")
     parser.add_argument("--label-column", default="label")
     parser.add_argument("--fitz-column", default="fitzpatrick_type")
+    parser.add_argument("--link", choices=("copy", "hardlink", "symlink"), default="copy",
+                        help="how to place images in the output (default copy; "
+                             "hardlink avoids doubling disk for large corpora)")
     parser.add_argument("--group-column", default=None,
                         help="column holding a lesion/patient id, passed through as group_id")
     parser.add_argument("--source-template", default=None,

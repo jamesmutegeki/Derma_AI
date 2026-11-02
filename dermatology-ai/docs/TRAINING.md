@@ -97,6 +97,57 @@ This is a decision for the owner, not something to paper over. Until it is made,
 S1-1 stays open -- and that is the correct state, because the alternative is a
 checkpoint that silently cannot do part of its job.
 
+## 2b-ii. If you already have HAM10000 locally
+
+Verified before anything else -- a half-unzipped archive trains silently on
+6,000 images and reports a number that means nothing:
+
+```bash
+python scripts/verify_ham10000.py \
+    --images-dir ~/ham10000/images \
+    --metadata ~/ham10000/HAM10000_metadata.csv \
+    --out ham10000_verification.json
+```
+
+It checks 10,015 images against 10,015 rows, every row joined to a file and
+every file to a row, that `lesion_id` exists (group-aware splitting), and that
+the class counts match the published release (nv 6,705 · mel 1,113 · bkl 1,099 ·
+bcc 514 · akiec 327 · vasc 142 · df 115). Exit 3 means **do not train**.
+
+Then convert with hardlinks, because a copy doubles 2.7 GB for nothing:
+
+```bash
+python scripts/prepare_dataset.py \
+    --input ~/ham10000/HAM10000_metadata.csv \
+    --images-root ~/ham10000/images \
+    --image-column image_id --label-column dx --fitz-column "" \
+    --label-map scripts/label_maps/ham10000.json \
+    --group-column lesion_id --link hardlink \
+    --output ~/ham10000/converted --source HAM10000
+```
+
+### Mirroring it through a GitHub release
+
+Repositories are the wrong vehicle: GitHub rejects files over 100 MB and the two
+archives are ~1.37 GB each. Release assets allow 2 GiB per file, so:
+
+```bash
+gh release create ham10000-v1 \
+    HAM10000_images_part1.zip HAM10000_images_part2.zip HAM10000_metadata.csv \
+    --repo <owner>/<repo> --title "HAM10000 mirror (CC BY-NC 4.0)" \
+    --notes "Mirror of the Harvard Dataverse release (Tschandl et al. 2018, \
+doi:10.7910/DVN/DBW86T). CC BY-NC 4.0, non-commercial research, attribution \
+required. Delete after the frozen artefact exists."
+```
+
+and pull it back with:
+
+```bash
+bash scripts/fetch_and_verify_ham10000.sh --repo <owner>/<repo> --tag ham10000-v1 --work ~/ham10000
+```
+
+which downloads, verifies, converts with hardlinks and prints the class counts.
+
 ## 2c. Train on a T4 (or Colab)
 
 The whole procedure is one script:
