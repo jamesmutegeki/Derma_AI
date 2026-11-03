@@ -3,8 +3,10 @@
 **Written:** 2026-11-03 · **Horizon:** 12 weeks (to ~2027-01-26) + an open lane
 **Owner:** J. Mutegeki · **Status:** active
 **Interactive version:** [`roadmap.html`](./roadmap.html) — four views (timeline,
-board, list, dependency map); filter by lane, week or search; open any task for its
-four steps, evidence file, definition of done and failure mode; open a **week sheet**
+board, list, dependency map); filter by lane, week, search, or the things worth
+worrying about (**overdue**, **no slack**, **needs a gate**); a **Next up** panel
+that names the first unticked step of the four tasks to do now; open any task for
+its steps, evidence file, definition of done and failure mode; open a **week sheet**
 for the week's lane, ethics, study and writing work; tick things off (kept in this
 browser only, exportable as JSON); switch on a scenario to see what parks when it
 happens

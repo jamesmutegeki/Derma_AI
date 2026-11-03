@@ -90,10 +90,25 @@ def validate(plan: dict) -> None:
         if task.get("gate") and task["gate"] not in gates:
             problems.append(f"{tid}: unknown gate {task['gate']}")
 
+    by_id = {task["id"]: task for task in tasks}
     for task in tasks:
         for dep in task.get("depends", []):
             if dep not in ids:
                 problems.append(f"{task['id']}: depends on unknown task {dep}")
+                continue
+            parent = by_id[dep]
+            if parent["weeks"][1] > task["weeks"][0]:
+                problems.append(
+                    f"{task['id']} starts in W{task['weeks'][0]} but its dependency "
+                    f"{dep} runs to W{parent['weeks'][1]}: the plan contradicts itself"
+                )
+
+    for milestone in meta.get("milestones", []):
+        if not (1 <= int(milestone.get("week", 0)) <= weeks):
+            problems.append(f"milestone {milestone.get('label')!r} sits outside the horizon")
+        for field in ("date", "label"):
+            if not str(milestone.get(field, "")).strip():
+                problems.append(f"milestone at week {milestone.get('week')}: {field} is empty")
 
     weeks = plan.get("weeks", [])
     if [w.get("week") for w in weeks] != list(range(1, int(meta.get("weeks", 0)) + 1)):

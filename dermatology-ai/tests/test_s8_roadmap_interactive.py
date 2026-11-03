@@ -181,11 +181,46 @@ def test_the_markdown_calendar_is_generated_from_the_same_weeks(app_dir):
 
 def test_the_page_exposes_the_detail_it_promises(app_dir):
     html = _page(app_dir)
-    # Views, the week sheet, dependency map, deep links and progress export.
+    # Views, the week sheet, dependency map, deep links, signals and progress export.
     for hook in ('data-view="map"', 'id="openWeek"', 'id="modalExport"', 'id="modalImport"',
-                 '"w=" + n', '"t=" + id', "chainOf", "weekMarkdown"):
+                 '"w=" + n', '"t=" + id', "chainOf", "weekMarkdown",
+                 'data-scope="overdue"', 'data-scope="slack"', 'data-scope="gate"',
+                 'id="nextUp"', 'id="acts"', 'id="milestones"', "noSlack", "firstOpenStep"):
         assert hook in html, f"the page is missing {hook}"
     assert "derma-roadmap-v2" in html
+
+
+def test_milestones_are_dated_and_inside_the_horizon(app_dir):
+    plan = _data(app_dir)
+    milestones = plan["meta"]["milestones"]
+    assert len(milestones) >= 4, "a twelve-week plan needs its hard dates marked"
+    dates = {entry["week"]: entry["dates"] for entry in plan["meta"]["weekDates"]}
+    for milestone in milestones:
+        assert 1 <= milestone["week"] <= plan["meta"]["weeks"]
+        assert milestone["date"] == dates[milestone["week"]], milestone
+        assert milestone["label"].strip()
+    # The two cutoffs this project actually turns on.
+    labels = " ".join(m["label"] for m in milestones).lower()
+    assert "14 dec" in labels and "demo" in labels
+
+
+def test_the_plan_cannot_contradict_itself(app_dir):
+    """A dependency may not finish after the thing that depends on it starts."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("build_roadmap", app_dir / "scripts" / "build_roadmap.py")
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+
+    plan = _data(app_dir)
+    builder.validate(plan)  # the committed plan is consistent
+
+    broken = json.loads(json.dumps(plan))
+    task = next(t for t in broken["tasks"] if t["id"] == "1.4")
+    task["weeks"] = [2, 2]  # starts before dependency 1.3 (W2-3) is finished
+    with pytest.raises(SystemExit) as error:
+        builder.validate(broken)
+    assert "1.4" in str(error.value) and "contradicts itself" in str(error.value)
 
 
 def test_dependencies_scenarios_and_gates_all_resolve(app_dir):

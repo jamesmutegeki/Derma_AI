@@ -516,6 +516,53 @@
   .import-note { min-height: 18px; font-size: 12px; color: var(--coral); }
 
   mark { background: color-mix(in srgb, var(--coral) 28%, transparent); color: inherit; border-radius: 2px; }
+
+  /* ---------------- next up / acts ---------------- */
+  .next-row { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .next-row:last-child { border-bottom: 0; }
+  .next-row .id { font: 10.5px var(--mono); color: var(--muted); flex: none; width: 30px; padding-top: 1px; }
+  .next-row button.link {
+    border: 0; background: none; padding: 0; text-align: left; cursor: pointer; flex: 1 1 auto;
+  }
+  .next-row .t { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+  .next-row .step { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .next-row button.link:hover .t { color: var(--navy); text-decoration: underline; }
+  .next-row.done .t { color: var(--muted); text-decoration: line-through; }
+
+  .act-row { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .act-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .act-row button {
+    border: 0; background: none; padding: 0; width: 100%; text-align: left; cursor: pointer;
+    display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted);
+  }
+  .act-row button:hover { color: var(--navy); }
+  .act-row b { color: var(--ink); font-weight: 600; font-size: 12px; }
+  .act-row .meter { height: 4px; border-radius: 999px; background: var(--line); margin-top: 5px; overflow: hidden; }
+  .act-row .meter i { display: block; height: 100%; background: var(--navy); border-radius: 999px; }
+  .act-row.on button { color: var(--navy); }
+  .act-filter { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .act-filter button {
+    border: 1px solid var(--line-strong); background: var(--paper); border-radius: 999px;
+    padding: 2px 8px; font-size: 11px; cursor: pointer; color: var(--navy);
+  }
+  .scope-note { font-size: 11.5px; color: var(--muted); margin: 0 0 8px; }
+
+  .act-group { position: relative; }
+  .group-markers { position: absolute; inset: 0; pointer-events: none; }
+  .group-markers .milestone-line { top: 0; bottom: 0; }
+  .group-markers .nowline { top: 0; bottom: 0; }
+  .milestone-line {
+    position: absolute; top: -3px; bottom: -3px; width: 0;
+    border-left: 1px dashed color-mix(in srgb, var(--coral) 70%, transparent); pointer-events: none;
+  }
+  .rail button.milestone::after {
+    content: "◆"; position: absolute; top: 2px; right: 4px; font-size: 7px; color: var(--coral);
+  }
+  .rail button { position: relative; }
+  .milestone-list { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  .milestone-list li { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  .milestone-list li:last-child { border-bottom: 0; }
+  .milestone-list .w { font: 10.5px var(--mono); color: var(--coral); flex: none; width: 26px; }
   .track .nowline {
     position: absolute; top: -2px; bottom: -2px; width: 1px;
     background: color-mix(in srgb, var(--coral) 65%, transparent); pointer-events: none;
@@ -636,6 +683,13 @@
       <button data-view="map" aria-pressed="false" title="Dependency map — 4">Map</button>
     </div>
 
+    <div class="chips" role="group" aria-label="Filter by attention">
+      <button class="chip" data-scope="all" aria-pressed="true">Any state</button>
+      <button class="chip" data-scope="overdue" aria-pressed="false">Overdue <span class="n" id="nOverdue"></span></button>
+      <button class="chip" data-scope="slack" aria-pressed="false" title="A dependency finishes in the same week this task starts: no room to slip">No slack <span class="n" id="nSlack"></span></button>
+      <button class="chip" data-scope="gate" aria-pressed="false">Needs a gate <span class="n" id="nGate"></span></button>
+    </div>
+
     <button class="chip" id="copy" title="Build a markdown status update">Copy status</button>
     <button class="chip" id="reset" title="Clear ticks for this roadmap">Reset</button>
   </div>
@@ -668,13 +722,23 @@
 
     <aside class="side">
       <section class="panel">
+        <h2>Next up</h2>
+        <div class="panel-body" id="nextUp"></div>
+      </section>
+
+      <section class="panel">
         <h2 class="with-action">This week <button class="chip" id="openWeek" title="Open the week sheet — w">Open sheet</button></h2>
         <div class="panel-body" id="thisWeek"></div>
       </section>
 
       <section class="panel">
-        <h2>Rhythm</h2>
-        <div class="panel-body" id="rhythm"></div>
+        <h2>Acts</h2>
+        <div class="panel-body" id="acts"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Milestones</h2>
+        <div class="panel-body"><ul class="milestone-list" id="milestones"></ul></div>
       </section>
 
       <section class="panel">
@@ -847,6 +911,33 @@
         "label": "Jan 2027",
         "from": 9,
         "to": 12
+      }
+    ],
+    "milestones": [
+      {
+        "week": 2,
+        "date": "10–16 Nov",
+        "label": "Exemption request submitted"
+      },
+      {
+        "week": 4,
+        "date": "24–30 Nov",
+        "label": "Frozen artefact v1 and the Tone Gap Ledger"
+      },
+      {
+        "week": 6,
+        "date": "8–14 Dec",
+        "label": "14 Dec — ethics and Kaposi sarcoma cutoff"
+      },
+      {
+        "week": 9,
+        "date": "29 Dec–4 Jan",
+        "label": "Reproducibility test and full draft"
+      },
+      {
+        "week": 12,
+        "date": "19–26 Jan",
+        "label": "Demo day and submission"
       }
     ]
   },
@@ -2182,7 +2273,9 @@
     done: {},
     steps: {},
     scenarios: {},
-    selected: null
+    selected: null,
+    scope: "all",
+    act: null
   };
 
   /* ------------------------------ storage ------------------------------ */
@@ -2280,6 +2373,20 @@
     });
   }
 
+  function milestonesInWeek(n) {
+    return (DATA.meta.milestones || []).filter(function (item) { return item.week === n; });
+  }
+
+  function milestoneLines() {
+    return (DATA.meta.milestones || []).map(function (item) {
+      return el("div", {
+        class: "milestone-line",
+        style: "left:calc(" + (item.week / TOTAL_WEEKS) * 100 + "%)",
+        title: item.date + " · " + item.label
+      });
+    });
+  }
+
   function chainOf(id) {
     var set = {};
     set[id] = true;
@@ -2334,6 +2441,10 @@
 
   function matches(task) {
     if (state.lane !== "all" && task.lane !== state.lane) return false;
+    if (state.act !== null && task.act !== state.act) return false;
+    if (state.scope === "overdue" && !isOverdue(task)) return false;
+    if (state.scope === "slack" && !noSlack(task)) return false;
+    if (state.scope === "gate" && !needsGate(task)) return false;
     if (state.status === "open" && isDone(task)) return false;
     if (state.status === "done" && !isDone(task)) return false;
     if (state.week !== null && !(task.weeks[0] <= state.week && task.weeks[1] >= state.week)) return false;
@@ -2373,6 +2484,9 @@
     document.getElementById("nAll").textContent = String(tasks().length);
     document.getElementById("nA").textContent = String(tasks().filter(function (t) { return t.lane === "A"; }).length);
     document.getElementById("nB").textContent = String(tasks().filter(function (t) { return t.lane === "B"; }).length);
+    document.getElementById("nOverdue").textContent = String(tasks().filter(isOverdue).length);
+    document.getElementById("nSlack").textContent = String(tasks().filter(noSlack).length);
+    document.getElementById("nGate").textContent = String(tasks().filter(needsGate).length);
   }
 
   function renderRail() {
@@ -2387,9 +2501,12 @@
           type: "button",
           "aria-pressed": state.week === n ? "true" : "false",
           "aria-label": "Week " + n + ", " + (WEEK_DATES[n] || "") + ", " + inWeek.length + " tasks",
-          class: (n === now ? "now " : "") + (parked ? "parked" : ""),
+          class: (n === now ? "now " : "") + (parked ? "parked " : "") +
+            (milestonesInWeek(n).length ? "milestone" : ""),
           title: (WEEK_BY_NUM[n] ? WEEK_BY_NUM[n].laneA + " · " : "") +
-            inWeek.length + " tasks — click to filter, double-click for the week sheet"
+            inWeek.length + " tasks — click to filter, double-click for the week sheet" +
+            (milestonesInWeek(n).length ? " · milestone: " +
+              milestonesInWeek(n).map(function (m) { return m.label; }).join("; ") : "")
         }, [
           el("b", { text: "W" + n }),
           el("small", { text: WEEK_DATES[n] || "" }),
@@ -2476,12 +2593,126 @@
       ]));
     });
 
-    var rhythm = document.getElementById("rhythm");
-    rhythm.textContent = "";
-    DATA.meta.rhythm.forEach(function (entry) {
-      rhythm.appendChild(el("div", { class: "week-row" }, [
-        el("span", { class: "id", text: entry.day.slice(0, 3) }),
-        el("span", { class: "t", text: entry.ritual + " — " + entry.output })
+
+  }
+
+  /* ------------------------------ signals ------------------------------ */
+  function isOverdue(task) { return !isDone(task) && task.weeks[1] < currentWeek(); }
+
+  function noSlack(task) {
+    if (isDone(task)) return false;
+    return task.depends.some(function (dep) {
+      var parent = BY_ID[dep];
+      return parent && !isDone(parent) && parent.weeks[1] === task.weeks[0];
+    });
+  }
+
+  function needsGate(task) {
+    if (!task.gate) return false;
+    var gate = GATE[task.gate];
+    return Boolean(gate) && gate.state !== "closed";
+  }
+
+  function firstOpenStep(task) {
+    var marks = state.steps[task.id] || [];
+    for (var i = 0; i < task.steps.length; i++) if (!marks[i]) return { index: i, text: task.steps[i] };
+    return null;
+  }
+
+  function nextUp(limit) {
+    return tasks()
+      .filter(function (task) { return !isDone(task) && (state.lane === "all" || task.lane === state.lane); })
+      .sort(function (a, b) {
+        if (a.weeks[0] !== b.weeks[0]) return a.weeks[0] - b.weeks[0];
+        return a.id.localeCompare(b.id, undefined, { numeric: true });
+      })
+      .slice(0, limit);
+  }
+
+  /* ------------------------------ side panels ------------------------------ */
+  function renderNextUp() {
+    var host = document.getElementById("nextUp");
+    host.textContent = "";
+    var items = nextUp(4);
+    if (!items.length) {
+      host.appendChild(el("p", { class: "empty-note", text: "Everything on this lane is ticked. Check the other lane." }));
+      return;
+    }
+    items.forEach(function (task) {
+      var step = firstOpenStep(task);
+      var marks = state.steps[task.id] || [];
+      var box = el("button", {
+        class: "tick", type: "button", role: "checkbox",
+        "aria-checked": step ? "false" : "true",
+        "aria-label": step ? "Tick step one of " + task.title : task.title + " has all its steps ticked",
+        disabled: step ? null : "disabled"
+      }, [el("span", { text: step ? "" : "✓" })]);
+      if (step) {
+        box.addEventListener("click", function () {
+          var current = state.steps[task.id] || [];
+          current[step.index] = true;
+          state.steps[task.id] = current;
+          save();
+          render();
+        });
+      }
+      var link = el("button", { class: "link", type: "button", "data-task": task.id }, [
+        el("span", { class: "t", html: marked(task.title) }),
+        el("span", { class: "step", text: step ? "next: " + step.text.replace(/`/g, "") : "all steps ticked — finish it" })
+      ]);
+      link.addEventListener("click", function () { openDrawer(task.id); });
+      host.appendChild(el("div", { class: "next-row" }, [
+        el("span", { class: "id", text: task.id }),
+        link,
+        box
+      ]));
+    });
+  }
+
+  function renderActs() {
+    var host = document.getElementById("acts");
+    host.textContent = "";
+    DATA.acts.forEach(function (act) {
+      var inAct = tasks().filter(function (task) { return task.act === act.id; });
+      var done = inAct.filter(isDone).length;
+      var percent = inAct.length ? Math.round((done / inAct.length) * 100) : 0;
+      var button = el("button", {
+        type: "button",
+        "aria-pressed": state.act === act.id ? "true" : "false",
+        title: act.goal
+      }, [
+        el("b", { text: "Act " + act.id + " · " + act.name }),
+        el("span", { text: done + "/" + inAct.length })
+      ]);
+      button.addEventListener("click", function () {
+        state.act = state.act === act.id ? null : act.id;
+        render();
+      });
+      host.appendChild(el("div", { class: "act-row" + (state.act === act.id ? " on" : "") }, [
+        button,
+        el("div", { class: "meter" }, [el("i", { style: "width:" + percent + "%" })])
+      ]));
+    });
+    if (state.act !== null) {
+      var clear = el("button", { class: "btn", type: "button", text: "Clear act filter" });
+      clear.addEventListener("click", function () { state.act = null; render(); });
+      host.appendChild(el("div", { class: "act-filter" }, [
+        el("span", { text: "Showing act " + state.act + " only" }),
+        clear
+      ]));
+    }
+  }
+
+  function renderMilestones() {
+    var host = document.getElementById("milestones");
+    host.textContent = "";
+    (DATA.meta.milestones || []).forEach(function (milestone) {
+      host.appendChild(el("li", {}, [
+        el("span", { class: "w", text: "W" + milestone.week }),
+        el("span", {}, [
+          el("b", { text: milestone.date + " · " }),
+          el("span", { text: milestone.label })
+        ])
       ]));
     });
   }
@@ -2540,7 +2771,7 @@
         el("span", { class: "id", text: "Week" }),
         el("span", { class: "title", text: DATA.meta.start + " → " + DATA.meta.end })
       ]),
-      el("div", { class: "track" }, [months, ticks, nowline()])
+      el("div", { class: "track" }, [months, ticks].concat(milestoneLines(), [nowline()]))
     ]);
   }
 
@@ -2592,6 +2823,8 @@
       var inAct = list.filter(function (task) { return task.act === act.id; });
       if (!inAct.length) return;
       var group = el("div", { class: "act-group" });
+      group.appendChild(el("div", { class: "group-markers", "aria-hidden": "true" },
+        milestoneLines().concat([nowline()])));
       group.appendChild(el("div", { class: "act-head" }, [
         el("h3", { text: "Act " + act.id + " — " + act.name }),
         el("span", { class: "goal", text: act.goal }),
@@ -2971,6 +3204,8 @@
 
     renderProgress();
     renderThisWeek();
+    renderNextUp();
+    renderActs();
     renderBanner();
     renderRail();
     document.querySelectorAll(".views button").forEach(function (button) {
@@ -3146,6 +3381,17 @@
       });
       lines.push("");
     });
+    var overdue = tasks().filter(isOverdue);
+    var tight = tasks().filter(noSlack);
+    lines.push("Overdue: " + (overdue.length
+      ? overdue.map(function (t) { return t.id + " (" + t.title + ")"; }).join(", ")
+      : "none"));
+    lines.push("No slack (a dependency finishes the same week this task starts): " + (tight.length
+      ? tight.map(function (t) { return t.id + " after " + t.depends.join("/"); }).join(", ")
+      : "none"));
+    lines.push("Next up: " + nextUp(4).map(function (t) { return t.id + " " + t.title; }).join(" · "));
+    lines.push("");
+
     var parked = tasks().filter(isParked);
     lines.push("Parked by a scenario: " + (parked.length ? parked.map(function (t) { return t.id; }).join(", ") : "none"));
     lines.push("Gates: " + DATA.gates.map(function (g) { return g.id + " " + g.state; }).join(" · "));
@@ -3194,6 +3440,16 @@
       chip.addEventListener("click", function () {
         state.status = chip.getAttribute("data-status");
         document.querySelectorAll(".chip[data-status]").forEach(function (other) {
+          other.setAttribute("aria-pressed", other === chip ? "true" : "false");
+        });
+        render();
+      });
+    });
+
+    document.querySelectorAll(".chip[data-scope]").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        state.scope = chip.getAttribute("data-scope");
+        document.querySelectorAll(".chip[data-scope]").forEach(function (other) {
           other.setAttribute("aria-pressed", other === chip ? "true" : "false");
         });
         render();
@@ -3406,6 +3662,7 @@
     load();
     renderFacts();
     renderSide();
+    renderMilestones();
     renderScenarios();
     bindToolbar();
     bindKeys();
