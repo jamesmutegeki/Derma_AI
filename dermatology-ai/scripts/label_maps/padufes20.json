@@ -1,0 +1,9 @@
+{
+  "_comment": "PAD-UFES-20 (Brazilian smartphone images) -> this project's classes. MEL is biopsy-proven melanoma; NEV and SEK are benign. ACK is excluded as pre-malignant, and BCC/SCC are excluded because they are malignant but not one of our three classes -- folding them into 'benign' would be a false reassurance. There is no Kaposi sarcoma in this dataset. NOTE: 52 melanomas only; always report the confidence interval.",
+  "mel": "melanoma",
+  "nev": "benign",
+  "sek": "benign",
+  "ack": "skip",
+  "bcc": "skip",
+  "scc": "skip"
+}

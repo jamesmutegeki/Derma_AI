@@ -1,0 +1,10 @@
+{
+  "_comment": "DermaMNIST is HAM10000 at 28x28 (MedMNIST+, CC BY-NC 4.0). Same mapping logic as ham10000.json: nv/bkl/df are benign, mel is the only malignant class we keep, bcc/akiec/vasc are skipped. Use for CI and smoke runs only -- 28x28 images cannot support a clinical claim.",
+  "nv": "benign",
+  "bkl": "benign",
+  "df": "benign",
+  "mel": "melanoma",
+  "bcc": "skip",
+  "akiec": "skip",
+  "vasc": "skip"
+}

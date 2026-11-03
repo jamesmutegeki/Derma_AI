@@ -106,6 +106,12 @@ compute).
 
 ---
 
+## Where the project goes next
+
+The twelve-week plan that turns these gates into a finished study is in
+[`ROADMAP.md`](./ROADMAP.md); the data you can start on today is in
+[`DATASET_SOURCES_IMMEDIATE.md`](./DATASET_SOURCES_IMMEDIATE.md).
+
 ## Decisions still open
 
 1. **Kaposi sarcoma** (`docs/TRAINING.md` §2b): obtain a cohort, serve two

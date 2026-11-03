@@ -8,6 +8,11 @@ PASSION, and what each one can and cannot support.
 
 ---
 
+> **Update 2026-11-03:** the request-gated options below are no longer on the
+> critical path. For sources that need no request at all, see
+> [`DATASET_SOURCES_IMMEDIATE.md`](./DATASET_SOURCES_IMMEDIATE.md) (PAD-UFES-20,
+> DermaMNIST, SCIN) and the plan in [`ROADMAP.md`](./ROADMAP.md).
+
 ## 1. What PASSION was actually for
 
 It is worth being explicit, because it changes the answer. PASSION is **not** a

@@ -117,12 +117,20 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S6-1** | A local HAM10000 copy is verified before training: complete, joined, grouped, and matching the published class counts -- on a subset the counts are not applied, because five images are not evidence | `tests/test_s5_4_ingest.py` (8 tests) | done |
 | **S6-2** | Conversion can hardlink instead of copying, so a 2.7 GB corpus is not doubled, and a release mirror can be pulled and checked in one command | `scripts/fetch_and_verify_ham10000.sh`, `prepare_dataset.py --link` | done |
 
+## Sprint 7 -- an immediate data answer and a plan to finish
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S7-1** | A dataset you can start on today, with no request form: PAD-UFES-20 (phone images, biopsy-proven cancers, Fitzpatrick labels, CC BY 4.0, direct download), DermaMNIST (`pip install medmnist`), SCIN (public bucket) | `docs/DATASET_SOURCES_IMMEDIATE.md`, `docs/DATASET_CARD_PAD_UFES_20.md`, `docs/DATASET_CARD_DERMAMNIST.md`, label maps | done |
+| **S7-2** | The twelve-week plan to completion: two lanes, dated weeks, evidence file per deliverable, kill criteria, risk register | `docs/ROADMAP.md`, `tests/test_s7_sources_and_roadmap.py` (9 tests) | done |
+
 ## Scope decisions
 
 | Date | Decision | Effect |
 | --- | --- | --- |
 | 2026-10-30 | **The triage module stays.** It is part of the product (API `triage*` fields, `TRUE_LABEL_TO_TRIAGE`, dashboard panel, `metrics_tracker` triage maths, poster and docs). | Review item **P2-12 is withdrawn**; the branch name `pre-triage-removal` is historical and does not describe the code |
 | 2026-10-30 | PASSION is treated as **unavailable** after unanswered access requests | Nothing in the pipeline depends on it; SCIN is the recommended substitute for the evaluation role only |
+| 2026-11-03 | Training corpus for **Lane A** is **PAD-UFES-20 + HAM10000**; **SCIN** is the tone-stratified evaluation set; DermaMNIST is CI/smoke only | Removes every request-gated dependency from the critical path. No immediate public source contains Kaposi sarcoma, which is the documented reason gate 1A stays paused |
 | 2026-10-31 | **Gate 1A is paused** until a Kaposi sarcoma cohort is obtained. No checkpoint may be served in the meantime; a frozen artefact is allowed for measurement only, with `serving.enabled = false` | `/api/diagnose` keeps returning 503 with the hold reason; `train_model.py` holds by default; closing the pause requires a KS cohort that converts to a non-zero class count |
 | 2026-10-31 | The approved logo (navy/coral emblem + "DERMATOLOGY SYSTEM") replaces every previous mark | One asset set in `assets/`, served from `/assets/`; the system is branded **Dermatology System** |
 | 2026-10-30 | The three-class head is **not** redefined to fit whichever dataset is to hand | Mapped-label cohorts (SCIN, eSkinHealth) are used for tone-stratified evaluation, never as malignancy benchmarks |
