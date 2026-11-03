@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap — Dermatology System</title>
+<!--
+  The interactive roadmap. One self-contained file: no fonts, no CDNs, no
+  network calls, no analytics. It works offline, which matters because the
+  deployment target is a clinic with intermittent connectivity.
+
+  Two rules govern the content:
+    1. every task names the file it will produce ("evidence");
+    2. no performance figures appear here at all -- numbers live in
+       runs/<date>/report.json and nowhere else.
+
+  Progress checkboxes are stored in this browser only (localStorage). They are
+  a planning aid, not a claim about the model.
+-->
+<style>
+  :root {
+    --navy: #113B65;
+    --navy-2: #1B4E7F;
+    --coral: #E66461;
+    --coral-soft: #FDECEA;
+    --ink: #16202B;
+    --muted: #5C6B7A;
+    --line: #E1E8EF;
+    --paper: #FFFFFF;
+    --wash: #F4F7FA;
+    --amber: #B26A00;
+    --amber-soft: #FFF4E3;
+    --green: #1F6B3F;
+    --green-soft: #E7F3EC;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(17, 59, 101, .06), 0 8px 24px rgba(17, 59, 101, .06);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--wash);
+    color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--navy); text-underline-offset: 2px; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; border-radius: 4px; }
+
+  /* ---------------- top bar ---------------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(255, 255, 255, .94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1400px; margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand img { width: 32px; height: 32px; flex: none; }
+  .brand h1 { font-size: 15px; letter-spacing: -0.2px; margin: 0; white-space: nowrap; }
+  .brand h1 span { color: var(--muted); font-weight: 500; }
+  .spacer { flex: 1 1 auto; }
+
+  .progress { display: flex; align-items: center; gap: 10px; }
+  .ring { transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 4; }
+  .ring .track { stroke: var(--line); }
+  .ring .value { stroke: var(--coral); stroke-linecap: round; transition: stroke-dashoffset .4s ease; }
+  .progress-text { font-size: 12px; color: var(--muted); line-height: 1.2; }
+  .progress-text b { display: block; color: var(--ink); font-size: 13px; }
+
+  /* ---------------- controls ---------------- */
+  .controls {
+    max-width: 1400px; margin: 0 auto; padding: 14px 20px 0;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  .search { position: relative; flex: 1 1 240px; min-width: 200px; }
+  .search input {
+    width: 100%; padding: 8px 10px 8px 32px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  }
+  .search::before {
+    content: "⌕"; position: absolute; left: 10px; top: 6px;
+    color: var(--muted); font-size: 15px;
+  }
+  .search kbd {
+    position: absolute; right: 8px; top: 8px;
+    font: 11px ui-monospace, monospace; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: var(--wash);
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; transition: .15s;
+  }
+  .chip:hover { border-color: var(--navy); color: var(--navy); }
+  .chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .chip.coral[aria-pressed="true"] { background: var(--coral); border-color: var(--coral); }
+  .views { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .views button {
+    border: 0; background: transparent; padding: 8px 12px; cursor: pointer;
+    font-size: 13px; color: var(--muted);
+  }
+  .views button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+
+  /* ---------------- week rail ---------------- */
+  .rail {
+    max-width: 1400px; margin: 12px auto 0; padding: 0 20px;
+    display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px;
+  }
+  .rail button {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 8px 6px; cursor: pointer; text-align: center; line-height: 1.2;
+    transition: .15s;
+  }
+  .rail button b { display: block; font-size: 12px; }
+  .rail button small { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .rail button:hover { border-color: var(--navy); }
+  .rail button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .rail button[aria-pressed="true"] small { color: rgba(255,255,255,.75); }
+  .rail button.now { box-shadow: inset 0 -3px 0 var(--coral); }
+  .rail button.parked { opacity: .45; }
+
+  /* ---------------- scenario bar ---------------- */
+  .scenarios {
+    max-width: 1400px; margin: 12px auto 0; padding: 0 20px;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .scenarios .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .switch {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    border: 1px dashed var(--line); border-radius: 999px; padding: 5px 12px 5px 8px;
+    font-size: 13px; background: #fff;
+  }
+  .switch input { appearance: none; width: 30px; height: 17px; border-radius: 999px; background: var(--line); position: relative; transition: .2s; cursor: pointer; }
+  .switch input::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+    border-radius: 50%; background: #fff; transition: .2s;
+  }
+  .switch input:checked { background: var(--coral); }
+  .switch input:checked::after { transform: translateX(13px); }
+  .switch:has(input:checked) { border-style: solid; border-color: var(--coral); background: var(--coral-soft); }
+  .banner {
+    max-width: 1400px; margin: 12px auto 0; padding: 0 20px; display: none;
+  }
+  .banner.show { display: block; }
+  .banner .inner {
+    background: var(--amber-soft); border: 1px solid #F0D9B5; color: #6E4400;
+    border-radius: var(--radius); padding: 10px 14px; font-size: 13px;
+  }
+  .banner b { color: var(--amber); }
+
+  .honesty {
+    max-width: 1400px; margin: 12px auto 0; padding: 0 20px;
+  }
+  .honesty .inner {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--wash); border: 1px solid var(--line); border-left: 3px solid var(--navy);
+    border-radius: var(--radius); padding: 10px 14px; font-size: 12.5px; color: var(--muted);
+    line-height: 1.5;
+  }
+  .honesty b { color: var(--ink); }
+  .honesty .tag {
+    flex: none; font-size: 10px; letter-spacing: .7px; text-transform: uppercase;
+    color: var(--navy); background: var(--paper); border: 1px solid var(--line);
+    border-radius: 999px; padding: 2px 8px; margin-top: 1px;
+  }
+
+  /* ---------------- layout ---------------- */
+  main { max-width: 1400px; margin: 0 auto; padding: 18px 20px 80px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .rail { grid-template-columns: repeat(6, 1fr); } }
+  @media (max-width: 640px) { .rail { grid-template-columns: repeat(4, 1fr); } }
+
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .panel h2 {
+    font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted);
+    margin: 0; padding: 14px 16px 10px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .panel h2 .count { font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .panel-body { padding: 14px 16px; }
+
+  /* ---------------- timeline ---------------- */
+  .act-group { margin-bottom: 18px; }
+  .act-head {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 0 6px;
+    border-bottom: 1px solid var(--line); margin-bottom: 6px;
+  }
+  .act-head h3 { font-size: 14px; margin: 0; }
+  .act-head span { font-size: 12px; color: var(--muted); }
+  .row {
+    display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px;
+    align-items: center; padding: 5px 0; border-radius: 6px;
+  }
+  @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  .row:hover { background: var(--wash); }
+  .row-label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; text-align: left; background: none; border: 0; padding: 0; font: inherit; }
+  .row-label .id { font: 11px ui-monospace, monospace; color: var(--muted); flex: none; }
+  .row-label .title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { position: relative; height: 22px; background: repeating-linear-gradient(90deg, transparent, transparent calc(100%/12 - 1px), var(--line) calc(100%/12 - 1px), var(--line) calc(100%/12)); border-radius: 4px; }
+  .bar {
+    position: absolute; top: 4px; height: 14px; border-radius: 4px;
+    background: var(--navy); display: flex; align-items: center; padding: 0 6px;
+    color: #fff; font-size: 10px; white-space: nowrap; overflow: hidden;
+    cursor: pointer; border: 0; text-align: left;
+  }
+  .bar.lane-b { background: var(--coral); }
+  .bar.done { background: var(--green); }
+  .bar.parked { background: repeating-linear-gradient(45deg, #C9D3DC, #C9D3DC 4px, #DDE5EC 4px, #DDE5EC 8px); color: #55636F; }
+  .bar.impacted { outline: 2px dashed var(--amber); outline-offset: 1px; }
+  .bar.gate::after {
+    content: "◆"; font-size: 9px; margin-left: auto; padding-left: 6px; opacity: .9;
+  }
+  .row.axis:hover { background: none; }
+  .axis { margin-bottom: 4px; }
+  .axis .track {
+    height: auto; background: none; display: grid; grid-template-columns: repeat(12, 1fr);
+    font: 10px ui-monospace, monospace; color: var(--muted); text-align: center;
+    border-bottom: 1px solid var(--line); padding-bottom: 4px; border-radius: 0;
+  }
+  .axis .track span.now { color: var(--coral); font-weight: 700; }
+
+  /* ---------------- board ---------------- */
+  .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1000px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 680px) { .board { grid-template-columns: 1fr; } }
+  .col-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 8px; }
+  .col-head h3 { font-size: 13px; margin: 0; }
+  .col-head span { font-size: 11px; color: var(--muted); }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--navy);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+    transition: .15s; text-align: left; width: 100%; display: block;
+  }
+  .card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+  .card.lane-b { border-left-color: var(--coral); }
+  .card.done { border-left-color: var(--green); background: #FBFDFC; }
+  .card.done .card-title { text-decoration: line-through; color: var(--muted); }
+  .card.impacted { border-style: dashed; border-color: var(--amber); }
+  .card-title { font-size: 13px; font-weight: 600; line-height: 1.35; margin-bottom: 4px; }
+  .card-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .tag.b { border-color: var(--coral); color: var(--coral); }
+  .tag.g { border-color: var(--amber); color: var(--amber); }
+
+  /* ---------------- list ---------------- */
+  table.list { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.list th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line);
+  }
+  table.list td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.list tr.done td { color: var(--muted); }
+  table.list tr.done .t { text-decoration: line-through; }
+  table.list code { font: 11px ui-monospace, monospace; color: var(--navy-2); }
+  .check { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .check[aria-checked="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+
+  /* ---------------- side panels ---------------- */
+  .side { display: grid; gap: 16px; position: sticky; top: 84px; }
+  @media (max-width: 1080px) { .side { position: static; } }
+  .gate { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .gate:last-child { border-bottom: 0; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .dot.paused { background: var(--amber); }
+  .dot.closed { background: var(--green); }
+  .dot.pending { background: var(--coral); }
+  .gate b { display: block; font-size: 13px; }
+  .gate small { color: var(--muted); font-size: 12px; }
+  .kill { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .kill li { position: relative; padding-left: 18px; margin-bottom: 10px; color: var(--ink); }
+  .kill li::before { content: "→"; position: absolute; left: 0; color: var(--coral); font-weight: 700; }
+  .kill li b { display: block; }
+
+  /* ---------------- drawer ---------------- */
+  .drawer {
+    position: fixed; inset: 0; z-index: 40; display: none;
+  }
+  .drawer.open { display: block; }
+  .drawer .scrim { position: absolute; inset: 0; background: rgba(16, 28, 40, .35); }
+  .drawer .sheet {
+    position: absolute; right: 0; top: 0; bottom: 0; width: min(460px, 92vw);
+    background: #fff; box-shadow: -12px 0 32px rgba(16, 28, 40, .18);
+    padding: 20px 22px; overflow-y: auto;
+  }
+  .drawer h3 { font-size: 17px; margin: 8px 0 4px; line-height: 1.3; }
+  .drawer .close { position: absolute; right: 14px; top: 12px; border: 1px solid var(--line); background: #fff; border-radius: 8px; width: 30px; height: 30px; cursor: pointer; }
+  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 13px; margin: 14px 0; }
+  .kv dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .kv dd { margin: 0; }
+  .kv code { font: 12px ui-monospace, monospace; color: var(--navy-2); word-break: break-all; }
+  .why { background: var(--wash); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--ink); }
+  .drawer .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding: 10px 16px 0; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+  footer { max-width: 1400px; margin: 0 auto; padding: 24px 20px 60px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+  footer b { color: var(--ink); }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body { background: #fff; font-size: 10pt; }
+    .topbar, .controls, .rail, .scenarios, .banner, .side, .drawer { display: none !important; }
+    main { padding: 0; }
+    .layout { grid-template-columns: 1fr; }
+    .panel { box-shadow: none; border: 0; }
+    .card, .row { break-inside: avoid; }
+    .track { background: none; }
+    .bar { position: static; width: auto !important; left: auto !important; color: #000; background: #eee !important; }
+    .honesty { border: 1px solid #bbb !important; background: #fff !important; }
+  }
+</style>
+</head>
+<body>
+
+<noscript>
+  <div class="honesty">
+    <div class="inner">
+      <span class="tag">No JavaScript</span>
+      <span>
+        This page filters, searches and remembers your ticks with a small inline
+        script. With scripting off the same plan is still here, offline:
+        <a href="./ROADMAP.md">ROADMAP.md</a> (the full twelve weeks, prose) and
+        <a href="./roadmap_wallchart.html">roadmap_wallchart.html</a> (A3, printable).
+        Every task, gate, dependency and kill criterion also sits unrendered in the
+        <code>#roadmap-data</code> block of this file.
+      </span>
+    </div>
+  </div>
+</noscript>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <img src="../assets/logo-mark.png" alt="">
+      <h1>Twelve weeks to a defensible study <span>· 2026-11-03 → 2027-01-26</span></h1>
+    </div>
+    <div class="spacer"></div>
+    <div class="progress" title="Tasks you have ticked off — stored in this browser only">
+      <svg class="ring" width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+        <circle class="track" cx="19" cy="19" r="16"></circle>
+        <circle class="value" id="ringValue" cx="19" cy="19" r="16"
+                stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
+      </svg>
+      <div class="progress-text">
+        <b><span id="doneCount">0</span> / <span id="totalCount">0</span> done</b>
+        self-reported · this browser
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="honesty">
+  <div class="inner">
+    <span class="tag">Evidence first</span>
+    <span>
+      <b>No performance figure appears on this page.</b> Every accuracy, sensitivity and
+      fairness number stays <b>not yet measured</b> until a frozen
+      <code>model_manifest.json</code> and its evaluation report exist — the road map tracks
+      the work that produces them, not a result. Kaposi sarcoma stays paused — <b>gate 1A, 2026-10-31</b> — and serving stays
+      disabled in code until a real KS cohort exists.
+      Research and educational use only, not a medical device.
+    </span>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="search">
+    <label class="sr-only" for="q">Search tasks and evidence files</label>
+    <input id="q" type="search" placeholder="Search tasks, files, acts…" autocomplete="off">
+    <kbd>/</kbd>
+  </div>
+
+  <div class="chips" role="group" aria-label="Filter by lane">
+    <button class="chip" data-lane="all" aria-pressed="true">All lanes</button>
+    <button class="chip" data-lane="A" aria-pressed="false">Lane A</button>
+    <button class="chip coral" data-lane="B" aria-pressed="false">Lane B</button>
+  </div>
+
+  <div class="chips" role="group" aria-label="Filter by state">
+    <button class="chip" data-status="all" aria-pressed="false">Everything</button>
+    <button class="chip" data-status="open" aria-pressed="true">Open</button>
+    <button class="chip" data-status="done" aria-pressed="false">Done</button>
+  </div>
+
+  <div class="views" role="group" aria-label="View">
+    <button data-view="timeline" aria-pressed="true">Timeline</button>
+    <button data-view="board" aria-pressed="false">Board</button>
+    <button data-view="list" aria-pressed="false">List</button>
+  </div>
+
+  <button class="chip" id="reset" title="Clear ticks for this roadmap">Reset progress</button>
+</div>
+
+<div class="rail" id="rail" role="group" aria-label="Filter by week"></div>
+
+<div class="scenarios" id="scenarios">
+  <span class="label">What if…</span>
+</div>
+
+<div class="banner" id="banner" aria-live="polite"><div class="inner" id="bannerText"></div></div>
+
+<main>
+  <div class="layout">
+    <section class="panel" aria-label="Roadmap">
+      <h2>
+        <span id="viewTitle">Timeline</span>
+        <span class="count" id="resultCount" aria-live="polite"></span>
+      </h2>
+      <div class="legend">
+        <span><i style="background:var(--navy)"></i>Lane A</span>
+        <span><i style="background:var(--coral)"></i>Lane B</span>
+        <span><i style="background:var(--green)"></i>done</span>
+        <span><i style="background:#C9D3DC"></i>parked by a scenario</span>
+        <span>◆ gate</span>
+      </div>
+      <div class="panel-body" id="view"></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Gates</h2>
+        <div class="panel-body" id="gates"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Kill criteria</h2>
+        <div class="panel-body">
+          <ul class="kill" id="kill"></ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>How to use this</h2>
+        <div class="panel-body" style="font-size:13px;color:var(--muted)">
+          <p style="margin:0 0 8px"><b style="color:var(--ink)">Tick a task</b> when its evidence file exists — not when you have started it. The ring counts files, not effort.</p>
+          <p style="margin:0 0 8px"><b style="color:var(--ink)">/</b> focuses search, <b style="color:var(--ink)">Esc</b> clears it, <b style="color:var(--ink)">1 2 3</b> switch views.</p>
+          <p style="margin:0">The <b style="color:var(--ink)">What if…</b> switches re-draw the plan under a risk; they change nothing else.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer>
+  <p style="margin:0 0 6px"><b>Evidence first.</b> Every number on a slide traces to <code>runs/&lt;date&gt;/report.json</code> and <code>model_manifest.json</code>. This page deliberately contains no performance figures — it is a plan, not a result.</p>
+  <p style="margin:0 0 6px">Progress is stored in this browser only (<code>localStorage</code>); nothing is sent anywhere, and this file loads no external font, script or image.</p>
+  <p style="margin:0"><b>Research prototype · Not a medical device · No Business Associate Agreement (BAA) · Do not use with real patient data.</b></p>
+</footer>
+
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="scrim" data-close></div>
+  <div class="sheet">
+    <button class="close" data-close aria-label="Close">×</button>
+    <div id="drawerBody"></div>
+  </div>
+</div>
+
+<script type="application/json" id="roadmap-data">
+{
+  "meta": {
+    "title": "Twelve weeks to a defensible study",
+    "owner": "J. Mutegeki",
+    "start": "2026-11-03",
+    "end": "2027-01-26",
+    "weeks": 12,
+    "updated": "2026-11-03"
+  },
+  "acts": [
+    {"id": "0", "name": "Landing", "weeks": [1, 1], "summary": "Stop shopping for data. One corpus in, verified, plus a one-minute smoke run."},
+    {"id": "1", "name": "The honest model", "weeks": [1, 5], "summary": "A frozen artefact that survives hostile inspection, with the tone gap published."},
+    {"id": "2", "name": "Permission", "weeks": [2, 6], "summary": "Replace 'pending' with a letter — either answer unlocks a decision."},
+    {"id": "3", "name": "The clinician study", "weeks": [6, 9], "summary": "Twelve humans, a vignette instrument, and the unflattering arm reported."},
+    {"id": "4", "name": "The argument", "weeks": [9, 12], "summary": "Paper, poster, an honest demo, and a stranger reproducing the headline."},
+    {"id": "5", "name": "Lane B — Kaposi sarcoma", "weeks": [1, 12], "summary": "The pause is only a pause if someone is working to end it."}
+  ],
+  "gates": [
+    {"id": "S1-1", "name": "Frozen artefact — gate 1A", "state": "paused", "note": "Paused 2026-10-31 until a real KS cohort exists. Serving held in code."},
+    {"id": "S2-4", "name": "Runbook signed", "state": "closed", "note": "Signed 2026-10-30, single-engineer review stated plainly."},
+    {"id": "RET", "name": "Retention policy", "state": "closed", "note": "In force 2026-10-30, scoped to synthetic/de-identified data."},
+    {"id": "IRB", "name": "Ethics determination", "state": "pending", "note": "Request prepared; four fields and a submission away."}
+  ],
+  "kill": [
+    {"id": "k1", "when": "PAD-UFES-20 skin types are unusable", "then": "Train on HAM10000, evaluate on SCIN, and say so in the model card."},
+    {"id": "k2", "when": "SCIN turns out to have no melanoma", "then": "Evaluate the benign head and calibration only; restate the plan, do not report a number that pretends otherwise."},
+    {"id": "k3", "when": "No ethics answer by 14 Dec", "then": "Public data only, limitation in the abstract, re-apply next cycle."},
+    {"id": "k4", "when": "No KS reply by 14 Dec", "then": "Lane B becomes a protocol chapter with the email trail as process evidence."},
+    {"id": "k5", "when": "Dark-skin gap is large", "then": "That is the finding. Publish it with the Failure Museum; do not tune it away."}
+  ],
+  "scenarios": [
+    {"id": "ks", "label": "KS cohort never arrives", "impact": ["5.6", "5.7", "5.8"], "effect": "Lane B parks after the six-week decision; the thesis ships Lane A and presents Lane B as a designed, unexecuted protocol."},
+    {"id": "ethics", "label": "Ethics stays silent", "impact": ["2.3", "3.2", "3.5", "3.6"], "effect": "The clinician study cannot start. Cut to 8 participants if a letter lands late, or replace it with the retrospective shadow-mode analysis and say so."},
+    {"id": "signal", "label": "Melanoma signal too small", "impact": ["1.3", "1.4", "4.1"], "effect": "Reframe the contribution from detection to triage ordering plus fairness. Same artefact, honest claim."},
+    {"id": "compute", "label": "Compute too slow", "impact": ["1.2", "1.3"], "effect": "Train at 160 px instead of 224, record the size in the manifest, and state the serving-time shift in the model card."}
+  ],
+  "tasks": [
+    {"id": "0.1", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Fetch and verify PAD-UFES-20", "evidence": "padufes/verification.json", "done": "2,298 rows, patient-grouped, biopsy flags complete, skin types present", "depends": []},
+    {"id": "0.2", "act": "0", "lane": "A", "weeks": [1, 1], "title": "DermaMNIST smoke run", "evidence": "runs/smoke/report.json", "done": "Trains end to end; report is valid=false and cannot be frozen", "depends": []},
+    {"id": "0.3", "act": "0", "lane": "A", "weeks": [1, 1], "title": "SCIN access and schema check", "evidence": "reports/scin_access.md", "done": "cases/labels CSVs read; sFST, eFST and eMST columns confirmed", "depends": []},
+    {"id": "0.4", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Licence register complete", "evidence": "docs/DATASET_SOURCES_IMMEDIATE.md", "done": "Every dataset has a licence line and a redistribution rule", "depends": []},
+    {"id": "0.5", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Data decision recorded", "evidence": "REMEDIATION_STATUS.md", "done": "Scope table names the corpus for each role: train, evaluate, stretch", "depends": ["0.1", "0.4"]},
+
+    {"id": "1.1", "act": "1", "lane": "A", "weeks": [1, 2], "title": "Patient-grouped split", "evidence": "report.json → provenance.split", "done": "No patient appears on both sides; verified by a test", "depends": ["0.1"]},
+    {"id": "1.2", "act": "1", "lane": "A", "weeks": [2, 3], "title": "HAM10000 baseline run", "evidence": "runs/ham-*/report.json", "done": "Valid report, group-aware by lesion_id, provenance recorded or null", "depends": ["1.1"], "gate": "S1-1"},
+    {"id": "1.3", "act": "1", "lane": "A", "weeks": [2, 3], "title": "PAD-UFES-20 run", "evidence": "runs/pad-*/report.json", "done": "52 melanomas accounted for; the interval is reported, not just the point", "depends": ["1.1"], "gate": "S1-1"},
+    {"id": "1.4", "act": "1", "lane": "A", "weeks": [3, 3], "title": "Freeze artefact v1", "evidence": "model_manifest.json", "done": "status frozen, sha256 verified, serving.enabled = false", "depends": ["1.2", "1.3"], "gate": "S1-1"},
+    {"id": "1.5", "act": "1", "lane": "A", "weeks": [4, 4], "title": "SCIN tone-stratified evaluation", "evidence": "reports/eval_scin.json", "done": "Per-stratum n and CI; empty strata absent, not zero", "depends": ["1.4", "0.3"]},
+    {"id": "1.6", "act": "1", "lane": "A", "weeks": [4, 4], "title": "Tone Gap Ledger", "evidence": "docs/TONE_GAP_LEDGER.md", "done": "The worst stratum is published in words, with n and an interval", "depends": ["1.5"]},
+    {"id": "1.7", "act": "1", "lane": "A", "weeks": [4, 5], "title": "Failure Museum, twelve cases", "evidence": "docs/FAILURE_MUSEUM.md", "done": "Twelve curated errors with Grad-CAM and one sentence each on why", "depends": ["1.4"]},
+    {"id": "1.8", "act": "1", "lane": "A", "weeks": [5, 5], "title": "Calibration report", "evidence": "reports/calibration.json", "done": "Reliability curve and ECE overall and per tone stratum", "depends": ["1.5"]},
+    {"id": "1.9", "act": "1", "lane": "A", "weeks": [5, 5], "title": "Out-of-distribution probe", "evidence": "study/ood.md", "done": "Eight deliberately hard images; the failure rate is reported separately", "depends": ["1.4"]},
+    {"id": "1.10", "act": "1", "lane": "A", "weeks": [6, 6], "title": "Red-team day #1", "evidence": "docs/RED_TEAM.md", "done": "Every claim on the poster attacked; fixes logged", "depends": ["1.6", "1.7"]},
+
+    {"id": "2.1", "act": "2", "lane": "A", "weeks": [2, 2], "title": "Fill the exemption request", "evidence": "docs/IRB_EXEMPTION_REQUEST.md", "done": "No bracketed placeholder left in the document", "depends": []},
+    {"id": "2.2", "act": "2", "lane": "A", "weeks": [2, 2], "title": "Submit to the committee", "evidence": "docs/ethics/SUBMISSION.md", "done": "Reference number recorded, date logged", "depends": ["2.1"], "gate": "IRB"},
+    {"id": "2.3", "act": "2", "lane": "A", "weeks": [5, 6], "title": "Determination on file", "evidence": "docs/ethics/DETERMINATION.pdf", "done": "A committee wrote something — either answer unlocks a decision", "depends": ["2.2"], "gate": "IRB"},
+    {"id": "2.4", "act": "2", "lane": "A", "weeks": [4, 4], "title": "Retention scope re-check", "evidence": "SECURITY.md §4", "done": "The policy still matches what is actually held", "depends": []},
+    {"id": "2.5", "act": "2", "lane": "A", "weeks": [5, 5], "title": "Escalation letter", "evidence": "docs/ethics/ESCALATION.md", "done": "Sent if silent by 1 Dec; the escalation path is in writing", "depends": ["2.2"]},
+    {"id": "2.6", "act": "2", "lane": "A", "weeks": [6, 6], "title": "Full-approval scoping note", "evidence": "docs/ethics/FULL_APPROVAL_SCOPE.md", "done": "States exactly what real patient data would require, and that it is out of scope", "depends": ["2.3"]},
+
+    {"id": "3.1", "act": "3", "lane": "A", "weeks": [6, 6], "title": "Vignette protocol fixed", "evidence": "study/vignette_protocol.md", "done": "Question wording frozen before any data collection", "depends": ["2.3"]},
+    {"id": "3.2", "act": "3", "lane": "A", "weeks": [6, 6], "title": "Ethics cover for the study", "evidence": "study/ethics_cover.md", "done": "The study sits inside the determined scope, or is exempt in writing", "depends": ["2.3"], "gate": "IRB"},
+    {"id": "3.3", "act": "3", "lane": "A", "weeks": [7, 7], "title": "Pilot with two participants", "evidence": "study/pilot.md", "done": "Instrument bugs found and fixed before the real sessions", "depends": ["3.1", "3.2"]},
+    {"id": "3.4", "act": "3", "lane": "A", "weeks": [7, 7], "title": "Recruit twelve participants", "evidence": "study/participants.csv", "done": "Twelve confirmed; no identifiers stored", "depends": ["3.3"]},
+    {"id": "3.5", "act": "3", "lane": "A", "weeks": [7, 8], "title": "Run the sessions", "evidence": "study/responses.csv", "done": "Twelve completed, de-identified, with arm A and arm B", "depends": ["3.4"]},
+    {"id": "3.6", "act": "3", "lane": "A", "weeks": [8, 9], "title": "Analysis", "evidence": "study/analysis.json", "done": "Override rate, confidence change and time-to-decision, all with intervals", "depends": ["3.5"]},
+    {"id": "3.7", "act": "3", "lane": "A", "weeks": [8, 8], "title": "The unflattering arm", "evidence": "study/hard_cases.json", "done": "Eight hard images analysed and reported separately", "depends": ["1.9", "3.5"]},
+    {"id": "3.8", "act": "3", "lane": "A", "weeks": [9, 9], "title": "Shadow mode (optional)", "evidence": "study/shadow.md", "done": "Retrospective agreement on de-identified images; no live use", "depends": ["1.4", "2.3"]},
+
+    {"id": "4.1", "act": "4", "lane": "A", "weeks": [9, 10], "title": "Paper draft", "evidence": "paper/draft.md", "done": "Every number cites a report file; limitations section written first", "depends": ["1.6", "3.6"]},
+    {"id": "4.2", "act": "4", "lane": "A", "weeks": [10, 10], "title": "Poster", "evidence": "poster.html", "done": "Disclaimers verbatim; no figure without a report", "depends": ["1.6", "3.6"]},
+    {"id": "4.3", "act": "4", "lane": "A", "weeks": [10, 11], "title": "Demo script and rehearsals", "evidence": "docs/DEMO_SCRIPT.md", "done": "Two rehearsals, including the segment where it fails on purpose", "depends": ["1.7"]},
+    {"id": "4.4", "act": "4", "lane": "A", "weeks": [11, 11], "title": "Reproducibility test", "evidence": "docs/REPRODUCIBILITY.md", "done": "A clean clone reproduces the headline number within tolerance", "depends": ["1.4"]},
+    {"id": "4.5", "act": "4", "lane": "A", "weeks": [11, 11], "title": "Red-team day #2", "evidence": "docs/RED_TEAM.md", "done": "An external reader tries to falsify three claims; outcome logged", "depends": ["4.1"]},
+    {"id": "4.6", "act": "4", "lane": "A", "weeks": [12, 12], "title": "Submit", "evidence": "paper/SUBMITTED.md", "done": "Submission ID recorded; deadline verified on the venue's own site", "depends": ["4.1", "4.4", "4.5"]},
+
+    {"id": "5.1", "act": "5", "lane": "B", "weeks": [1, 1], "title": "UCI / UVRI approach", "evidence": "outreach/uci-uvri.md", "done": "Email sent with a one-page protocol sketch and a co-authorship offer", "depends": []},
+    {"id": "5.2", "act": "5", "lane": "B", "weeks": [2, 3], "title": "Makerere dermatology meeting", "evidence": "outreach/makerere.md", "done": "Twenty minutes with the unit; supervision question asked", "depends": []},
+    {"id": "5.3", "act": "5", "lane": "B", "weeks": [3, 3], "title": "Consortium author contact", "evidence": "outreach/consortium.md", "done": "Sent to a recent KS imaging paper's corresponding author, citing their protocol", "depends": []},
+    {"id": "5.4", "act": "5", "lane": "B", "weeks": [4, 5], "title": "Ethics amendment draft", "evidence": "docs/ethics/AMENDMENT.md", "done": "Ready to file the day a cohort appears", "depends": ["2.2"]},
+    {"id": "5.5", "act": "5", "lane": "B", "weeks": [6, 6], "title": "Six-week decision", "evidence": "docs/KS_DECISION.md", "done": "Written outcome: data, a clear no, or park with a date", "depends": ["5.1", "5.2", "5.3"], "gate": "S1-1"},
+    {"id": "5.6", "act": "5", "lane": "B", "weeks": [7, 8], "title": "KS cohort ingest", "evidence": "datasets/ks/verification.json", "done": "Blocked until 5.5 says yes; verified the same way as every other corpus", "depends": ["5.5"]},
+    {"id": "5.7", "act": "5", "lane": "B", "weeks": [8, 10], "title": "Train the third class", "evidence": "runs/ks-*/report.json", "done": "Blocked by 5.6; per-class support recorded, intervals reported", "depends": ["5.6"]},
+    {"id": "5.8", "act": "5", "lane": "B", "weeks": [10, 12], "title": "Lift the serving hold", "evidence": "model_manifest.json → serving.enabled = true", "done": "Blocked by 5.7 and by the ethics determination; not before both", "depends": ["5.7", "2.3"], "gate": "S1-1"}
+  ]
+}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("roadmap-data").textContent);
+  var STORE_KEY = "derma-roadmap-v1";
+  var TOTAL_WEEKS = DATA.meta.weeks;
+
+  var state = {
+    view: "timeline",
+    lane: "all",
+    status: "open",
+    query: "",
+    week: null,
+    scenarios: {},
+    done: {}
+  };
+
+  /* ---------- persistence ---------- */
+  function load() {
+    try {
+      var raw = window.localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      state.done = saved.done || {};
+      state.scenarios = saved.scenarios || {};
+    } catch (err) { /* private mode, or corrupt value: start clean */ }
+  }
+  function save() {
+    try {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify({
+        done: state.done, scenarios: state.scenarios
+      }));
+    } catch (err) { /* nothing to do: the page still works */ }
+  }
+
+  /* ---------- helpers ---------- */
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (key) {
+        if (key === "text") node.textContent = attrs[key];
+        else if (key === "class") node.className = attrs[key];
+        else node.setAttribute(key, attrs[key]);
+      });
+    }
+    (children || []).forEach(function (child) {
+      if (child) node.appendChild(child);
+    });
+    return node;
+  }
+
+  function tasks() { return DATA.tasks; }
+  function byId(id) {
+    for (var i = 0; i < DATA.tasks.length; i++) {
+      if (DATA.tasks[i].id === id) return DATA.tasks[i];
+    }
+    return null;
+  }
+  function actName(id) {
+    for (var i = 0; i < DATA.acts.length; i++) {
+      if (DATA.acts[i].id === id) return DATA.acts[i].name;
+    }
+    return "Act " + id;
+  }
+  function isDone(task) { return Boolean(state.done[task.id]); }
+  function isParked(task) {
+    var parked = false;
+    Object.keys(state.scenarios).forEach(function (scenarioId) {
+      if (!state.scenarios[scenarioId]) return;
+      var scenario = null;
+      for (var i = 0; i < DATA.scenarios.length; i++) {
+        if (DATA.scenarios[i].id === scenarioId) scenario = DATA.scenarios[i];
+      }
+      if (scenario && scenario.impact.indexOf(task.id) !== -1) parked = true;
+    });
+    return parked;
+  }
+  function isImpacted(task) { return isParked(task); }
+  function matches(task) {
+    if (state.lane !== "all" && task.lane !== state.lane) return false;
+    if (state.status === "open" && isDone(task)) return false;
+    if (state.status === "done" && !isDone(task)) return false;
+    if (state.week !== null && !(task.weeks[0] <= state.week && task.weeks[1] >= state.week)) {
+      return false;
+    }
+    if (state.query) {
+      var haystack = [
+        task.id, task.title, task.evidence, task.done, actName(task.act),
+        "lane " + task.lane
+      ].join(" ").toLowerCase();
+      if (haystack.indexOf(state.query.toLowerCase()) === -1) return false;
+    }
+    return true;
+  }
+  function visible() { return tasks().filter(matches); }
+
+  /* ---------- week helper ---------- */
+  function currentWeek() {
+    var start = new Date(DATA.meta.start + "T00:00:00");
+    var now = new Date();
+    var days = Math.floor((now - start) / 86400000);
+    if (isNaN(days)) return 1;
+    var week = Math.floor(days / 7) + 1;
+    return Math.max(1, Math.min(TOTAL_WEEKS, week));
+  }
+
+  /* ---------- rendering: chrome ---------- */
+  function renderGates() {
+    var host = document.getElementById("gates");
+    host.textContent = "";
+    DATA.gates.forEach(function (gate) {
+      host.appendChild(el("div", { class: "gate" }, [
+        el("span", { class: "dot " + gate.state }),
+        el("div", {}, [
+          el("b", { text: gate.name + " (" + gate.id + ")" }),
+          el("small", { text: gate.note })
+        ])
+      ]));
+    });
+  }
+
+  function renderKill() {
+    var host = document.getElementById("kill");
+    host.textContent = "";
+    DATA.kill.forEach(function (item) {
+      host.appendChild(el("li", {}, [
+        el("b", { text: item.when }),
+        el("span", { text: item.then })
+      ]));
+    });
+  }
+
+  function renderScenarios() {
+    var host = document.getElementById("scenarios");
+    while (host.children.length > 1) host.removeChild(host.lastChild);
+    DATA.scenarios.forEach(function (scenario) {
+      var input = el("input", { type: "checkbox", "aria-label": scenario.label });
+      input.checked = Boolean(state.scenarios[scenario.id]);
+      input.addEventListener("change", function () {
+        state.scenarios[scenario.id] = input.checked;
+        save();
+        render();
+      });
+      host.appendChild(el("label", { class: "switch" }, [input, el("span", { text: scenario.label })]));
+    });
+  }
+
+  function renderBanner() {
+    var active = DATA.scenarios.filter(function (s) { return state.scenarios[s.id]; });
+    var banner = document.getElementById("banner");
+    var text = document.getElementById("bannerText");
+    if (!active.length) {
+      banner.className = "banner";
+      text.textContent = "";
+      return;
+    }
+    banner.className = "banner show";
+    text.textContent = "";
+    active.forEach(function (scenario) {
+      text.appendChild(el("div", {}, [
+        el("b", { text: scenario.label + " → " }),
+        el("span", { text: scenario.effect })
+      ]));
+    });
+  }
+
+  function renderRail() {
+    var host = document.getElementById("rail");
+    host.textContent = "";
+    var now = currentWeek();
+    for (var week = 1; week <= TOTAL_WEEKS; week++) {
+      (function (weekNumber) {
+        var inWeek = tasks().filter(function (task) {
+          return task.weeks[0] <= weekNumber && task.weeks[1] >= weekNumber;
+        });
+        var parked = inWeek.length > 0 && inWeek.every(isParked);
+        var button = el("button", {
+          type: "button",
+          class: (weekNumber === now ? "now " : "") + (parked ? "parked" : ""),
+          "aria-pressed": state.week === weekNumber ? "true" : "false",
+          title: inWeek.length + " tasks this week"
+        }, [
+          el("b", { text: "W" + weekNumber }),
+          el("small", { text: inWeek.length + " task" + (inWeek.length === 1 ? "" : "s") })
+        ]);
+        button.addEventListener("click", function () {
+          state.week = state.week === weekNumber ? null : weekNumber;
+          render();
+        });
+        host.appendChild(button);
+      })(week);
+    }
+  }
+
+  function updateProgress() {
+    var total = tasks().length;
+    var done = tasks().filter(isDone).length;
+    document.getElementById("doneCount").textContent = String(done);
+    document.getElementById("totalCount").textContent = String(total);
+    var circumference = 2 * Math.PI * 16;
+    var ring = document.getElementById("ringValue");
+    ring.setAttribute("stroke-dasharray", circumference.toFixed(2));
+    ring.setAttribute("stroke-dashoffset",
+      (circumference * (1 - (total ? done / total : 0))).toFixed(2));
+  }
+
+  /* ---------- rendering: views ---------- */
+  function weekColumns() { return TOTAL_WEEKS; }
+
+  function barFor(task) {
+    var span = task.weeks[1] - task.weeks[0] + 1;
+    var left = ((task.weeks[0] - 1) / weekColumns()) * 100;
+    var width = (span / weekColumns()) * 100;
+    var classes = ["bar", "lane-" + task.lane.toLowerCase()];
+    if (isDone(task)) classes.push("done");
+    if (isParked(task)) { classes.push("parked"); classes.push("impacted"); }
+    if (task.gate) classes.push("gate");
+    var bar = el("button", {
+      type: "button",
+      class: classes.join(" "),
+      style: "left:" + left + "%;width:calc(" + width + "% - 2px)",
+      title: task.title + " · " + task.evidence,
+      "aria-label": task.title + ", weeks " + task.weeks[0] + " to " + task.weeks[1]
+    }, [el("span", { text: "W" + task.weeks[0] + (span > 1 ? "–" + task.weeks[1] : "") })]);
+    bar.addEventListener("click", function () { openDrawer(task.id); });
+    return bar;
+  }
+
+  function renderTimeline(list) {
+    var host = document.getElementById("view");
+    host.textContent = "";
+    if (!list.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc or reset the filters." }));
+      return;
+    }
+    var now = currentWeek();
+    var axisTrack = el("div", { class: "track", "aria-hidden": "true" });
+    for (var weekNumber = 1; weekNumber <= weekColumns(); weekNumber++) {
+      (function (n) {
+        axisTrack.appendChild(el("span", {
+          class: n === now ? "now" : "",
+          text: n === now ? "W" + n + "·now" : "W" + n
+        }));
+      })(weekNumber);
+    }
+    host.appendChild(el("div", { class: "row axis" }, [
+      el("div", { class: "row-label", "aria-hidden": "true" }, [
+        el("span", { class: "id", text: "Week" }),
+        el("span", { class: "title", text: "2026-11-03 → 2027-01-26" })
+      ]),
+      axisTrack
+    ]));
+
+    DATA.acts.forEach(function (act) {
+      var inAct = list.filter(function (task) { return task.act === act.id; });
+      if (!inAct.length) return;
+      var group = el("div", { class: "act-group" });
+      group.appendChild(el("div", { class: "act-head" }, [
+        el("h3", { text: "Act " + act.id + " — " + act.name }),
+        el("span", { text: inAct.length + " task" + (inAct.length === 1 ? "" : "s") })
+      ]));
+      inAct.forEach(function (task) {
+        var label = el("button", { class: "row-label", type: "button" }, [
+          el("span", { class: "id", text: task.id }),
+          el("span", { class: "title", text: task.title })
+        ]);
+        label.addEventListener("click", function () { openDrawer(task.id); });
+        group.appendChild(el("div", { class: "row" }, [
+          label,
+          el("div", { class: "track" }, [barFor(task)])
+        ]));
+      });
+      host.appendChild(group);
+    });
+  }
+
+  function cardFor(task) {
+    var classes = ["card", "lane-" + task.lane.toLowerCase()];
+    if (isDone(task)) classes.push("done");
+    if (isImpacted(task)) classes.push("impacted");
+    var card = el("button", { type: "button", class: classes.join(" ") }, [
+      el("div", { class: "card-title", text: task.title }),
+      el("div", { class: "card-meta" }, [
+        el("span", { text: "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") }),
+        el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: "Lane " + task.lane }),
+        task.gate ? el("span", { class: "tag g", text: "gate" }) : null
+      ])
+    ]);
+    card.addEventListener("click", function () { openDrawer(task.id); });
+    return card;
+  }
+
+  function renderBoard(list) {
+    var host = document.getElementById("view");
+    host.textContent = "";
+    if (!list.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters." }));
+      return;
+    }
+    var board = el("div", { class: "board" });
+    DATA.acts.forEach(function (act) {
+      var inAct = list.filter(function (task) { return task.act === act.id; });
+      if (!inAct.length) return;
+      var column = el("div", {});
+      column.appendChild(el("div", { class: "col-head" }, [
+        el("h3", { text: act.name }),
+        el("span", { text: inAct.length })
+      ]));
+      inAct.forEach(function (task) { column.appendChild(cardFor(task)); });
+      board.appendChild(column);
+    });
+    host.appendChild(board);
+  }
+
+  function renderList(list) {
+    var host = document.getElementById("view");
+    host.textContent = "";
+    if (!list.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters." }));
+      return;
+    }
+    var table = el("table", { class: "list" });
+    var head = el("tr", {}, [
+      el("th", { text: "" }),
+      el("th", { text: "Task" }),
+      el("th", { text: "Weeks" }),
+      el("th", { text: "Evidence" }),
+      el("th", { text: "Lane" })
+    ]);
+    table.appendChild(el("thead", {}, [head]));
+    var body = el("tbody", {});
+    list.forEach(function (task) {
+      var check = el("button", {
+        class: "check", type: "button", role: "checkbox",
+        "aria-checked": isDone(task) ? "true" : "false",
+        "aria-label": "Mark " + task.title + " done"
+      }, [el("span", { text: isDone(task) ? "✓" : "" })]);
+      check.addEventListener("click", function (event) {
+        event.stopPropagation();
+        toggle(task.id);
+      });
+      var row = el("tr", { class: isDone(task) ? "done" : "" }, [
+        el("td", {}, [check]),
+        el("td", {}, [
+          el("span", { class: "t", text: task.title }),
+          el("div", { style: "font-size:11px;color:var(--muted)", text: task.id + " · " + actName(task.act) })
+        ]),
+        el("td", { text: "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") }),
+        el("td", {}, [el("code", { text: task.evidence })]),
+        el("td", {}, [el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: task.lane })])
+      ]);
+      row.addEventListener("click", function () { openDrawer(task.id); });
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    host.appendChild(table);
+  }
+
+  /* ---------- drawer ---------- */
+  function openDrawer(id) {
+    var task = byId(id);
+    if (!task) return;
+    var body = document.getElementById("drawerBody");
+    body.textContent = "";
+
+    var deps = task.depends.length
+      ? task.depends.map(function (dep) {
+          var parent = byId(dep);
+          return parent ? dep + " " + parent.title : dep;
+        }).join(" · ")
+      : "none";
+
+    body.appendChild(el("div", { class: "card-meta" }, [
+      el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: "Lane " + task.lane }),
+      el("span", { text: "Act " + task.act + " — " + actName(task.act) }),
+      task.gate ? el("span", { class: "tag g", text: "gate " + task.gate }) : null
+    ]));
+    body.appendChild(el("h3", { id: "drawerTitle", text: task.title }));
+
+    var list = el("dl", { class: "kv" }, []);
+    function pair(key, value, isCode) {
+      list.appendChild(el("dt", { text: key }));
+      list.appendChild(el("dd", {}, [isCode ? el("code", { text: value }) : el("span", { text: value })]));
+    }
+    pair("Weeks", "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? " – W" + task.weeks[1] : ""));
+    pair("Evidence", task.evidence, true);
+    pair("Depends on", deps);
+    body.appendChild(list);
+
+    body.appendChild(el("div", { class: "why" }, [
+      el("b", { text: "Done when: " }),
+      el("span", { text: task.done })
+    ]));
+
+    if (isParked(task)) {
+      body.appendChild(el("div", { class: "why", style: "margin-top:10px;background:var(--amber-soft)" }, [
+        el("b", { text: "Parked by a scenario: " }),
+        el("span", { text: "this task is deferred under the assumption you switched on. It is not cancelled — it is waiting on a decision." })
+      ]));
+    }
+
+    var actions = el("div", { class: "actions" });
+    var toggleButton = el("button", {
+      class: "chip" + (isDone(task) ? "" : " coral"),
+      type: "button",
+      "aria-pressed": isDone(task) ? "true" : "false",
+      text: isDone(task) ? "Mark as open" : "Mark done (evidence exists)"
+    });
+    toggleButton.addEventListener("click", function () {
+      toggle(task.id);
+      openDrawer(task.id);
+    });
+    actions.appendChild(toggleButton);
+    body.appendChild(actions);
+
+    document.getElementById("drawer").className = "drawer open";
+  }
+
+  function closeDrawer() {
+    document.getElementById("drawer").className = "drawer";
+  }
+
+  function toggle(id) {
+    if (state.done[id]) delete state.done[id];
+    else state.done[id] = true;
+    save();
+    render();
+  }
+
+  /* ---------- orchestration ---------- */
+  function render() {
+    var list = visible();
+    var host = document.getElementById("view");
+    document.getElementById("viewTitle").textContent =
+      state.view.charAt(0).toUpperCase() + state.view.slice(1);
+    document.getElementById("resultCount").textContent =
+      list.length + " of " + tasks().length + " tasks";
+
+    if (state.view === "timeline") renderTimeline(list);
+    else if (state.view === "board") renderBoard(list);
+    else renderList(list);
+
+    void host;
+    updateProgress();
+    renderRail();
+    renderBanner();
+  }
+
+  function bindChips() {
+    document.querySelectorAll(".chip[data-lane]").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        state.lane = chip.getAttribute("data-lane");
+        document.querySelectorAll(".chip[data-lane]").forEach(function (other) {
+          other.setAttribute("aria-pressed", other === chip ? "true" : "false");
+        });
+        render();
+      });
+    });
+    document.querySelectorAll(".chip[data-status]").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        state.status = chip.getAttribute("data-status");
+        document.querySelectorAll(".chip[data-status]").forEach(function (other) {
+          other.setAttribute("aria-pressed", other === chip ? "true" : "false");
+        });
+        render();
+      });
+    });
+    document.querySelectorAll(".views button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        state.view = button.getAttribute("data-view");
+        document.querySelectorAll(".views button").forEach(function (other) {
+          other.setAttribute("aria-pressed", other === button ? "true" : "false");
+        });
+        render();
+      });
+    });
+  }
+
+  function bindKeys() {
+    document.addEventListener("keydown", function (event) {
+      var target = event.target;
+      var typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        document.getElementById("q").focus();
+      } else if (event.key === "Escape") {
+        var input = document.getElementById("q");
+        if (input.value) { input.value = ""; state.query = ""; render(); }
+        closeDrawer();
+        if (state.week !== null) { state.week = null; render(); }
+      } else if (!typing && (event.key === "1" || event.key === "2" || event.key === "3")) {
+        var map = { "1": "timeline", "2": "board", "3": "list" };
+        state.view = map[event.key];
+        document.querySelectorAll(".views button").forEach(function (button) {
+          button.setAttribute("aria-pressed",
+            button.getAttribute("data-view") === state.view ? "true" : "false");
+        });
+        render();
+      }
+    });
+  }
+
+  function init() {
+    load();
+    renderGates();
+    renderKill();
+    renderScenarios();
+    bindChips();
+    bindKeys();
+
+    var search = document.getElementById("q");
+    search.addEventListener("input", function () {
+      state.query = search.value.trim();
+      render();
+    });
+
+    document.getElementById("reset").addEventListener("click", function () {
+      state.done = {};
+      save();
+      render();
+    });
+
+    document.querySelectorAll("[data-close]").forEach(function (node) {
+      node.addEventListener("click", closeDrawer);
+    });
+
+    render();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

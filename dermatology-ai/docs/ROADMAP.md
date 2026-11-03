@@ -2,8 +2,15 @@
 
 **Written:** 2026-11-03 · **Horizon:** 12 weeks (to ~2027-01-26) + an open lane
 **Owner:** J. Mutegeki · **Status:** active
+**Interactive version:** [`roadmap.html`](./roadmap.html) — filter by lane, week
+or search; tick tasks off (kept in this browser only); switch on a scenario to see
+what parks when it happens
 **Printable version:** [`roadmap_wallchart.html`](./roadmap_wallchart.html) — A3
 landscape, no external assets, print it and put it above the desk
+
+Both are single files with no network calls, no fonts to fetch and no figures:
+every model or fairness number in them reads **not yet measured** until a frozen
+`model_manifest.json` and its evaluation report exist.
 
 ---
 
