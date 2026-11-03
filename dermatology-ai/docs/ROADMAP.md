@@ -3,14 +3,25 @@
 **Written:** 2026-11-03 · **Horizon:** 12 weeks (to ~2027-01-26) + an open lane
 **Owner:** J. Mutegeki · **Status:** active
 **Interactive version:** [`roadmap.html`](./roadmap.html) — filter by lane, week
-or search; tick tasks off (kept in this browser only); switch on a scenario to see
+or search; open any task for its four steps, evidence file, definition of done and
+failure mode; tick it off (kept in this browser only); switch on a scenario to see
 what parks when it happens
 **Printable version:** [`roadmap_wallchart.html`](./roadmap_wallchart.html) — A3
 landscape, no external assets, print it and put it above the desk
 
-Both are single files with no network calls, no fonts to fetch and no figures:
-every model or fairness number in them reads **not yet measured** until a frozen
-`model_manifest.json` and its evaluation report exist.
+**Source of truth:** [`roadmap_data.json`](./roadmap_data.json) — 43 tasks, 173
+steps, dependencies, gates, kill criteria and scenarios, in one file. The task
+tables below and the interactive page are both generated from it, so they cannot
+drift apart:
+
+```bash
+python scripts/build_roadmap.py           # regenerate the page and these tables
+python scripts/build_roadmap.py --check   # what CI runs: fail on any drift
+```
+
+Both artefacts are single files with no network calls, no fonts to fetch and no
+figures: every model or fairness number in them reads **not yet measured** until a
+frozen `model_manifest.json` and its evaluation report exist.
 
 ---
 
@@ -64,12 +75,15 @@ the *third class*, not the project.
 
 **Goal:** stop shopping for datasets; start training on one.
 
+<!-- BEGIN:act-0 tasks (generated from docs/roadmap_data.json) -->
 | # | Deliverable | Evidence file | Done when |
 | --- | --- | --- | --- |
-| 0.1 | PAD-UFES-20 downloaded and verified (`bash scripts/fetch_padufes20.sh --work ~/padufes`) | `padufes_verification.json` | 2,298 images, 1,373 patients, all cancer labels biopsy-proven |
-| 0.2 | DermaMNIST smoke run | `runs/smoke/report.json` (`valid: false`) | pipeline trains and reports, no claim implied |
-| 0.3 | Licence register | `docs/DATASET_SOURCES_IMMEDIATE.md` | every dataset has a licence line and a redistribution rule |
-| 0.4 | Data decision recorded | `REMEDIATION_STATUS.md` scope table | PAD-UFES-20 + HAM10000 for training, SCIN for tone, DDI as stretch |
+| 0.1 | Fetch and verify PAD-UFES-20 | `padufes/verification.json` | 2,298 rows, patient-grouped, biopsy flags complete, skin types present |
+| 0.2 | DermaMNIST smoke run | `runs/smoke/report.json` | The pipeline trains, writes a report, and refuses to call the run valid |
+| 0.3 | SCIN access and schema check | `reports/scin_access.md` | The CSVs parse, the tone columns are named, and the licence line is recorded |
+| 0.4 | Licence register complete | `docs/DATASET_SOURCES_IMMEDIATE.md` | Every dataset named anywhere in the repo has a licence line and a redistribution rule |
+| 0.5 | Data decision recorded | `REMEDIATION_STATUS.md` | One dated paragraph names the training set, the evaluation set and the missing class |
+<!-- END:act-0 tasks -->
 
 **Kill criterion:** if PAD-UFES-20's Fitzpatrick field turns out to be unusable
 (missing for most patients), fall back to HAM10000 training + SCIN evaluation
@@ -81,15 +95,20 @@ and say so in the model card. Do not quietly drop the fairness analysis.
 
 **Goal:** one frozen artefact that survives hostile inspection.
 
+<!-- BEGIN:act-1 tasks (generated from docs/roadmap_data.json) -->
 | # | Deliverable | Evidence file | Done when |
 | --- | --- | --- | --- |
-| 1.1 | Patient-grouped split | `report.json → provenance.split` | no patient appears in both train and eval |
-| 1.2 | Lane A model trained | `runs/<date>/checkpoints/model.pt` | reproducible with one recorded command |
-| 1.3 | Frozen artefact | `model_manifest.json` | `status: frozen`, sha256 matches, `serving.enabled: false` |
-| 1.4 | Tone-stratified evaluation on SCIN | `reports/eval_scin.json` | per-stratum `n`, accuracy, CI; empty strata **absent**, not zero |
-| 1.5 | **Tone Gap Ledger** | `docs/TONE_GAP_LEDGER.md` | a table that includes the worst stratum and says so in words |
-| 1.6 | **Failure Museum** | `docs/FAILURE_MUSEUM.md` | 12 curated errors with Grad-CAM and one sentence each on why |
-| 1.7 | Red-team day #1 | `docs/RED_TEAM.md` | someone (or you, adversarial) tries to break every claim in the poster |
+| 1.1 | Patient-grouped split | `report.json → provenance.split` | No patient_id appears in both train and eval, and a test proves it |
+| 1.2 | HAM10000 baseline run | `runs/ham-*/report.json` | One recorded command reproduces the run and report.json names the commit, config and data hash |
+| 1.3 | PAD-UFES-20 run | `runs/pad-*/report.json` | The run reports per-class n, recall and CI, and the small MEL class is stated, not smoothed away |
+| 1.4 | Freeze artefact v1 | `model_manifest.json` | status: frozen, sha256 matches the file, serving.enabled: false, verification is one command |
+| 1.5 | SCIN tone-stratified evaluation | `reports/eval_scin.json` | Per-stratum n and CI are present, empty strata are absent rather than zero, and the manifest hash is recorded |
+| 1.6 | Tone Gap Ledger | `docs/TONE_GAP_LEDGER.md` | The ledger includes the worst stratum and says in words what it implies |
+| 1.7 | Failure Museum, twelve cases | `docs/FAILURE_MUSEUM.md` | Twelve cases with Grad-CAM and one honest sentence each |
+| 1.8 | Calibration report | `reports/calibration.json` | Before and after calibration are both stored, and the file records which split was fitted on |
+| 1.9 | Out-of-distribution probe | `study/ood.md` | The note states what the model does when the input is not from its training distribution |
+| 1.10 | Red-team day #1 | `docs/RED_TEAM.md` | Each planned claim has an entry: attempt, outcome, and what changed as a result |
+<!-- END:act-1 tasks -->
 
 **Why the Failure Museum exists:** a gallery of your model's worst mistakes is the
 single most persuasive honesty artefact you can put in front of a clinician
@@ -106,12 +125,16 @@ otherwise.
 
 **Goal:** replace "pending" with a letter.
 
+<!-- BEGIN:act-2 tasks (generated from docs/roadmap_data.json) -->
 | # | Deliverable | Evidence file | Done when |
 | --- | --- | --- | --- |
-| 2.1 | Exemption request submitted | `docs/IRB_EXEMPTION_REQUEST.md` + submission receipt | four bracketed fields filled, reference number recorded |
-| 2.2 | Determination received | `docs/ethics/DETERMINATION.pdf` (or refused) | a committee wrote something; either answer unlocks a decision |
-| 2.3 | Data-protection note | `SECURITY.md` §4 link | retention scope still matches what you actually hold |
-| 2.4 | If real patient data ever appears: full approval | protocol + consent | **not** in this 12-week plan; it is a separate 3–6 month track |
+| 2.1 | Fill the exemption request | `docs/IRB_EXEMPTION_REQUEST.md` | No bracketed placeholder remains and the document claims nothing unmeasured |
+| 2.2 | Submit to the committee | `docs/ethics/SUBMISSION.md` | A reference number and a submission date exist, and the sent email is archived |
+| 2.3 | Determination on file | `docs/ethics/DETERMINATION.pdf` | A committee wrote something, and the protocol's scope is checked against it |
+| 2.4 | Retention scope re-check | `SECURITY.md §4` | The policy still matches what is actually held |
+| 2.5 | Escalation letter | `docs/ethics/ESCALATION.md` | A dated escalation exists that a reader could find in the email trail |
+| 2.6 | Full-approval scoping note | `docs/ethics/FULL_APPROVAL_SCOPE.md` | The note exists and explicitly keeps real patient data out of the twelve weeks |
+<!-- END:act-2 tasks -->
 
 **Kill criterion:** no answer by **14 Dec** → proceed with public data only, publish
 that limitation in the abstract, and re-apply next cycle. Do not let a silent
@@ -131,13 +154,18 @@ blind set of ~40 cases with the model's triage suggestion + Grad-CAM, and record
 (dermatologists, residents, final-year students) is enough for a within-subject
 signal and honest about its power.
 
+<!-- BEGIN:act-3 tasks (generated from docs/roadmap_data.json) -->
 | # | Deliverable | Evidence file | Done when |
 | --- | --- | --- | --- |
-| 3.1 | Instrument | `study/vignette_protocol.md` | question wording fixed before data collection |
-| 3.2 | Ethics cover | links to 2.2 | the study is inside the determined scope, or exempt |
-| 3.3 | Collection | `study/responses.csv` (de-identified) | ≥12 participants, no identifiers stored |
-| 3.4 | Analysis | `study/analysis.json` | override rate, Δconfidence, Δtime with intervals |
-| 3.5 | **Shadow mode** (optional) | `study/shadow.md` | retrospective agreement on de-identified images, no live use |
+| 3.1 | Vignette protocol fixed | `study/vignette_protocol.md` | The wording is frozen, the four measures are defined, and the power limit is stated |
+| 3.2 | Ethics cover for the study | `study/ethics_cover.md` | The study sits inside the determined scope, or the exemption covers it explicitly |
+| 3.3 | Pilot with two participants | `study/pilot.md` | Two dry runs completed, the instrument amended once, and the change is dated |
+| 3.4 | Recruit twelve participants | `study/participants.csv` | Twelve slots booked against participant codes, with no identifiers stored |
+| 3.5 | Run the sessions | `study/responses.csv` | Twelve completed sessions, de-identified, with deviations logged |
+| 3.6 | Analysis | `study/analysis.json` | Override rate, Δconfidence and Δtime are reported with intervals and a power caveat |
+| 3.7 | The unflattering arm | `study/hard_cases.json` | A separate failure rate on hard cases is reported beside the main result |
+| 3.8 | Shadow mode (optional) | `study/shadow.md` | Either a retrospective agreement analysis exists, or the omission is recorded |
+<!-- END:act-3 tasks -->
 
 **Creative twist — "the unflattering arm":** include 8 deliberately difficult or
 out-of-distribution images and report the model's failure rate on them
@@ -148,13 +176,16 @@ one that doesn't.
 
 ## Act 4 — The Argument (Weeks 9–12: 5–26 Jan)
 
-| # | Deliverable | Done when |
-| --- | --- | --- |
-| 4.1 | Paper draft (workshop length) | every number has a `report.json` citation |
-| 4.2 | Poster | disclaimers verbatim: research prototype, not a medical device, no BAA |
-| 4.3 | **The honest demo** | 8-minute script: what it does, what it cannot do, then a live failure |
-| 4.4 | Reproducibility test | a fresh clone + one script reproduces `report.json` within tolerance |
-| 4.5 | Red-team day #2 | an external reader tries to falsify three claims |
+<!-- BEGIN:act-4 tasks (generated from docs/roadmap_data.json) -->
+| # | Deliverable | Evidence file | Done when |
+| --- | --- | --- | --- |
+| 4.1 | Paper draft | `paper/draft.md` | Every number in the draft carries a file citation, and no claim outruns its evidence |
+| 4.2 | Poster | `poster.html` | Disclaimers verbatim, every figure traceable, and the gap visible without narration |
+| 4.3 | Demo script and rehearsals | `docs/DEMO_SCRIPT.md` | Two rehearsals completed, one with a non-specialist, and the offline fallback exists |
+| 4.4 | Reproducibility test | `docs/REPRODUCIBILITY.md` | A stranger reproduces the recorded result from a clean clone using only the docs |
+| 4.5 | Red-team day #2 | `docs/RED_TEAM.md` | An external reader tried to falsify three claims and the outcome is written down |
+| 4.6 | Submit | `paper/SUBMITTED.md` | A submission confirmation exists, dated, against a deadline verified that day |
+<!-- END:act-4 tasks -->
 
 **Demo script skeleton (rehearse it twice):**
 
@@ -180,6 +211,19 @@ of realism:
 | **1. Uganda Cancer Institute / UVRI** | KS is a defining AIDS-related malignancy in the region; they hold the images and the pathology | retrospective, de-identified KS images under an approved protocol, with a named collaborator | a 200-word email + a one-page protocol sketch + offer to co-author |
 | **2. Makerere / Mulago dermatology** | clinical photography already happens; a consultant supervisor converts the ask into an institutional one | supervised access, joint ethics application | request a 20-minute meeting with the dermatology unit |
 | **3. International KS consortia** | multi-site African KS studies with imaging sub-studies | a data-sharing appendix to an existing approval | find the corresponding author of one recent KS imaging paper, cite their protocol back to them |
+
+<!-- BEGIN:act-5 tasks (generated from docs/roadmap_data.json) -->
+| # | Deliverable | Evidence file | Done when |
+| --- | --- | --- | --- |
+| 5.1 | UCI / UVRI approach | `outreach/uci-uvri.md` | A dated email exists with the ask, the citation and the follow-up date recorded |
+| 5.2 | Makerere dermatology meeting | `outreach/makerere.md` | The meeting happened and the recommended access route is written down with a name |
+| 5.3 | Consortium author contact | `outreach/consortium.md` | A named corresponding author has been written to, with the citation and date recorded |
+| 5.4 | Ethics amendment draft | `docs/ethics/AMENDMENT.md` | A draft amendment exists that only needs a partner's name and a signature |
+| 5.5 | Six-week decision | `docs/KS_DECISION.md` | A dated decision exists: data in hand, or the pause documented as attempted |
+| 5.6 | KS cohort ingest | `datasets/ks/verification.json` | The cohort verifies like PAD-UFES-20 and the data agreement is on file |
+| 5.7 | Train the third class | `runs/ks-*/report.json` | A three-class artefact exists with a report, a ledger and a failure museum of its own |
+| 5.8 | Lift the serving hold | `model_manifest.json → serving.enabled = true` | The hold is lifted only where a frozen artefact and its evaluation justify it |
+<!-- END:act-5 tasks -->
 
 **The 6-week rule:** if none of the three has produced a written "no" or a
 dataset by **14 Dec**, write the thesis with Lane A only, and present Lane B as a

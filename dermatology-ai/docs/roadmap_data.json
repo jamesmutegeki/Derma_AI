@@ -1,0 +1,1296 @@
+{
+  "meta": {
+    "title": "Twelve weeks to a defensible study",
+    "subtitle": "Lane A ships on its own. Lane B is parked behind a gate, not forgotten.",
+    "owner": "J. Mutegeki",
+    "start": "2026-11-03",
+    "end": "2027-01-26",
+    "weeks": 12,
+    "updated": "2026-11-03",
+    "weekDates": [
+      {
+        "week": 1,
+        "dates": "3–9 Nov"
+      },
+      {
+        "week": 2,
+        "dates": "10–16 Nov"
+      },
+      {
+        "week": 3,
+        "dates": "17–23 Nov"
+      },
+      {
+        "week": 4,
+        "dates": "24–30 Nov"
+      },
+      {
+        "week": 5,
+        "dates": "1–7 Dec"
+      },
+      {
+        "week": 6,
+        "dates": "8–14 Dec"
+      },
+      {
+        "week": 7,
+        "dates": "15–21 Dec"
+      },
+      {
+        "week": 8,
+        "dates": "22–28 Dec"
+      },
+      {
+        "week": 9,
+        "dates": "29 Dec–4 Jan"
+      },
+      {
+        "week": 10,
+        "dates": "5–11 Jan"
+      },
+      {
+        "week": 11,
+        "dates": "12–18 Jan"
+      },
+      {
+        "week": 12,
+        "dates": "19–26 Jan"
+      }
+    ],
+    "sizes": {
+      "S": "half a day",
+      "M": "one to two days",
+      "L": "three days or more"
+    },
+    "sizeNote": "Planning weight only — the author's estimate, not a measurement.",
+    "rhythm": [
+      {
+        "day": "Monday",
+        "ritual": "Gate review",
+        "output": "one line: what moved, what is stuck"
+      },
+      {
+        "day": "Wednesday",
+        "ritual": "Evidence day",
+        "output": "every claim made this week gets a file or is deleted"
+      },
+      {
+        "day": "Friday",
+        "ritual": "Writing hour",
+        "output": "500 words of thesis, no code"
+      }
+    ],
+    "months": [
+      {
+        "label": "Nov 2026",
+        "from": 1,
+        "to": 4
+      },
+      {
+        "label": "Dec 2026",
+        "from": 5,
+        "to": 8
+      },
+      {
+        "label": "Jan 2027",
+        "from": 9,
+        "to": 12
+      }
+    ]
+  },
+  "acts": [
+    {
+      "id": "0",
+      "name": "Landing",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "goal": "Stop shopping for datasets; start training on one.",
+      "why": "Every week spent comparing datasets is a week not spent on an artefact that survives inspection. This act ends with one dataset on disk, verified, and a decision written down."
+    },
+    {
+      "id": "1",
+      "name": "The honest model",
+      "lane": "A",
+      "weeks": [
+        1,
+        5
+      ],
+      "goal": "One frozen artefact that survives hostile inspection.",
+      "why": "The contribution is not a number, it is an artefact plus the honest measurement of where it fails. Freeze early, evaluate on a population you did not train on, and publish the worst stratum in words."
+    },
+    {
+      "id": "2",
+      "name": "Permission",
+      "lane": "A",
+      "weeks": [
+        2,
+        6
+      ],
+      "goal": "Replace \"pending\" with a letter.",
+      "why": "The clinician study cannot start without a determination. A silent committee is the most likely failure in this plan, so it gets a deadline, an escalation and a published fallback."
+    },
+    {
+      "id": "3",
+      "name": "The clinician study",
+      "lane": "A",
+      "weeks": [
+        6,
+        9
+      ],
+      "goal": "Show that a human plus the model changes a decision, or does not.",
+      "why": "A vignette study with twelve participants is underpowered and honest about it. It measures override rate, confidence shift and time to decide -- three things a reviewer can check without trusting the model's accuracy."
+    },
+    {
+      "id": "4",
+      "name": "The argument",
+      "lane": "A",
+      "weeks": [
+        9,
+        12
+      ],
+      "goal": "Turn artefacts into a paper, a poster and an eight-minute demo.",
+      "why": "Every claim in the write-up must trace to a file. The demo's job is to make the limitations impossible to miss, including a live failure."
+    },
+    {
+      "id": "5",
+      "name": "Lane B — Kaposi sarcoma",
+      "lane": "B",
+      "weeks": [
+        1,
+        12
+      ],
+      "goal": "End the pause with a real cohort, or document that it was genuinely attempted.",
+      "why": "Gate 1A is paused (2026-10-31) because no immediately downloadable public source contains Kaposi sarcoma. A pause is only respectable if someone is working to end it -- three routes, six weeks, written evidence either way."
+    }
+  ],
+  "gates": [
+    {
+      "id": "S1-1",
+      "name": "Frozen artefact — gate 1A",
+      "state": "paused",
+      "note": "Paused 2026-10-31 until a real KS cohort exists. Serving held in code.",
+      "unlocks": "Evaluation, calibration, the vignette study and any serving change"
+    },
+    {
+      "id": "S2-4",
+      "name": "Runbook signed",
+      "state": "closed",
+      "note": "Signed 2026-10-30, single-engineer review stated plainly."
+    },
+    {
+      "id": "RET",
+      "name": "Retention policy",
+      "state": "closed",
+      "note": "In force 2026-10-30, scoped to synthetic/de-identified data."
+    },
+    {
+      "id": "IRB",
+      "name": "Ethics determination",
+      "state": "pending",
+      "note": "Request prepared; four fields and a submission away."
+    }
+  ],
+  "kill": [
+    {
+      "id": "k1",
+      "when": "PAD-UFES-20 skin types are unusable",
+      "then": "Train on HAM10000, evaluate on SCIN, and say so in the model card."
+    },
+    {
+      "id": "k2",
+      "when": "SCIN turns out to have no melanoma",
+      "then": "Evaluate the benign head and calibration only; restate the plan, do not report a number that pretends otherwise."
+    },
+    {
+      "id": "k3",
+      "when": "No ethics answer by 14 Dec",
+      "then": "Public data only, limitation in the abstract, re-apply next cycle."
+    },
+    {
+      "id": "k4",
+      "when": "No KS reply by 14 Dec",
+      "then": "Lane B becomes a protocol chapter with the email trail as process evidence."
+    },
+    {
+      "id": "k5",
+      "when": "Dark-skin gap is large",
+      "then": "That is the finding. Publish it with the Failure Museum; do not tune it away."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "ks",
+      "label": "KS cohort never arrives",
+      "impact": [
+        "5.6",
+        "5.7",
+        "5.8"
+      ],
+      "effect": "Lane B parks after the six-week decision. The thesis ships Lane A and presents Lane B as a designed, unexecuted protocol with the email trail as process evidence.",
+      "mitigation": "Write the Lane B chapter from 5.1–5.4 as it stands: routes attempted, dates, replies, protocol sketch. Turn the pause into a documented gap."
+    },
+    {
+      "id": "ethics",
+      "label": "Ethics stays silent",
+      "impact": [
+        "2.3",
+        "3.2",
+        "3.5",
+        "3.6"
+      ],
+      "effect": "The clinician study cannot start. Cut to eight participants if a letter lands late, or replace it with the retrospective shadow-mode analysis and say so.",
+      "mitigation": "Send 2.5 on the day 2.3 goes overdue, keep 3.8 (shadow mode) ready as the fallback, and publish the limitation in the abstract rather than hiding it."
+    },
+    {
+      "id": "signal",
+      "label": "Melanoma signal too small",
+      "impact": [
+        "1.3",
+        "1.4",
+        "4.1"
+      ],
+      "effect": "Reframe the contribution from detection to triage ordering plus fairness. Same artefact, honest claim.",
+      "mitigation": "Report per-class recall with n and CI, lead with the Failure Museum, and let the paper argue about ranking and calibration rather than detection."
+    },
+    {
+      "id": "compute",
+      "label": "Compute too slow",
+      "impact": [
+        "1.2",
+        "1.3"
+      ],
+      "effect": "Train at 160 px instead of 224, record the size in the manifest, and state the serving-time shift in the model card.",
+      "mitigation": "Cut seeds before cutting resolution, and record every configuration change in the run report so the comparison stays honest."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "0.1",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Fetch and verify PAD-UFES-20",
+      "size": "M",
+      "steps": [
+        "Run `bash scripts/fetch_padufes20.sh --check` and read the plan before pulling 3.35 GB",
+        "Run it with `--work ~/padufes`; rerun after any interruption — the download resumes",
+        "Read `padufes/verification.json`: 2,298 images, 1,373 patients, 1,641 lesions, per-class counts",
+        "Confirm every cancer label carries its biopsy flag and every patient a Fitzpatrick type",
+        "Convert once: `prepare_dataset.py --link hardlink --group-column patient_id`"
+      ],
+      "evidence": "padufes/verification.json",
+      "done": "2,298 rows, patient-grouped, biopsy flags complete, skin types present",
+      "risk": "The S3 zip can stall; the script resumes, so rerun rather than restart. If the archive 404s, stop and re-read the dataset page — do not substitute a dataset without recording the change.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.2",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "DermaMNIST smoke run",
+      "size": "S",
+      "steps": [
+        "Inside the venv: `pip install medmnist` (20 MB npz, downloaded on first use)",
+        "One epoch through `scripts/train_model.py` — the point is plumbing, not accuracy",
+        "Confirm `runs/smoke/report.json` exists and is stamped `valid: false`",
+        "Time the run on this hardware so week 2's estimate is real"
+      ],
+      "evidence": "runs/smoke/report.json",
+      "done": "The pipeline trains, writes a report, and refuses to call the run valid",
+      "risk": "A smoke run invites you to quote its number. It is `valid: false` by construction and never leaves the sandbox.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.3",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "SCIN access and schema check",
+      "size": "S",
+      "steps": [
+        "Read the public bucket `dx-scin-public-data` and pull only the case and label CSVs",
+        "Confirm the tone columns exist and note their exact names (self-reported vs estimated)",
+        "Count how many cases actually carry a tone label — this decides the strata in 1.5",
+        "Record the licence line and whether images are reachable from here"
+      ],
+      "evidence": "reports/scin_access.md",
+      "done": "The CSVs parse, the tone columns are named, and the licence line is recorded",
+      "risk": "Some paths may be read-only for an anonymous reader. If images are unreachable, record that now rather than discovering it in week 4.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.4",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Licence register complete",
+      "size": "S",
+      "steps": [
+        "One row per dataset named anywhere in the repo — including the rejected ones",
+        "Each row: licence, redistribution rule, gated yes/no, adopted in this cycle yes/no",
+        "Mark every request-gated source as not adoptable this cycle, with the reason",
+        "State plainly that no downloadable public source carries Kaposi sarcoma"
+      ],
+      "evidence": "docs/DATASET_SOURCES_IMMEDIATE.md",
+      "done": "Every dataset named anywhere in the repo has a licence line and a redistribution rule",
+      "risk": "A dataset named in the thesis without a licence line is a reviewer finding; the register is the cheapest defence you will ever write.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.5",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Data decision recorded",
+      "size": "S",
+      "steps": [
+        "Write the decision into the scope table in `REMEDIATION_STATUS.md`, dated",
+        "Name the training set, the evaluation set and the class that is absent",
+        "State what was rejected and why, in one line each",
+        "Anything not on the list becomes a new sprint with its own justification"
+      ],
+      "evidence": "REMEDIATION_STATUS.md",
+      "done": "One dated paragraph names the training set, the evaluation set and the missing class",
+      "risk": "Scope creeps back if the decision is not written down; an unwritten decision is a debate you have every Monday.",
+      "depends": [
+        "0.1",
+        "0.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.1",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        1,
+        2
+      ],
+      "title": "Patient-grouped split",
+      "size": "M",
+      "steps": [
+        "Group by `patient_id`, never by image — 1,641 lesions over 1,373 patients",
+        "Hold out roughly a fifth of the patients, stratified by diagnosis",
+        "Write `provenance.split` into `report.json`: seed, counts, hash of the id list",
+        "Add a test that asserts no `patient_id` appears in both splits, and keep it green"
+      ],
+      "evidence": "report.json → provenance.split",
+      "done": "No patient_id appears in both train and eval, and a test proves it",
+      "risk": "Some releases rename a patient per visit. Check the lesion-to-patient mapping before trusting the grouping; a leaky split invalidates every number downstream.",
+      "depends": [
+        "0.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.2",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "HAM10000 baseline run",
+      "size": "L",
+      "steps": [
+        "Fetch and verify with `scripts/fetch_and_verify_ham10000.sh` (published counts or nothing)",
+        "Train one configuration end to end, 224 px, one seed first",
+        "Record command, commit sha, config and data hash inside `report.json`",
+        "Keep it as a pipeline proof and a cross-check — not the headline"
+      ],
+      "evidence": "runs/ham-*/report.json",
+      "done": "One recorded command reproduces the run and report.json names the commit, config and data hash",
+      "risk": "HAM10000 is a different population from PAD-UFES-20. Mixing the two into one headline number would be a quiet lie; use it to prove the pipeline.",
+      "depends": [
+        "1.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.3",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "PAD-UFES-20 run",
+      "size": "L",
+      "steps": [
+        "Train on the grouped split from 1.1 with the label map in `scripts/label_maps/padufes20.json`",
+        "Report per-class n and recall with confidence intervals — MEL has very few images",
+        "Add two more seeds if time allows, and report the spread instead of the best seed",
+        "Write every configuration into `report.json` and store the checkpoint outside git"
+      ],
+      "evidence": "runs/pad-*/report.json",
+      "done": "The run reports per-class n, recall and CI, and the small MEL class is stated, not smoothed away",
+      "risk": "MEL is tiny. If recall swings across seeds, say so and widen the interval; do not 'fix' it with augmented copies of the same lesion.",
+      "depends": [
+        "1.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.4",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        3,
+        3
+      ],
+      "title": "Freeze artefact v1",
+      "size": "M",
+      "steps": [
+        "Pick the run: the one whose report you would defend line by line",
+        "Run `scripts/freeze_model.py`; the sha256 lands in `model_manifest.json`",
+        "Set `status: frozen`, keep `serving.enabled: false`, and record the split hash",
+        "Verify from a fresh shell that the hash matches the stored file"
+      ],
+      "evidence": "model_manifest.json",
+      "done": "status: frozen, sha256 matches the file, serving.enabled: false, verification is one command",
+      "risk": "Freezing too early locks in a split you will want to change. Freeze only after the leakage test in 1.1 is green.",
+      "depends": [
+        "1.1",
+        "1.3"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.5",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "SCIN tone-stratified evaluation",
+      "size": "L",
+      "steps": [
+        "Score SCIN clinical images with the frozen artefact only — no retraining",
+        "Stratify by the self-reported tone column, and separately by the estimated one",
+        "Per stratum: n, the metric, and a confidence interval; empty strata are absent, not zero",
+        "Write `reports/eval_scin.json` and record the manifest hash it was computed against"
+      ],
+      "evidence": "reports/eval_scin.json",
+      "done": "Per-stratum n and CI are present, empty strata are absent rather than zero, and the manifest hash is recorded",
+      "risk": "If SCIN carries no melanoma, a melanoma recall line would be a fiction. Restrict to the benign head and calibration, and restate the plan (kill criterion k2).",
+      "depends": [
+        "1.4",
+        "0.3"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.6",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "Tone Gap Ledger",
+      "size": "M",
+      "steps": [
+        "Table: stratum, n, metric, interval, gap against the lightest stratum",
+        "Bold the worst stratum and write one paragraph saying what it means",
+        "No composite fairness score — a single number hides the failure you are reporting",
+        "Link each row to the row in `reports/eval_scin.json` that produced it"
+      ],
+      "evidence": "docs/TONE_GAP_LEDGER.md",
+      "done": "The ledger includes the worst stratum and says in words what it implies",
+      "risk": "An aggregate score invites the reader to conclude 'fair enough'. Publish the table.",
+      "depends": [
+        "1.5"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.7",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        5
+      ],
+      "title": "Failure Museum, twelve cases",
+      "size": "M",
+      "steps": [
+        "Sample 12 errors by error type, not by which heatmap looks best",
+        "Include at least three cases from the darkest strata in the ledger",
+        "One Grad-CAM per case and exactly one sentence on why it failed",
+        "Note the licence position before publishing any image"
+      ],
+      "evidence": "docs/FAILURE_MUSEUM.md",
+      "done": "Twelve cases with Grad-CAM and one honest sentence each",
+      "risk": "Curating only flattering failures defeats the artefact. Fix the sampling rule before you look at the images.",
+      "depends": [
+        "1.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.8",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Calibration report",
+      "size": "M",
+      "steps": [
+        "Reliability diagram per class, plus the calibration error, on the frozen artefact",
+        "Fit any temperature on the validation split only",
+        "Recompute on the held-out split and store before and after",
+        "State in one sentence what a confidence of 0.8 means operationally"
+      ],
+      "evidence": "reports/calibration.json",
+      "done": "Before and after calibration are both stored, and the file records which split was fitted on",
+      "risk": "Fitting temperature on the evaluation split is leakage with a friendly name. The file must record the split.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.9",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Out-of-distribution probe",
+      "size": "S",
+      "steps": [
+        "Score a handful of images from a source the model never saw, at the same resolution",
+        "Record the confidence drop and what the errors look like",
+        "Write `study/ood.md`: what OOD looks like in practice, with no clinical claim",
+        "Feed the worst cases into the Failure Museum shortlist"
+      ],
+      "evidence": "study/ood.md",
+      "done": "The note states what the model does when the input is not from its training distribution",
+      "risk": "'It generalises well' is the trap. Report the drop, including the cases where confidence stays high and wrong.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.10",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Red-team day #1",
+      "size": "S",
+      "steps": [
+        "Take every claim you intend to make and try to falsify it in one sitting",
+        "Log each attempt, the evidence found, and the outcome: kept, weakened, withdrawn",
+        "Fix the artefacts rather than softening the wording",
+        "Date and sign the entry in `docs/RED_TEAM.md`"
+      ],
+      "evidence": "docs/RED_TEAM.md",
+      "done": "Each planned claim has an entry: attempt, outcome, and what changed as a result",
+      "risk": "A red-team day that finds nothing usually means the attacks were too polite. Attack the split, the strata and the licence claims first.",
+      "depends": [
+        "1.6",
+        "1.8"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.1",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        2,
+        2
+      ],
+      "title": "Fill the exemption request",
+      "size": "S",
+      "steps": [
+        "Fill the four bracketed fields in `docs/IRB_EXEMPTION_REQUEST.md`",
+        "Read it once as a committee member looking for a reason to say no",
+        "Remove any claim the artefacts do not support (no clinical validity, no KS class)",
+        "Have the supervisor read it before it goes anywhere"
+      ],
+      "evidence": "docs/IRB_EXEMPTION_REQUEST.md",
+      "done": "No bracketed placeholder remains and the document claims nothing unmeasured",
+      "risk": "Overclaiming in the request is the fastest way to a refusal; describe the vignette study, not a diagnostic device.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "2.2",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        2,
+        2
+      ],
+      "title": "Submit to the committee",
+      "size": "S",
+      "steps": [
+        "Submit through the university channel and keep the receipt",
+        "Record the reference number, the date and the named contact in `docs/ethics/SUBMISSION.md`",
+        "Save the sent email with its attachments alongside it",
+        "Note the committee's stated turnaround, if it states one"
+      ],
+      "evidence": "docs/ethics/SUBMISSION.md",
+      "done": "A reference number and a submission date exist, and the sent email is archived",
+      "risk": "A submission with no receipt is indistinguishable from a draft. The receipt is the evidence you will be asked for in week 6.",
+      "depends": [
+        "2.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.3",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        5,
+        6
+      ],
+      "title": "Determination on file",
+      "size": "M",
+      "steps": [
+        "Chase once at week 4, once at week 5, in writing",
+        "Store the letter as `docs/ethics/DETERMINATION.pdf` — approval or refusal, both count",
+        "Map the letter's scope onto the vignette protocol in 3.1",
+        "If refused: record the reasons verbatim and decide against kill criterion k3"
+      ],
+      "evidence": "docs/ethics/DETERMINATION.pdf",
+      "done": "A committee wrote something, and the protocol's scope is checked against it",
+      "risk": "A verbal 'you are fine' is not a determination. Ask for it in writing while the conversation is friendly.",
+      "depends": [
+        "2.2"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "2.4",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "Retention scope re-check",
+      "size": "S",
+      "steps": [
+        "Read `SECURITY.md` §4 against what is actually on disk today",
+        "Confirm: synthetic and de-identified data only, no real patient images",
+        "Update the section if reality moved, and date the change",
+        "Link the section from the model card so a reader can find it"
+      ],
+      "evidence": "SECURITY.md §4",
+      "done": "The policy still matches what is actually held",
+      "risk": "A policy that describes a different repository than the one you have is worse than no policy: it reads as a claim.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "2.5",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Escalation letter",
+      "size": "S",
+      "steps": [
+        "One short, polite follow-up naming the 14 Dec dependency",
+        "Copy the supervisor and the named contact from the receipt",
+        "State the fallback plainly: public data only, limitation in the abstract",
+        "Log the date sent in `docs/ethics/ESCALATION.md`"
+      ],
+      "evidence": "docs/ethics/ESCALATION.md",
+      "done": "A dated escalation exists that a reader could find in the email trail",
+      "risk": "Escalation without a stated consequence reads as nagging. Name the deadline and the fallback in the same paragraph.",
+      "depends": [
+        "2.2"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.6",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Full-approval scoping note",
+      "size": "S",
+      "steps": [
+        "Write the one-page shape of a full approval track: protocol, consent, data agreement",
+        "State the realistic timeline (three to six months) and that it is outside this plan",
+        "Name what would move the project onto that track — real patient images only",
+        "Keep it as a plan, not a promise"
+      ],
+      "evidence": "docs/ethics/FULL_APPROVAL_SCOPE.md",
+      "done": "The note exists and explicitly keeps real patient data out of the twelve weeks",
+      "risk": "Letting the full-approval track leak into week 8 is how the degree slips a year.",
+      "depends": [
+        "2.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.1",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Vignette protocol fixed",
+      "size": "M",
+      "steps": [
+        "Fix the instrument: about 40 cases, blind, two arms, order randomised per participant",
+        "Four measures only: own decision, whether it changed, confidence 1–5, seconds to decide",
+        "State the power position honestly: twelve participants, within-subject, small effects",
+        "Freeze the wording before the pilot — wording changes after data collection are fatal"
+      ],
+      "evidence": "study/vignette_protocol.md",
+      "done": "The wording is frozen, the four measures are defined, and the power limit is stated",
+      "risk": "An instrument tuned after the first two participants cannot be analysed cleanly. Pilot, then freeze, then collect.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "3.2",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Ethics cover for the study",
+      "size": "S",
+      "steps": [
+        "Attach the determination (2.3) to the protocol",
+        "Check every element of the protocol against the letter's scope",
+        "If the letter is narrower, cut the protocol rather than stretching the letter",
+        "Record the mapping in `study/ethics_cover.md`"
+      ],
+      "evidence": "study/ethics_cover.md",
+      "done": "The study sits inside the determined scope, or the exemption covers it explicitly",
+      "risk": "A scope mismatch discovered in week 8 invalidates the data you already collected.",
+      "depends": [
+        "2.3"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "3.3",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        7
+      ],
+      "title": "Pilot with two participants",
+      "size": "M",
+      "steps": [
+        "Run the whole instrument with two colleagues, timing included",
+        "Watch for ambiguous wording rather than explaining it away",
+        "Fix the instrument, then re-freeze it and note the change in the protocol",
+        "Keep pilot data out of the analysis set and say so"
+      ],
+      "evidence": "study/pilot.md",
+      "done": "Two dry runs completed, the instrument amended once, and the change is dated",
+      "risk": "Pilot data leaking into the main set is a silent inflation of n. Label it and exclude it.",
+      "depends": [
+        "3.1",
+        "3.2"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "3.4",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        7
+      ],
+      "title": "Recruit twelve participants",
+      "size": "M",
+      "steps": [
+        "Identify dermatologists, residents and final-year students; keep a list of roles only",
+        "No names in the repository — a participant code is enough",
+        "Book 30-minute slots across weeks 7 and 8, with two spares",
+        "Tell each person what the study is not: no patient contact, no clinical use"
+      ],
+      "evidence": "study/participants.csv",
+      "done": "Twelve slots booked against participant codes, with no identifiers stored",
+      "risk": "Recruitment slippage is the most common schedule failure in a twelve-week plan. Book spares in week 7, not week 8.",
+      "depends": [
+        "3.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.5",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        8
+      ],
+      "title": "Run the sessions",
+      "size": "L",
+      "steps": [
+        "Run each session identically: same instructions, same order rule",
+        "Capture responses into `study/responses.csv` — codes, decisions, confidence, seconds",
+        "Stop immediately if a participant is uncomfortable; that is not data, it is a signal",
+        "Note any deviation from the protocol in a dated log entry"
+      ],
+      "evidence": "study/responses.csv",
+      "done": "Twelve completed sessions, de-identified, with deviations logged",
+      "risk": "Unlogged deviations are what a reviewer finds first. One line per session costs nothing now.",
+      "depends": [
+        "3.4"
+      ],
+      "gate": "S2-4"
+    },
+    {
+      "id": "3.6",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        8,
+        9
+      ],
+      "title": "Analysis",
+      "size": "M",
+      "steps": [
+        "Override rate, confidence shift and time change, each with an interval",
+        "Use a paired analysis within participant; state the test and its assumptions",
+        "Report the direction of every effect, including the ones that go against you",
+        "Write `study/analysis.json` and a two-paragraph plain-language summary"
+      ],
+      "evidence": "study/analysis.json",
+      "done": "Override rate, Δconfidence and Δtime are reported with intervals and a power caveat",
+      "risk": "With n=12, a p-value is a rumour. Lead with effect sizes and intervals.",
+      "depends": [
+        "3.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.7",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        8,
+        8
+      ],
+      "title": "The unflattering arm",
+      "size": "S",
+      "steps": [
+        "Take eight deliberately difficult or out-of-distribution images",
+        "Score the model on them separately and report the failure rate",
+        "Keep them in the same instrument so the contrast is visible",
+        "Publish the comparison next to the main result, not in an appendix"
+      ],
+      "evidence": "study/hard_cases.json",
+      "done": "A separate failure rate on hard cases is reported beside the main result",
+      "risk": "Reviewers trust a paper that shows its own worst case; they discount one that does not.",
+      "depends": [
+        "3.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.8",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        9,
+        9
+      ],
+      "title": "Shadow mode (optional)",
+      "size": "M",
+      "steps": [
+        "Retrospective agreement only: de-identified images already in the evaluation set",
+        "No live use, no patient contact, no new data collection",
+        "Report agreement with the recorded reading, not with a clinician's live decision",
+        "Skip it without guilt if week 9 is already full"
+      ],
+      "evidence": "study/shadow.md",
+      "done": "Either a retrospective agreement analysis exists, or the omission is recorded",
+      "risk": "Shadow mode drifting into live use is the one line this project must never cross.",
+      "depends": [
+        "3.6"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.1",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        9,
+        10
+      ],
+      "title": "Paper draft",
+      "size": "L",
+      "steps": [
+        "Draft to the workshop length; one claim per paragraph",
+        "Every number gets a citation to a `report.json` path and a commit",
+        "Limitations section names the missing KS class and the single-cohort problem",
+        "Leave the abstract to last, after the numbers stop moving"
+      ],
+      "evidence": "paper/draft.md",
+      "done": "Every number in the draft carries a file citation, and no claim outruns its evidence",
+      "risk": "A number written from memory is the one an examiner checks first. Cite or delete.",
+      "depends": [
+        "1.6",
+        "3.6"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.2",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        10,
+        10
+      ],
+      "title": "Poster",
+      "size": "M",
+      "steps": [
+        "Build on the existing poster template so the disclaimers stay verbatim",
+        "One figure per claim: ledger, calibration, failure museum",
+        "The dark-skin gap gets a panel of its own, not a footnote",
+        "Print once early to check the type size at arm's length"
+      ],
+      "evidence": "poster.html",
+      "done": "Disclaimers verbatim, every figure traceable, and the gap visible without narration",
+      "risk": "A poster that hides the gap looks strong for ten seconds and weak for the whole session.",
+      "depends": [
+        "4.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.3",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        10,
+        11
+      ],
+      "title": "Demo script and rehearsals",
+      "size": "M",
+      "steps": [
+        "Eight minutes: what it does, why, where it fails, what it cannot do, what would change that",
+        "Include one live failure from the Failure Museum and let it land",
+        "Rehearse twice — once to a colleague, once to a non-specialist",
+        "Keep an offline fallback: screenshots and a recorded run for a dead network"
+      ],
+      "evidence": "docs/DEMO_SCRIPT.md",
+      "done": "Two rehearsals completed, one with a non-specialist, and the offline fallback exists",
+      "risk": "A demo that only shows successes invites exactly the question it cannot answer.",
+      "depends": [
+        "4.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.4",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        11,
+        11
+      ],
+      "title": "Reproducibility test",
+      "size": "M",
+      "steps": [
+        "Fresh clone on a clean machine, no cached artefacts",
+        "Run the documented command and compare against the frozen report within a stated tolerance",
+        "Record the hardware and the wall-clock time next to the result",
+        "Fix the instructions, not the numbers, when they disagree"
+      ],
+      "evidence": "docs/REPRODUCIBILITY.md",
+      "done": "A stranger reproduces the recorded result from a clean clone using only the docs",
+      "risk": "'It works on my machine' with a cached checkpoint is not reproducibility. Delete the cache first.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.5",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        11,
+        11
+      ],
+      "title": "Red-team day #2",
+      "size": "S",
+      "steps": [
+        "Give an external reader the poster and three claims to falsify",
+        "Log attempts and outcomes in `docs/RED_TEAM.md`, dated",
+        "Withdraw or weaken any claim the artefacts cannot carry",
+        "Re-run the definition-of-done script at the end of the day"
+      ],
+      "evidence": "docs/RED_TEAM.md",
+      "done": "An external reader tried to falsify three claims and the outcome is written down",
+      "risk": "Internal review finds internal problems. This one has to be somebody who owes you nothing.",
+      "depends": [
+        "4.2"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.6",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        12,
+        12
+      ],
+      "title": "Submit",
+      "size": "M",
+      "steps": [
+        "Verify the workshop deadline on its own site on the day — never from memory",
+        "Check the submission system's format requirements against the draft",
+        "Submit the Lane A paper even if Lane B is still open",
+        "Store the confirmation as `paper/SUBMITTED.md` with the date and the reference"
+      ],
+      "evidence": "paper/SUBMITTED.md",
+      "done": "A submission confirmation exists, dated, against a deadline verified that day",
+      "risk": "Planning against a remembered deadline is how work misses by a week.",
+      "depends": [
+        "4.4",
+        "4.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.1",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "UCI / UVRI approach",
+      "size": "S",
+      "steps": [
+        "Two hundred words, one ask, one attachment: a one-page protocol sketch",
+        "Name the KS imaging sub-study you are asking about, with its citation",
+        "Offer co-authorship and a named collaborator on their side",
+        "Log the date, the addressee and the follow-up date in `outreach/uci-uvri.md`"
+      ],
+      "evidence": "outreach/uci-uvri.md",
+      "done": "A dated email exists with the ask, the citation and the follow-up date recorded",
+      "risk": "A vague ask gets a vague no. One protocol sketch beats a page of enthusiasm.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.2",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "Makerere dermatology meeting",
+      "size": "M",
+      "steps": [
+        "Request twenty minutes with the dermatology unit, not a data request",
+        "Bring one page: what the artefact does, what it cannot do, what you need",
+        "Ask which route they would trust for supervised, de-identified access",
+        "Write the answer down the same day"
+      ],
+      "evidence": "outreach/makerere.md",
+      "done": "The meeting happened and the recommended access route is written down with a name",
+      "risk": "A consultant supervisor converts a personal ask into an institutional one; ask for the route, not for images.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.3",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        3,
+        3
+      ],
+      "title": "Consortium author contact",
+      "size": "S",
+      "steps": [
+        "Pick one recent African KS imaging paper with a data-sharing statement",
+        "Write to the corresponding author, citing their own protocol back to them",
+        "Ask specifically about an amendment to an existing approval",
+        "Log the contact and the response date"
+      ],
+      "evidence": "outreach/consortium.md",
+      "done": "A named corresponding author has been written to, with the citation and date recorded",
+      "risk": "Broadcast emails to five groups get answered by none. One careful letter beats five.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.4",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        4,
+        5
+      ],
+      "title": "Ethics amendment draft",
+      "size": "M",
+      "steps": [
+        "Draft the amendment now so a yes does not wait on paperwork",
+        "Scope it to retrospective, de-identified images under their approval",
+        "Leave the data-transfer terms blank until a partner names them",
+        "Have it read by whoever wrote the exemption request"
+      ],
+      "evidence": "docs/ethics/AMENDMENT.md",
+      "done": "A draft amendment exists that only needs a partner's name and a signature",
+      "risk": "Starting the amendment after the yes costs four to six weeks you do not have.",
+      "depends": [
+        "5.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.5",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Six-week decision",
+      "size": "S",
+      "steps": [
+        "On 14 Dec, read the three outreach logs and decide against kill criterion k4",
+        "Write the decision with its reasons in `docs/KS_DECISION.md`, dated",
+        "If the answer is no: convert Lane B into a protocol chapter",
+        "Announce the decision in the Monday gate review the same week"
+      ],
+      "evidence": "docs/KS_DECISION.md",
+      "done": "A dated decision exists: data in hand, or the pause documented as attempted",
+      "risk": "A decision nobody wrote down gets re-litigated every week. Date it and move on.",
+      "depends": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.6",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        7,
+        8
+      ],
+      "title": "KS cohort ingest",
+      "size": "L",
+      "steps": [
+        "Same discipline as PAD-UFES-20: verify before training, never after",
+        "Check patient grouping, pathology confirmation and the licence or data agreement",
+        "Write `datasets/ks/verification.json` with counts, gaps and the agreement on file",
+        "If any check fails, stop — do not train on a cohort you cannot describe"
+      ],
+      "evidence": "datasets/ks/verification.json",
+      "done": "The cohort verifies like PAD-UFES-20 and the data agreement is on file",
+      "risk": "A cohort that arrives without an agreement is not data, it is a liability. Stop and ask.",
+      "depends": [
+        "5.5"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "5.7",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        8,
+        10
+      ],
+      "title": "Train the third class",
+      "size": "L",
+      "steps": [
+        "Keep the two-class frozen artefact intact while the three-class run is experimental",
+        "Retrain with KS added, grouped by patient, with per-class n and CI reported",
+        "Re-run the tone-stratified evaluation on the new artefact",
+        "Freeze as v2 only after the new ledger and museum exist"
+      ],
+      "evidence": "runs/ks-*/report.json",
+      "done": "A three-class artefact exists with a report, a ledger and a failure museum of its own",
+      "risk": "Overwriting v1 with v2 destroys the comparison the paper needs. Keep both.",
+      "depends": [
+        "5.6"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "5.8",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        10,
+        12
+      ],
+      "title": "Lift the serving hold",
+      "size": "M",
+      "steps": [
+        "Only after a frozen three-class artefact with its own evaluation exists",
+        "Flip `serving.enabled` in `model_manifest.json` deliberately, with the reason recorded",
+        "Re-read the serving checklist and the security section before flipping it",
+        "Update the model card and the dashboard copy in the same commit"
+      ],
+      "evidence": "model_manifest.json → serving.enabled = true",
+      "done": "The hold is lifted only where a frozen artefact and its evaluation justify it",
+      "risk": "Lifting the hold to demo something is the failure mode this gate exists to prevent.",
+      "depends": [
+        "5.7"
+      ],
+      "gate": "S1-1"
+    }
+  ]
+}

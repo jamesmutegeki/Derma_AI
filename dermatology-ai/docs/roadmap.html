@@ -3,37 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roadmap — Dermatology System</title>
-<!--
-  The interactive roadmap. One self-contained file: no fonts, no CDNs, no
-  network calls, no analytics. It works offline, which matters because the
-  deployment target is a clinic with intermittent connectivity.
-
-  Two rules govern the content:
-    1. every task names the file it will produce ("evidence");
-    2. no performance figures appear here at all -- numbers live in
-       runs/<date>/report.json and nowhere else.
-
-  Progress checkboxes are stored in this browser only (localStorage). They are
-  a planning aid, not a claim about the model.
--->
+<title>Roadmap — twelve weeks to a defensible study</title>
+<meta name="description" content="Offline, interactive planning artefact for the Derma AI twelve-week study plan. No performance figures; everything unmeasured is labelled not yet measured.">
 <style>
   :root {
     --navy: #113B65;
     --navy-2: #1B4E7F;
-    --coral: #E66461;
-    --coral-soft: #FDECEA;
+    --coral: #C9484A;
+    --coral-soft: #FBEAEA;
     --ink: #16202B;
-    --muted: #5C6B7A;
+    --muted: #5A6A79;
     --line: #E1E8EF;
+    --line-strong: #C8D4E0;
     --paper: #FFFFFF;
     --wash: #F4F7FA;
-    --amber: #B26A00;
+    --amber: #96560A;
     --amber-soft: #FFF4E3;
     --green: #1F6B3F;
     --green-soft: #E7F3EC;
     --radius: 10px;
-    --shadow: 0 1px 2px rgba(17, 59, 101, .06), 0 8px 24px rgba(17, 59, 101, .06);
+    --shadow: 0 1px 2px rgba(17, 59, 101, .06), 0 10px 28px rgba(17, 59, 101, .07);
+    --on-accent: #FFFFFF;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --navy: #8FB8DC;
+      --navy-2: #A9CBEA;
+      --coral: #F08C8C;
+      --coral-soft: #3A2426;
+      --ink: #E7EDF3;
+      --muted: #9BABBA;
+      --line: #27333E;
+      --line-strong: #3A4A57;
+      --paper: #141B21;
+      --wash: #0E1419;
+      --amber: #E6B36A;
+      --amber-soft: #332818;
+      --green: #7FC79B;
+      --green-soft: #16281D;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 28px rgba(0, 0, 0, .45);
+      --on-accent: #0E1419;
+    }
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -41,72 +52,106 @@
     margin: 0;
     background: var(--wash);
     color: var(--ink);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--navy); text-underline-offset: 2px; }
-  button, input, select { font: inherit; color: inherit; }
+  code { font-family: var(--mono); font-size: .92em; }
+  button, input, textarea, select { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; border-radius: 4px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 8px; z-index: 100;
+    background: var(--paper); border: 1px solid var(--line-strong); border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .skip:focus { left: 12px; }
 
-  /* ---------------- top bar ---------------- */
-  .topbar {
-    position: sticky; top: 0; z-index: 30;
-    background: rgba(255, 255, 255, .94);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--line);
-  }
+  /* ---------------- header ---------------- */
+  .topbar { background: var(--paper); border-bottom: 1px solid var(--line); }
   .topbar-inner {
-    max-width: 1400px; margin: 0 auto; padding: 12px 20px;
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    max-width: 1400px; margin: 0 auto; padding: 16px 20px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
   }
-  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .brand img { width: 32px; height: 32px; flex: none; }
-  .brand h1 { font-size: 15px; letter-spacing: -0.2px; margin: 0; white-space: nowrap; }
-  .brand h1 span { color: var(--muted); font-weight: 500; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand img { width: 36px; height: 36px; flex: none; }
+  .brand h1 { font-size: 17px; letter-spacing: -0.3px; margin: 0; line-height: 1.25; }
+  .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
   .spacer { flex: 1 1 auto; }
 
+  .facts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fact {
+    font-size: 11.5px; color: var(--muted); background: var(--wash);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+  }
+  .fact b { color: var(--ink); font-weight: 600; }
+
   .progress { display: flex; align-items: center; gap: 10px; }
-  .ring { transform: rotate(-90deg); }
+  .ring { transform: rotate(-90deg); flex: none; }
   .ring circle { fill: none; stroke-width: 4; }
   .ring .track { stroke: var(--line); }
   .ring .value { stroke: var(--coral); stroke-linecap: round; transition: stroke-dashoffset .4s ease; }
-  .progress-text { font-size: 12px; color: var(--muted); line-height: 1.2; }
+  .progress-text { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
   .progress-text b { display: block; color: var(--ink); font-size: 13px; }
 
-  /* ---------------- controls ---------------- */
-  .controls {
-    max-width: 1400px; margin: 0 auto; padding: 14px 20px 0;
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  /* ---------------- honesty strip ---------------- */
+  .honesty { max-width: 1400px; margin: 14px auto 0; padding: 0 20px; }
+  .honesty .inner {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--navy);
+    border-radius: var(--radius); padding: 11px 14px; font-size: 12.5px; color: var(--muted);
+    line-height: 1.55;
   }
-  .search { position: relative; flex: 1 1 240px; min-width: 200px; }
+  .honesty b { color: var(--ink); }
+  .honesty .tag {
+    flex: none; font-size: 10px; letter-spacing: .7px; text-transform: uppercase;
+    color: var(--navy); border: 1px solid var(--line-strong);
+    border-radius: 999px; padding: 2px 8px; margin-top: 1px; white-space: nowrap;
+  }
+
+  /* ---------------- toolbar ---------------- */
+  .toolbar {
+    position: sticky; top: 0; z-index: 30;
+    background: color-mix(in srgb, var(--wash) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    margin-top: 14px;
+  }
+  .toolbar-inner {
+    max-width: 1400px; margin: 0 auto; padding: 10px 20px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .search { position: relative; flex: 1 1 260px; min-width: 190px; }
   .search input {
-    width: 100%; padding: 8px 10px 8px 32px;
-    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+    width: 100%; padding: 8px 34px 8px 30px; border: 1px solid var(--line-strong);
+    border-radius: 8px; background: var(--paper);
   }
-  .search::before {
-    content: "⌕"; position: absolute; left: 10px; top: 6px;
-    color: var(--muted); font-size: 15px;
+  .search .icon {
+    position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 14px; pointer-events: none;
   }
   .search kbd {
-    position: absolute; right: 8px; top: 8px;
-    font: 11px ui-monospace, monospace; color: var(--muted);
-    border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: var(--wash);
+    position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+    font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px; background: var(--wash);
   }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip {
-    border: 1px solid var(--line); background: #fff; border-radius: 999px;
-    padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--muted);
-    display: inline-flex; align-items: center; gap: 6px; transition: .15s;
+    border: 1px solid var(--line-strong); background: var(--paper); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer; font-size: 12.5px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; transition: background .15s, color .15s, border-color .15s;
   }
   .chip:hover { border-color: var(--navy); color: var(--navy); }
-  .chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-accent); }
   .chip.coral[aria-pressed="true"] { background: var(--coral); border-color: var(--coral); }
-  .views { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
-  .views button {
-    border: 0; background: transparent; padding: 8px 12px; cursor: pointer;
-    font-size: 13px; color: var(--muted);
-  }
-  .views button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+  .chip .n { font: 11px var(--mono); opacity: .8; }
+  .views { display: flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; background: var(--paper); }
+  .views button { border: 0; background: transparent; padding: 8px 13px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
+  .views button + button { border-left: 1px solid var(--line); }
+  .views button[aria-pressed="true"] { background: var(--navy); color: var(--on-accent); }
 
   /* ---------------- week rail ---------------- */
   .rail {
@@ -114,201 +159,322 @@
     display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px;
   }
   .rail button {
-    border: 1px solid var(--line); background: #fff; border-radius: 8px;
-    padding: 8px 6px; cursor: pointer; text-align: center; line-height: 1.2;
-    transition: .15s;
+    border: 1px solid var(--line); background: var(--paper); border-radius: 8px;
+    padding: 7px 6px; cursor: pointer; text-align: center; line-height: 1.25; transition: .15s;
   }
-  .rail button b { display: block; font-size: 12px; }
-  .rail button small { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
   .rail button:hover { border-color: var(--navy); }
-  .rail button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
-  .rail button[aria-pressed="true"] small { color: rgba(255,255,255,.75); }
+  .rail button b { display: block; font-size: 11.5px; }
+  .rail button small { display: block; font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .rail button em { display: block; font: 9.5px var(--mono); color: var(--muted); font-style: normal; }
+  .rail button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); }
+  .rail button[aria-pressed="true"] b, .rail button[aria-pressed="true"] small,
+  .rail button[aria-pressed="true"] em { color: var(--on-accent); }
   .rail button.now { box-shadow: inset 0 -3px 0 var(--coral); }
   .rail button.parked { opacity: .45; }
+  @media (max-width: 1080px) { .rail { grid-template-columns: repeat(6, 1fr); } }
+  @media (max-width: 640px) { .rail { grid-template-columns: repeat(4, 1fr); } }
 
-  /* ---------------- scenario bar ---------------- */
+  /* ---------------- scenarios ---------------- */
   .scenarios {
     max-width: 1400px; margin: 12px auto 0; padding: 0 20px;
     display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
   }
-  .scenarios .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .scenarios .label {
+    font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+    margin-right: 2px;
+  }
   .switch {
     display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-    border: 1px dashed var(--line); border-radius: 999px; padding: 5px 12px 5px 8px;
-    font-size: 13px; background: #fff;
+    border: 1px solid var(--line-strong); background: var(--paper); border-radius: 999px;
+    padding: 5px 11px 5px 8px; font-size: 12.5px; color: var(--muted); transition: .15s;
   }
-  .switch input { appearance: none; width: 30px; height: 17px; border-radius: 999px; background: var(--line); position: relative; transition: .2s; cursor: pointer; }
-  .switch input::after {
-    content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
-    border-radius: 50%; background: #fff; transition: .2s;
+  .switch:hover { border-color: var(--coral); color: var(--coral); }
+  .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .switch .box {
+    width: 26px; height: 15px; border-radius: 999px; background: var(--line-strong);
+    position: relative; flex: none; transition: background .15s;
   }
-  .switch input:checked { background: var(--coral); }
-  .switch input:checked::after { transform: translateX(13px); }
-  .switch:has(input:checked) { border-style: solid; border-color: var(--coral); background: var(--coral-soft); }
-  .banner {
-    max-width: 1400px; margin: 12px auto 0; padding: 0 20px; display: none;
+  .switch .box::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px;
+    border-radius: 50%; background: var(--paper); transition: transform .15s;
   }
+  .switch input:checked + .box { background: var(--coral); }
+  .switch input:checked + .box::after { transform: translateX(11px); }
+  .switch input:focus-visible + .box { outline: 2px solid var(--coral); outline-offset: 2px; }
+  .switch:has(input:checked) { border-color: var(--coral); color: var(--coral); background: var(--coral-soft); }
+
+  .banner { max-width: 1400px; margin: 10px auto 0; padding: 0 20px; display: none; }
   .banner.show { display: block; }
   .banner .inner {
-    background: var(--amber-soft); border: 1px solid #F0D9B5; color: #6E4400;
-    border-radius: var(--radius); padding: 10px 14px; font-size: 13px;
+    background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    border-radius: var(--radius); padding: 11px 14px; font-size: 12.5px; line-height: 1.55;
   }
   .banner b { color: var(--amber); }
-
-  .honesty {
-    max-width: 1400px; margin: 12px auto 0; padding: 0 20px;
-  }
-  .honesty .inner {
-    display: flex; gap: 10px; align-items: flex-start;
-    background: var(--wash); border: 1px solid var(--line); border-left: 3px solid var(--navy);
-    border-radius: var(--radius); padding: 10px 14px; font-size: 12.5px; color: var(--muted);
-    line-height: 1.5;
-  }
-  .honesty b { color: var(--ink); }
-  .honesty .tag {
-    flex: none; font-size: 10px; letter-spacing: .7px; text-transform: uppercase;
-    color: var(--navy); background: var(--paper); border: 1px solid var(--line);
-    border-radius: 999px; padding: 2px 8px; margin-top: 1px;
-  }
+  .banner p { margin: 0 0 6px; }
+  .banner p:last-child { margin-bottom: 0; }
+  .banner .mit { color: var(--muted); }
+  .banner code { color: var(--amber); }
 
   /* ---------------- layout ---------------- */
-  main { max-width: 1400px; margin: 0 auto; padding: 18px 20px 80px; }
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
-  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .rail { grid-template-columns: repeat(6, 1fr); } }
-  @media (max-width: 640px) { .rail { grid-template-columns: repeat(4, 1fr); } }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px 20px 90px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
 
-  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-  .panel h2 {
-    font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted);
-    margin: 0; padding: 14px 16px 10px; border-bottom: 1px solid var(--line);
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  .panel {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
   }
-  .panel h2 .count { font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .panel > h2, .panel-head h2 {
+    font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted);
+    margin: 0; font-weight: 600;
+  }
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 14px 16px 10px; border-bottom: 1px solid var(--line);
+  }
+  .panel-head .count { font-size: 11.5px; color: var(--muted); }
   .panel-body { padding: 14px 16px; }
+  .panel > h2 { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted);
+    padding: 9px 16px 0;
+  }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
   /* ---------------- timeline ---------------- */
-  .act-group { margin-bottom: 18px; }
-  .act-head {
-    display: flex; align-items: baseline; gap: 10px; padding: 8px 0 6px;
-    border-bottom: 1px solid var(--line); margin-bottom: 6px;
+  .axis { margin-bottom: 10px; }
+  .axis .track { height: auto; background: none; display: block; }
+  .axis .months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0; }
+  .axis .month {
+    grid-row: 1; font-size: 10px; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 4px;
+    text-align: left; white-space: nowrap; overflow: hidden;
   }
-  .act-head h3 { font-size: 14px; margin: 0; }
-  .act-head span { font-size: 12px; color: var(--muted); }
+  .axis .ticks { display: grid; grid-template-columns: repeat(12, 1fr); font: 9.5px var(--mono); color: var(--muted); text-align: center; padding-top: 4px; }
+  .axis .ticks .now { color: var(--coral); font-weight: 700; }
+
+  .act-group { margin-bottom: 20px; }
+  .act-group:last-child { margin-bottom: 0; }
+  .act-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 6px 0 7px; border-bottom: 1px solid var(--line-strong); margin-bottom: 6px; }
+  .act-head h3 { font-size: 13.5px; margin: 0; }
+  .act-head .goal { font-size: 12px; color: var(--muted); }
+  .act-head .meta { margin-left: auto; font: 10.5px var(--mono); color: var(--muted); }
+
   .row {
-    display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px;
-    align-items: center; padding: 5px 0; border-radius: 6px;
+    display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px;
+    align-items: center; padding: 4px 0; border-radius: 6px;
   }
-  @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .row { grid-template-columns: 1fr; } }
   .row:hover { background: var(--wash); }
-  .row-label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; text-align: left; background: none; border: 0; padding: 0; font: inherit; }
-  .row-label .id { font: 11px ui-monospace, monospace; color: var(--muted); flex: none; }
-  .row-label .title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .track { position: relative; height: 22px; background: repeating-linear-gradient(90deg, transparent, transparent calc(100%/12 - 1px), var(--line) calc(100%/12 - 1px), var(--line) calc(100%/12)); border-radius: 4px; }
+  .row.selected { background: color-mix(in srgb, var(--coral) 10%, transparent); }
+  .row-label {
+    display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer;
+    background: none; border: 0; padding: 2px 0; text-align: left; width: 100%;
+  }
+  .row-label .id { font: 10.5px var(--mono); color: var(--muted); flex: none; width: 30px; }
+  .row-label .title { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-label .mini { font: 9.5px var(--mono); color: var(--muted); flex: none; }
+  .row.done .title { color: var(--muted); text-decoration: line-through; }
+
+  .track {
+    position: relative; height: 22px; border-radius: 4px;
+    background: repeating-linear-gradient(90deg, transparent, transparent calc(100%/12 - 1px),
+      var(--line) calc(100%/12 - 1px), var(--line) calc(100%/12));
+  }
   .bar {
     position: absolute; top: 4px; height: 14px; border-radius: 4px;
-    background: var(--navy); display: flex; align-items: center; padding: 0 6px;
-    color: #fff; font-size: 10px; white-space: nowrap; overflow: hidden;
-    cursor: pointer; border: 0; text-align: left;
+    background: var(--navy); border: 0; display: flex; align-items: center; gap: 5px;
+    padding: 0 6px; color: var(--on-accent); font: 9.5px var(--mono); white-space: nowrap;
+    overflow: hidden; cursor: pointer; text-align: left;
   }
   .bar.lane-b { background: var(--coral); }
   .bar.done { background: var(--green); }
-  .bar.parked { background: repeating-linear-gradient(45deg, #C9D3DC, #C9D3DC 4px, #DDE5EC 4px, #DDE5EC 8px); color: #55636F; }
+  .bar.parked {
+    background: repeating-linear-gradient(45deg, var(--line-strong), var(--line-strong) 4px,
+      var(--line) 4px, var(--line) 8px);
+    color: var(--muted);
+  }
   .bar.impacted { outline: 2px dashed var(--amber); outline-offset: 1px; }
-  .bar.gate::after {
-    content: "◆"; font-size: 9px; margin-left: auto; padding-left: 6px; opacity: .9;
-  }
-  .row.axis:hover { background: none; }
-  .axis { margin-bottom: 4px; }
-  .axis .track {
-    height: auto; background: none; display: grid; grid-template-columns: repeat(12, 1fr);
-    font: 10px ui-monospace, monospace; color: var(--muted); text-align: center;
-    border-bottom: 1px solid var(--line); padding-bottom: 4px; border-radius: 0;
-  }
-  .axis .track span.now { color: var(--coral); font-weight: 700; }
+  .bar.gate::after { content: "◆"; font-size: 8px; margin-left: auto; }
+  .bar:hover { filter: brightness(1.08); }
 
   /* ---------------- board ---------------- */
   .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
   @media (max-width: 1000px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 680px) { .board { grid-template-columns: 1fr; } }
-  .col-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 8px; }
-  .col-head h3 { font-size: 13px; margin: 0; }
-  .col-head span { font-size: 11px; color: var(--muted); }
+  .col-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 2px 8px; }
+  .col-head h3 { font-size: 12.5px; margin: 0; }
+  .col-head .n { font: 10.5px var(--mono); color: var(--muted); }
+  .col-goal { font-size: 11px; color: var(--muted); margin: -4px 2px 8px; }
   .card {
-    background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--navy);
-    border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+    background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--navy);
+    border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; cursor: pointer;
     transition: .15s; text-align: left; width: 100%; display: block;
   }
   .card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
   .card.lane-b { border-left-color: var(--coral); }
-  .card.done { border-left-color: var(--green); background: #FBFDFC; }
+  .card.done { border-left-color: var(--green); }
   .card.done .card-title { text-decoration: line-through; color: var(--muted); }
   .card.impacted { border-style: dashed; border-color: var(--amber); }
-  .card-title { font-size: 13px; font-weight: 600; line-height: 1.35; margin-bottom: 4px; }
-  .card-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
-  .tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .card.selected { box-shadow: 0 0 0 2px var(--coral); }
+  .card-title { font-size: 12.5px; font-weight: 600; line-height: 1.35; margin-bottom: 4px; }
+  .card-meta { font-size: 10.5px; color: var(--muted); display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+
+  .tag {
+    font-size: 9.5px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line-strong);
+    color: var(--muted); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+  }
   .tag.b { border-color: var(--coral); color: var(--coral); }
   .tag.g { border-color: var(--amber); color: var(--amber); }
+  .tag.s { border-color: var(--line-strong); }
+  .tag.done { border-color: var(--green); color: var(--green); }
 
   /* ---------------- list ---------------- */
-  table.list { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.list th {
-    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
-    color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line);
+    text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .7px;
+    color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
   }
   table.list td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.list tbody tr { cursor: pointer; }
+  table.list tbody tr:hover { background: var(--wash); }
+  table.list tbody tr.selected { background: color-mix(in srgb, var(--coral) 10%, transparent); }
   table.list tr.done td { color: var(--muted); }
   table.list tr.done .t { text-decoration: line-through; }
-  table.list code { font: 11px ui-monospace, monospace; color: var(--navy-2); }
-  .check { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; display: grid; place-items: center; padding: 0; }
-  .check[aria-checked="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+  table.list .id { font: 10.5px var(--mono); color: var(--muted); }
+  table.list code { font: 10.5px var(--mono); color: var(--navy-2); word-break: break-word; }
+  .tick {
+    width: 18px; height: 18px; border: 1.5px solid var(--line-strong); border-radius: 4px;
+    background: var(--paper); cursor: pointer; display: grid; place-items: center; padding: 0;
+    font-size: 11px; line-height: 1;
+  }
+  .tick[aria-checked="true"] { background: var(--green); border-color: var(--green); color: var(--on-accent); }
 
-  /* ---------------- side panels ---------------- */
-  .side { display: grid; gap: 16px; position: sticky; top: 84px; }
+  .empty { padding: 30px 10px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* ---------------- side ---------------- */
+  .side { display: grid; gap: 16px; position: sticky; top: 62px; }
   @media (max-width: 1080px) { .side { position: static; } }
-  .gate { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .gate:last-child { border-bottom: 0; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .side .panel-body { font-size: 12.5px; }
+  .gate { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .gate:last-child { border-bottom: 0; padding-bottom: 0; }
+  .gate:first-child { padding-top: 0; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex: none; }
   .dot.paused { background: var(--amber); }
   .dot.closed { background: var(--green); }
   .dot.pending { background: var(--coral); }
-  .gate b { display: block; font-size: 13px; }
-  .gate small { color: var(--muted); font-size: 12px; }
-  .kill { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-  .kill li { position: relative; padding-left: 18px; margin-bottom: 10px; color: var(--ink); }
-  .kill li::before { content: "→"; position: absolute; left: 0; color: var(--coral); font-weight: 700; }
-  .kill li b { display: block; }
+  .gate b { display: block; font-size: 12.5px; }
+  .gate small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .gate .uses { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .kill { list-style: none; margin: 0; padding: 0; }
+  .kill li { position: relative; padding-left: 16px; margin-bottom: 9px; font-size: 12.5px; }
+  .kill li:last-child { margin-bottom: 0; }
+  .kill li::before { content: "→"; position: absolute; left: 0; top: 0; color: var(--coral); font-weight: 700; }
+  .kill b { font-weight: 600; }
+  .kill span { color: var(--muted); }
+
+  .week-row { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .week-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .week-row .id { font: 10.5px var(--mono); color: var(--muted); flex: none; width: 28px; }
+  .week-row .t { font-size: 12px; flex: 1 1 auto; }
+  .week-row.done .t { color: var(--muted); text-decoration: line-through; }
+  .empty-note { color: var(--muted); font-size: 12px; }
+
+  .keys { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .keys li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  kbd {
+    font: 10.5px var(--mono); border: 1px solid var(--line-strong); border-radius: 4px;
+    padding: 1px 5px; background: var(--wash); color: var(--ink); white-space: nowrap;
+  }
 
   /* ---------------- drawer ---------------- */
-  .drawer {
-    position: fixed; inset: 0; z-index: 40; display: none;
-  }
+  .drawer { position: fixed; inset: 0; z-index: 60; display: none; }
   .drawer.open { display: block; }
-  .drawer .scrim { position: absolute; inset: 0; background: rgba(16, 28, 40, .35); }
-  .drawer .sheet {
-    position: absolute; right: 0; top: 0; bottom: 0; width: min(460px, 92vw);
-    background: #fff; box-shadow: -12px 0 32px rgba(16, 28, 40, .18);
-    padding: 20px 22px; overflow-y: auto;
+  .drawer .scrim { position: absolute; inset: 0; background: rgba(8, 18, 28, .45); backdrop-filter: blur(1px); }
+  .sheet {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(490px, 100%);
+    background: var(--paper); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; box-shadow: -20px 0 40px rgba(8, 18, 28, .18);
+    animation: slide .18s ease-out;
   }
-  .drawer h3 { font-size: 17px; margin: 8px 0 4px; line-height: 1.3; }
-  .drawer .close { position: absolute; right: 14px; top: 12px; border: 1px solid var(--line); background: #fff; border-radius: 8px; width: 30px; height: 30px; cursor: pointer; }
-  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 13px; margin: 14px 0; }
-  .kv dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
-  .kv dd { margin: 0; }
-  .kv code { font: 12px ui-monospace, monospace; color: var(--navy-2); word-break: break-all; }
-  .why { background: var(--wash); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--ink); }
-  .drawer .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  @keyframes slide { from { transform: translateX(14px); opacity: .6; } to { transform: none; opacity: 1; } }
+  .sheet-head {
+    display: flex; gap: 10px; align-items: flex-start; padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-head .id { font: 11px var(--mono); color: var(--muted); margin-bottom: 3px; }
+  .sheet-head h2 { font-size: 15px; margin: 0; line-height: 1.3; }
+  .sheet-head .close {
+    margin-left: auto; border: 1px solid var(--line); background: var(--paper);
+    border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 16px; line-height: 1; flex: none;
+  }
+  .sheet-body { padding: 14px 16px 24px; overflow: auto; flex: 1 1 auto; }
+  .sheet-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .sheet h3 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .9px; color: var(--muted);
+    margin: 16px 0 7px;
+  }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .steps li:last-child { border-bottom: 0; }
+  .steps .box {
+    width: 17px; height: 17px; border: 1.5px solid var(--line-strong); border-radius: 4px;
+    background: var(--paper); flex: none; cursor: pointer; display: grid; place-items: center;
+    font-size: 10px; padding: 0; margin-top: 1px;
+  }
+  .steps .box[aria-checked="true"] { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+  .steps .txt { font-size: 12.5px; line-height: 1.45; }
+  .steps li.on .txt { color: var(--muted); text-decoration: line-through; }
+  .kv { margin: 0; font-size: 12.5px; }
+  .kv dt { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-top: 10px; }
+  .kv dd { margin: 2px 0 0; }
+  .kv code { color: var(--navy-2); word-break: break-word; }
+  .risk {
+    border-left: 3px solid var(--amber); background: var(--amber-soft);
+    border-radius: 0 8px 8px 0; padding: 9px 12px; font-size: 12.5px; line-height: 1.5;
+  }
+  .deps { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dep {
+    border: 1px solid var(--line-strong); background: var(--paper); border-radius: 999px;
+    padding: 3px 9px; font: 11px var(--mono); cursor: pointer; color: var(--navy);
+  }
+  .dep:hover { border-color: var(--navy); }
+  .sheet-foot { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .btn {
+    border: 1px solid var(--line-strong); background: var(--paper); border-radius: 8px;
+    padding: 8px 14px; cursor: pointer; font-size: 12.5px;
+  }
+  .btn:hover { border-color: var(--navy); color: var(--navy); }
+  .btn.primary { background: var(--navy); border-color: var(--navy); color: var(--on-accent); }
+  .btn.primary:hover { background: var(--navy-2); color: var(--on-accent); }
+  .btn.done { background: var(--green); border-color: var(--green); color: var(--on-accent); }
 
-  .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 14px; }
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding: 10px 16px 0; }
-  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  /* ---------------- modal ---------------- */
+  .modal { position: fixed; inset: 0; z-index: 70; display: none; }
+  .modal.open { display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal .scrim { position: absolute; inset: 0; background: rgba(8, 18, 28, .45); }
+  .modal .card-box {
+    position: relative; background: var(--paper); border-radius: var(--radius); width: min(620px, 100%);
+    box-shadow: var(--shadow); padding: 18px; border: 1px solid var(--line);
+  }
+  .modal h2 { margin: 0 0 4px; font-size: 15px; }
+  .modal p { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .modal textarea {
+    width: 100%; height: 230px; font: 11.5px/1.5 var(--mono); padding: 10px;
+    border: 1px solid var(--line-strong); border-radius: 8px; background: var(--wash); color: var(--ink);
+    resize: vertical;
+  }
+  .modal .row-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
-  footer { max-width: 1400px; margin: 0 auto; padding: 24px 20px 60px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+  /* ---------------- footer ---------------- */
+  footer {
+    max-width: 1400px; margin: 0 auto; padding: 22px 20px 60px; color: var(--muted);
+    font-size: 12px; border-top: 1px solid var(--line);
+  }
   footer b { color: var(--ink); }
-
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-  }
+  footer p { margin: 0 0 6px; }
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
@@ -316,19 +482,23 @@
 
   @media print {
     @page { size: A4 landscape; margin: 10mm; }
-    body { background: #fff; font-size: 10pt; }
-    .topbar, .controls, .rail, .scenarios, .banner, .side, .drawer { display: none !important; }
-    main { padding: 0; }
+    body { background: #fff; font-size: 9.5pt; }
+    .topbar, .toolbar, .rail, .scenarios, .banner, .side, .drawer, .modal, .skip, .legend { display: none !important; }
+    .honesty { margin: 0 0 8px; padding: 0; }
+    .honesty .inner { border: 1px solid #bbb; }
+    main { padding: 0; max-width: none; }
     .layout { grid-template-columns: 1fr; }
     .panel { box-shadow: none; border: 0; }
-    .card, .row { break-inside: avoid; }
+    .row, .card, tr { break-inside: avoid; }
     .track { background: none; }
     .bar { position: static; width: auto !important; left: auto !important; color: #000; background: #eee !important; }
-    .honesty { border: 1px solid #bbb !important; background: #fff !important; }
+    footer { padding: 10px 0 0; }
   }
 </style>
 </head>
 <body>
+
+<a class="skip" href="#plan">Skip to the plan</a>
 
 <noscript>
   <div class="honesty">
@@ -346,26 +516,30 @@
   </div>
 </noscript>
 
-<div class="topbar">
+<header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
       <img src="../assets/logo-mark.png" alt="">
-      <h1>Twelve weeks to a defensible study <span>· 2026-11-03 → 2027-01-26</span></h1>
+      <div>
+        <h1 id="pageTitle">Twelve weeks to a defensible study</h1>
+        <p id="pageSubtitle">Lane A ships on its own. Lane B is parked behind a gate, not forgotten.</p>
+      </div>
     </div>
     <div class="spacer"></div>
-    <div class="progress" title="Tasks you have ticked off — stored in this browser only">
-      <svg class="ring" width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
-        <circle class="track" cx="19" cy="19" r="16"></circle>
-        <circle class="value" id="ringValue" cx="19" cy="19" r="16"
-                stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
+    <div class="facts" id="facts"></div>
+    <div class="progress" title="Ticked by you — stored in this browser only">
+      <svg class="ring" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+        <circle class="track" cx="20" cy="20" r="17"></circle>
+        <circle class="value" id="ringValue" cx="20" cy="20" r="17"
+                stroke-dasharray="106.8" stroke-dashoffset="106.8"></circle>
       </svg>
       <div class="progress-text">
-        <b><span id="doneCount">0</span> / <span id="totalCount">0</span> done</b>
+        <b><span id="doneCount">0</span> / <span id="totalCount">0</span> tasks</b>
         self-reported · this browser
       </div>
     </div>
   </div>
-</div>
+</header>
 
 <div class="honesty">
   <div class="inner">
@@ -373,40 +547,44 @@
     <span>
       <b>No performance figure appears on this page.</b> Every accuracy, sensitivity and
       fairness number stays <b>not yet measured</b> until a frozen
-      <code>model_manifest.json</code> and its evaluation report exist — the road map tracks
-      the work that produces them, not a result. Kaposi sarcoma stays paused — <b>gate 1A, 2026-10-31</b> — and serving stays
-      disabled in code until a real KS cohort exists.
-      Research and educational use only, not a medical device.
+      <code>model_manifest.json</code> and its evaluation report exist — this page tracks
+      the work that produces them, not a result. Kaposi sarcoma stays paused —
+      <b>gate 1A, 2026-10-31</b> — and serving stays disabled in code until a real KS
+      cohort exists. Research and educational use only, not a medical device.
     </span>
   </div>
 </div>
 
-<div class="controls">
-  <div class="search">
-    <label class="sr-only" for="q">Search tasks and evidence files</label>
-    <input id="q" type="search" placeholder="Search tasks, files, acts…" autocomplete="off">
-    <kbd>/</kbd>
-  </div>
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <div class="search">
+      <span class="icon" aria-hidden="true">⌕</span>
+      <label class="sr-only" for="q">Search tasks, evidence files and steps</label>
+      <input id="q" type="search" placeholder="Search tasks, files, steps…" autocomplete="off">
+      <kbd>/</kbd>
+    </div>
 
-  <div class="chips" role="group" aria-label="Filter by lane">
-    <button class="chip" data-lane="all" aria-pressed="true">All lanes</button>
-    <button class="chip" data-lane="A" aria-pressed="false">Lane A</button>
-    <button class="chip coral" data-lane="B" aria-pressed="false">Lane B</button>
-  </div>
+    <div class="chips" role="group" aria-label="Filter by lane">
+      <button class="chip" data-lane="all" aria-pressed="true">All lanes <span class="n" id="nAll"></span></button>
+      <button class="chip" data-lane="A" aria-pressed="false">Lane A <span class="n" id="nA"></span></button>
+      <button class="chip coral" data-lane="B" aria-pressed="false">Lane B <span class="n" id="nB"></span></button>
+    </div>
 
-  <div class="chips" role="group" aria-label="Filter by state">
-    <button class="chip" data-status="all" aria-pressed="false">Everything</button>
-    <button class="chip" data-status="open" aria-pressed="true">Open</button>
-    <button class="chip" data-status="done" aria-pressed="false">Done</button>
-  </div>
+    <div class="chips" role="group" aria-label="Filter by state">
+      <button class="chip" data-status="open" aria-pressed="true">Open</button>
+      <button class="chip" data-status="done" aria-pressed="false">Done</button>
+      <button class="chip" data-status="all" aria-pressed="false">Everything</button>
+    </div>
 
-  <div class="views" role="group" aria-label="View">
-    <button data-view="timeline" aria-pressed="true">Timeline</button>
-    <button data-view="board" aria-pressed="false">Board</button>
-    <button data-view="list" aria-pressed="false">List</button>
-  </div>
+    <div class="views" role="group" aria-label="View">
+      <button data-view="timeline" aria-pressed="true">Timeline</button>
+      <button data-view="board" aria-pressed="false">Board</button>
+      <button data-view="list" aria-pressed="false">List</button>
+    </div>
 
-  <button class="chip" id="reset" title="Clear ticks for this roadmap">Reset progress</button>
+    <button class="chip" id="copy" title="Build a markdown status update">Copy status</button>
+    <button class="chip" id="reset" title="Clear ticks for this roadmap">Reset</button>
+  </div>
 </div>
 
 <div class="rail" id="rail" role="group" aria-label="Filter by week"></div>
@@ -417,24 +595,34 @@
 
 <div class="banner" id="banner" aria-live="polite"><div class="inner" id="bannerText"></div></div>
 
-<main>
+<main id="plan">
   <div class="layout">
-    <section class="panel" aria-label="Roadmap">
-      <h2>
-        <span id="viewTitle">Timeline</span>
+    <section class="panel" aria-label="Plan">
+      <div class="panel-head">
+        <h2 id="viewTitle">Timeline</h2>
         <span class="count" id="resultCount" aria-live="polite"></span>
-      </h2>
+      </div>
       <div class="legend">
         <span><i style="background:var(--navy)"></i>Lane A</span>
         <span><i style="background:var(--coral)"></i>Lane B</span>
         <span><i style="background:var(--green)"></i>done</span>
-        <span><i style="background:#C9D3DC"></i>parked by a scenario</span>
-        <span>◆ gate</span>
+        <span><i style="background:var(--line-strong)"></i>parked by a scenario</span>
+        <span>◆ needs a gate open</span>
       </div>
       <div class="panel-body" id="view"></div>
     </section>
 
     <aside class="side">
+      <section class="panel">
+        <h2>This week</h2>
+        <div class="panel-body" id="thisWeek"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Rhythm</h2>
+        <div class="panel-body" id="rhythm"></div>
+      </section>
+
       <section class="panel">
         <h2>Gates</h2>
         <div class="panel-body" id="gates"></div>
@@ -442,17 +630,19 @@
 
       <section class="panel">
         <h2>Kill criteria</h2>
-        <div class="panel-body">
-          <ul class="kill" id="kill"></ul>
-        </div>
+        <div class="panel-body"><ul class="kill" id="kill"></ul></div>
       </section>
 
       <section class="panel">
-        <h2>How to use this</h2>
-        <div class="panel-body" style="font-size:13px;color:var(--muted)">
-          <p style="margin:0 0 8px"><b style="color:var(--ink)">Tick a task</b> when its evidence file exists — not when you have started it. The ring counts files, not effort.</p>
-          <p style="margin:0 0 8px"><b style="color:var(--ink)">/</b> focuses search, <b style="color:var(--ink)">Esc</b> clears it, <b style="color:var(--ink)">1 2 3</b> switch views.</p>
-          <p style="margin:0">The <b style="color:var(--ink)">What if…</b> switches re-draw the plan under a risk; they change nothing else.</p>
+        <h2>Keyboard</h2>
+        <div class="panel-body">
+          <ul class="keys">
+            <li><span>Search</span> <kbd>/</kbd></li>
+            <li><span>Clear search, close, unfilter</span> <kbd>Esc</kbd></li>
+            <li><span>Timeline · Board · List</span> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></li>
+            <li><span>Move through tasks</span> <kbd>j</kbd> <kbd>k</kbd></li>
+            <li><span>Open the task</span> <kbd>Enter</kbd></li>
+          </ul>
         </div>
       </section>
     </aside>
@@ -460,16 +650,44 @@
 </main>
 
 <footer>
-  <p style="margin:0 0 6px"><b>Evidence first.</b> Every number on a slide traces to <code>runs/&lt;date&gt;/report.json</code> and <code>model_manifest.json</code>. This page deliberately contains no performance figures — it is a plan, not a result.</p>
-  <p style="margin:0 0 6px">Progress is stored in this browser only (<code>localStorage</code>); nothing is sent anywhere, and this file loads no external font, script or image.</p>
-  <p style="margin:0"><b>Research prototype · Not a medical device · No Business Associate Agreement (BAA) · Do not use with real patient data.</b></p>
+  <p><b>Evidence first.</b> Every number on a slide traces to <code>runs/&lt;date&gt;/report.json</code>
+  and <code>model_manifest.json</code>. This page deliberately contains no performance
+  figures — it is a plan, not a result. Where a number belongs, it says so.</p>
+  <p>Progress and step ticks are stored in this browser only (<code>localStorage</code>);
+  nothing is sent anywhere, and this file loads no external font, script or image.</p>
+  <p><b>Research prototype · Not a medical device · No Business Associate Agreement (BAA) · Do not use with real patient data.</b></p>
 </footer>
 
 <div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
   <div class="scrim" data-close></div>
   <div class="sheet">
-    <button class="close" data-close aria-label="Close">×</button>
-    <div id="drawerBody"></div>
+    <div class="sheet-head">
+      <div>
+        <div class="id" id="drawerId"></div>
+        <h2 id="drawerTitle"></h2>
+      </div>
+      <button class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="sheet-body" id="drawerBody"></div>
+    <div class="sheet-foot">
+      <button class="btn primary" id="drawerToggle">Mark done</button>
+      <button class="btn" id="drawerCopy">Copy task</button>
+      <button class="btn" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="scrim" data-close></div>
+  <div class="card-box">
+    <h2 id="modalTitle">Status update</h2>
+    <p>Markdown, ready to paste into a supervisor email. Generated from the ticks in this browser.</p>
+    <label class="sr-only" for="modalText">Status update text</label>
+    <textarea id="modalText" spellcheck="false"></textarea>
+    <div class="row-actions">
+      <button class="btn" id="modalSelect">Select all</button>
+      <button class="btn primary" data-close>Done</button>
+    </div>
   </div>
 </div>
 
@@ -477,88 +695,1297 @@
 {
   "meta": {
     "title": "Twelve weeks to a defensible study",
+    "subtitle": "Lane A ships on its own. Lane B is parked behind a gate, not forgotten.",
     "owner": "J. Mutegeki",
     "start": "2026-11-03",
     "end": "2027-01-26",
     "weeks": 12,
-    "updated": "2026-11-03"
+    "updated": "2026-11-03",
+    "weekDates": [
+      {
+        "week": 1,
+        "dates": "3–9 Nov"
+      },
+      {
+        "week": 2,
+        "dates": "10–16 Nov"
+      },
+      {
+        "week": 3,
+        "dates": "17–23 Nov"
+      },
+      {
+        "week": 4,
+        "dates": "24–30 Nov"
+      },
+      {
+        "week": 5,
+        "dates": "1–7 Dec"
+      },
+      {
+        "week": 6,
+        "dates": "8–14 Dec"
+      },
+      {
+        "week": 7,
+        "dates": "15–21 Dec"
+      },
+      {
+        "week": 8,
+        "dates": "22–28 Dec"
+      },
+      {
+        "week": 9,
+        "dates": "29 Dec–4 Jan"
+      },
+      {
+        "week": 10,
+        "dates": "5–11 Jan"
+      },
+      {
+        "week": 11,
+        "dates": "12–18 Jan"
+      },
+      {
+        "week": 12,
+        "dates": "19–26 Jan"
+      }
+    ],
+    "sizes": {
+      "S": "half a day",
+      "M": "one to two days",
+      "L": "three days or more"
+    },
+    "sizeNote": "Planning weight only — the author's estimate, not a measurement.",
+    "rhythm": [
+      {
+        "day": "Monday",
+        "ritual": "Gate review",
+        "output": "one line: what moved, what is stuck"
+      },
+      {
+        "day": "Wednesday",
+        "ritual": "Evidence day",
+        "output": "every claim made this week gets a file or is deleted"
+      },
+      {
+        "day": "Friday",
+        "ritual": "Writing hour",
+        "output": "500 words of thesis, no code"
+      }
+    ],
+    "months": [
+      {
+        "label": "Nov 2026",
+        "from": 1,
+        "to": 4
+      },
+      {
+        "label": "Dec 2026",
+        "from": 5,
+        "to": 8
+      },
+      {
+        "label": "Jan 2027",
+        "from": 9,
+        "to": 12
+      }
+    ]
   },
   "acts": [
-    {"id": "0", "name": "Landing", "weeks": [1, 1], "summary": "Stop shopping for data. One corpus in, verified, plus a one-minute smoke run."},
-    {"id": "1", "name": "The honest model", "weeks": [1, 5], "summary": "A frozen artefact that survives hostile inspection, with the tone gap published."},
-    {"id": "2", "name": "Permission", "weeks": [2, 6], "summary": "Replace 'pending' with a letter — either answer unlocks a decision."},
-    {"id": "3", "name": "The clinician study", "weeks": [6, 9], "summary": "Twelve humans, a vignette instrument, and the unflattering arm reported."},
-    {"id": "4", "name": "The argument", "weeks": [9, 12], "summary": "Paper, poster, an honest demo, and a stranger reproducing the headline."},
-    {"id": "5", "name": "Lane B — Kaposi sarcoma", "weeks": [1, 12], "summary": "The pause is only a pause if someone is working to end it."}
+    {
+      "id": "0",
+      "name": "Landing",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "goal": "Stop shopping for datasets; start training on one.",
+      "why": "Every week spent comparing datasets is a week not spent on an artefact that survives inspection. This act ends with one dataset on disk, verified, and a decision written down."
+    },
+    {
+      "id": "1",
+      "name": "The honest model",
+      "lane": "A",
+      "weeks": [
+        1,
+        5
+      ],
+      "goal": "One frozen artefact that survives hostile inspection.",
+      "why": "The contribution is not a number, it is an artefact plus the honest measurement of where it fails. Freeze early, evaluate on a population you did not train on, and publish the worst stratum in words."
+    },
+    {
+      "id": "2",
+      "name": "Permission",
+      "lane": "A",
+      "weeks": [
+        2,
+        6
+      ],
+      "goal": "Replace \"pending\" with a letter.",
+      "why": "The clinician study cannot start without a determination. A silent committee is the most likely failure in this plan, so it gets a deadline, an escalation and a published fallback."
+    },
+    {
+      "id": "3",
+      "name": "The clinician study",
+      "lane": "A",
+      "weeks": [
+        6,
+        9
+      ],
+      "goal": "Show that a human plus the model changes a decision, or does not.",
+      "why": "A vignette study with twelve participants is underpowered and honest about it. It measures override rate, confidence shift and time to decide -- three things a reviewer can check without trusting the model's accuracy."
+    },
+    {
+      "id": "4",
+      "name": "The argument",
+      "lane": "A",
+      "weeks": [
+        9,
+        12
+      ],
+      "goal": "Turn artefacts into a paper, a poster and an eight-minute demo.",
+      "why": "Every claim in the write-up must trace to a file. The demo's job is to make the limitations impossible to miss, including a live failure."
+    },
+    {
+      "id": "5",
+      "name": "Lane B — Kaposi sarcoma",
+      "lane": "B",
+      "weeks": [
+        1,
+        12
+      ],
+      "goal": "End the pause with a real cohort, or document that it was genuinely attempted.",
+      "why": "Gate 1A is paused (2026-10-31) because no immediately downloadable public source contains Kaposi sarcoma. A pause is only respectable if someone is working to end it -- three routes, six weeks, written evidence either way."
+    }
   ],
   "gates": [
-    {"id": "S1-1", "name": "Frozen artefact — gate 1A", "state": "paused", "note": "Paused 2026-10-31 until a real KS cohort exists. Serving held in code."},
-    {"id": "S2-4", "name": "Runbook signed", "state": "closed", "note": "Signed 2026-10-30, single-engineer review stated plainly."},
-    {"id": "RET", "name": "Retention policy", "state": "closed", "note": "In force 2026-10-30, scoped to synthetic/de-identified data."},
-    {"id": "IRB", "name": "Ethics determination", "state": "pending", "note": "Request prepared; four fields and a submission away."}
+    {
+      "id": "S1-1",
+      "name": "Frozen artefact — gate 1A",
+      "state": "paused",
+      "note": "Paused 2026-10-31 until a real KS cohort exists. Serving held in code.",
+      "unlocks": "Evaluation, calibration, the vignette study and any serving change"
+    },
+    {
+      "id": "S2-4",
+      "name": "Runbook signed",
+      "state": "closed",
+      "note": "Signed 2026-10-30, single-engineer review stated plainly."
+    },
+    {
+      "id": "RET",
+      "name": "Retention policy",
+      "state": "closed",
+      "note": "In force 2026-10-30, scoped to synthetic/de-identified data."
+    },
+    {
+      "id": "IRB",
+      "name": "Ethics determination",
+      "state": "pending",
+      "note": "Request prepared; four fields and a submission away."
+    }
   ],
   "kill": [
-    {"id": "k1", "when": "PAD-UFES-20 skin types are unusable", "then": "Train on HAM10000, evaluate on SCIN, and say so in the model card."},
-    {"id": "k2", "when": "SCIN turns out to have no melanoma", "then": "Evaluate the benign head and calibration only; restate the plan, do not report a number that pretends otherwise."},
-    {"id": "k3", "when": "No ethics answer by 14 Dec", "then": "Public data only, limitation in the abstract, re-apply next cycle."},
-    {"id": "k4", "when": "No KS reply by 14 Dec", "then": "Lane B becomes a protocol chapter with the email trail as process evidence."},
-    {"id": "k5", "when": "Dark-skin gap is large", "then": "That is the finding. Publish it with the Failure Museum; do not tune it away."}
+    {
+      "id": "k1",
+      "when": "PAD-UFES-20 skin types are unusable",
+      "then": "Train on HAM10000, evaluate on SCIN, and say so in the model card."
+    },
+    {
+      "id": "k2",
+      "when": "SCIN turns out to have no melanoma",
+      "then": "Evaluate the benign head and calibration only; restate the plan, do not report a number that pretends otherwise."
+    },
+    {
+      "id": "k3",
+      "when": "No ethics answer by 14 Dec",
+      "then": "Public data only, limitation in the abstract, re-apply next cycle."
+    },
+    {
+      "id": "k4",
+      "when": "No KS reply by 14 Dec",
+      "then": "Lane B becomes a protocol chapter with the email trail as process evidence."
+    },
+    {
+      "id": "k5",
+      "when": "Dark-skin gap is large",
+      "then": "That is the finding. Publish it with the Failure Museum; do not tune it away."
+    }
   ],
   "scenarios": [
-    {"id": "ks", "label": "KS cohort never arrives", "impact": ["5.6", "5.7", "5.8"], "effect": "Lane B parks after the six-week decision; the thesis ships Lane A and presents Lane B as a designed, unexecuted protocol."},
-    {"id": "ethics", "label": "Ethics stays silent", "impact": ["2.3", "3.2", "3.5", "3.6"], "effect": "The clinician study cannot start. Cut to 8 participants if a letter lands late, or replace it with the retrospective shadow-mode analysis and say so."},
-    {"id": "signal", "label": "Melanoma signal too small", "impact": ["1.3", "1.4", "4.1"], "effect": "Reframe the contribution from detection to triage ordering plus fairness. Same artefact, honest claim."},
-    {"id": "compute", "label": "Compute too slow", "impact": ["1.2", "1.3"], "effect": "Train at 160 px instead of 224, record the size in the manifest, and state the serving-time shift in the model card."}
+    {
+      "id": "ks",
+      "label": "KS cohort never arrives",
+      "impact": [
+        "5.6",
+        "5.7",
+        "5.8"
+      ],
+      "effect": "Lane B parks after the six-week decision. The thesis ships Lane A and presents Lane B as a designed, unexecuted protocol with the email trail as process evidence.",
+      "mitigation": "Write the Lane B chapter from 5.1–5.4 as it stands: routes attempted, dates, replies, protocol sketch. Turn the pause into a documented gap."
+    },
+    {
+      "id": "ethics",
+      "label": "Ethics stays silent",
+      "impact": [
+        "2.3",
+        "3.2",
+        "3.5",
+        "3.6"
+      ],
+      "effect": "The clinician study cannot start. Cut to eight participants if a letter lands late, or replace it with the retrospective shadow-mode analysis and say so.",
+      "mitigation": "Send 2.5 on the day 2.3 goes overdue, keep 3.8 (shadow mode) ready as the fallback, and publish the limitation in the abstract rather than hiding it."
+    },
+    {
+      "id": "signal",
+      "label": "Melanoma signal too small",
+      "impact": [
+        "1.3",
+        "1.4",
+        "4.1"
+      ],
+      "effect": "Reframe the contribution from detection to triage ordering plus fairness. Same artefact, honest claim.",
+      "mitigation": "Report per-class recall with n and CI, lead with the Failure Museum, and let the paper argue about ranking and calibration rather than detection."
+    },
+    {
+      "id": "compute",
+      "label": "Compute too slow",
+      "impact": [
+        "1.2",
+        "1.3"
+      ],
+      "effect": "Train at 160 px instead of 224, record the size in the manifest, and state the serving-time shift in the model card.",
+      "mitigation": "Cut seeds before cutting resolution, and record every configuration change in the run report so the comparison stays honest."
+    }
   ],
   "tasks": [
-    {"id": "0.1", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Fetch and verify PAD-UFES-20", "evidence": "padufes/verification.json", "done": "2,298 rows, patient-grouped, biopsy flags complete, skin types present", "depends": []},
-    {"id": "0.2", "act": "0", "lane": "A", "weeks": [1, 1], "title": "DermaMNIST smoke run", "evidence": "runs/smoke/report.json", "done": "Trains end to end; report is valid=false and cannot be frozen", "depends": []},
-    {"id": "0.3", "act": "0", "lane": "A", "weeks": [1, 1], "title": "SCIN access and schema check", "evidence": "reports/scin_access.md", "done": "cases/labels CSVs read; sFST, eFST and eMST columns confirmed", "depends": []},
-    {"id": "0.4", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Licence register complete", "evidence": "docs/DATASET_SOURCES_IMMEDIATE.md", "done": "Every dataset has a licence line and a redistribution rule", "depends": []},
-    {"id": "0.5", "act": "0", "lane": "A", "weeks": [1, 1], "title": "Data decision recorded", "evidence": "REMEDIATION_STATUS.md", "done": "Scope table names the corpus for each role: train, evaluate, stretch", "depends": ["0.1", "0.4"]},
-
-    {"id": "1.1", "act": "1", "lane": "A", "weeks": [1, 2], "title": "Patient-grouped split", "evidence": "report.json → provenance.split", "done": "No patient appears on both sides; verified by a test", "depends": ["0.1"]},
-    {"id": "1.2", "act": "1", "lane": "A", "weeks": [2, 3], "title": "HAM10000 baseline run", "evidence": "runs/ham-*/report.json", "done": "Valid report, group-aware by lesion_id, provenance recorded or null", "depends": ["1.1"], "gate": "S1-1"},
-    {"id": "1.3", "act": "1", "lane": "A", "weeks": [2, 3], "title": "PAD-UFES-20 run", "evidence": "runs/pad-*/report.json", "done": "52 melanomas accounted for; the interval is reported, not just the point", "depends": ["1.1"], "gate": "S1-1"},
-    {"id": "1.4", "act": "1", "lane": "A", "weeks": [3, 3], "title": "Freeze artefact v1", "evidence": "model_manifest.json", "done": "status frozen, sha256 verified, serving.enabled = false", "depends": ["1.2", "1.3"], "gate": "S1-1"},
-    {"id": "1.5", "act": "1", "lane": "A", "weeks": [4, 4], "title": "SCIN tone-stratified evaluation", "evidence": "reports/eval_scin.json", "done": "Per-stratum n and CI; empty strata absent, not zero", "depends": ["1.4", "0.3"]},
-    {"id": "1.6", "act": "1", "lane": "A", "weeks": [4, 4], "title": "Tone Gap Ledger", "evidence": "docs/TONE_GAP_LEDGER.md", "done": "The worst stratum is published in words, with n and an interval", "depends": ["1.5"]},
-    {"id": "1.7", "act": "1", "lane": "A", "weeks": [4, 5], "title": "Failure Museum, twelve cases", "evidence": "docs/FAILURE_MUSEUM.md", "done": "Twelve curated errors with Grad-CAM and one sentence each on why", "depends": ["1.4"]},
-    {"id": "1.8", "act": "1", "lane": "A", "weeks": [5, 5], "title": "Calibration report", "evidence": "reports/calibration.json", "done": "Reliability curve and ECE overall and per tone stratum", "depends": ["1.5"]},
-    {"id": "1.9", "act": "1", "lane": "A", "weeks": [5, 5], "title": "Out-of-distribution probe", "evidence": "study/ood.md", "done": "Eight deliberately hard images; the failure rate is reported separately", "depends": ["1.4"]},
-    {"id": "1.10", "act": "1", "lane": "A", "weeks": [6, 6], "title": "Red-team day #1", "evidence": "docs/RED_TEAM.md", "done": "Every claim on the poster attacked; fixes logged", "depends": ["1.6", "1.7"]},
-
-    {"id": "2.1", "act": "2", "lane": "A", "weeks": [2, 2], "title": "Fill the exemption request", "evidence": "docs/IRB_EXEMPTION_REQUEST.md", "done": "No bracketed placeholder left in the document", "depends": []},
-    {"id": "2.2", "act": "2", "lane": "A", "weeks": [2, 2], "title": "Submit to the committee", "evidence": "docs/ethics/SUBMISSION.md", "done": "Reference number recorded, date logged", "depends": ["2.1"], "gate": "IRB"},
-    {"id": "2.3", "act": "2", "lane": "A", "weeks": [5, 6], "title": "Determination on file", "evidence": "docs/ethics/DETERMINATION.pdf", "done": "A committee wrote something — either answer unlocks a decision", "depends": ["2.2"], "gate": "IRB"},
-    {"id": "2.4", "act": "2", "lane": "A", "weeks": [4, 4], "title": "Retention scope re-check", "evidence": "SECURITY.md §4", "done": "The policy still matches what is actually held", "depends": []},
-    {"id": "2.5", "act": "2", "lane": "A", "weeks": [5, 5], "title": "Escalation letter", "evidence": "docs/ethics/ESCALATION.md", "done": "Sent if silent by 1 Dec; the escalation path is in writing", "depends": ["2.2"]},
-    {"id": "2.6", "act": "2", "lane": "A", "weeks": [6, 6], "title": "Full-approval scoping note", "evidence": "docs/ethics/FULL_APPROVAL_SCOPE.md", "done": "States exactly what real patient data would require, and that it is out of scope", "depends": ["2.3"]},
-
-    {"id": "3.1", "act": "3", "lane": "A", "weeks": [6, 6], "title": "Vignette protocol fixed", "evidence": "study/vignette_protocol.md", "done": "Question wording frozen before any data collection", "depends": ["2.3"]},
-    {"id": "3.2", "act": "3", "lane": "A", "weeks": [6, 6], "title": "Ethics cover for the study", "evidence": "study/ethics_cover.md", "done": "The study sits inside the determined scope, or is exempt in writing", "depends": ["2.3"], "gate": "IRB"},
-    {"id": "3.3", "act": "3", "lane": "A", "weeks": [7, 7], "title": "Pilot with two participants", "evidence": "study/pilot.md", "done": "Instrument bugs found and fixed before the real sessions", "depends": ["3.1", "3.2"]},
-    {"id": "3.4", "act": "3", "lane": "A", "weeks": [7, 7], "title": "Recruit twelve participants", "evidence": "study/participants.csv", "done": "Twelve confirmed; no identifiers stored", "depends": ["3.3"]},
-    {"id": "3.5", "act": "3", "lane": "A", "weeks": [7, 8], "title": "Run the sessions", "evidence": "study/responses.csv", "done": "Twelve completed, de-identified, with arm A and arm B", "depends": ["3.4"]},
-    {"id": "3.6", "act": "3", "lane": "A", "weeks": [8, 9], "title": "Analysis", "evidence": "study/analysis.json", "done": "Override rate, confidence change and time-to-decision, all with intervals", "depends": ["3.5"]},
-    {"id": "3.7", "act": "3", "lane": "A", "weeks": [8, 8], "title": "The unflattering arm", "evidence": "study/hard_cases.json", "done": "Eight hard images analysed and reported separately", "depends": ["1.9", "3.5"]},
-    {"id": "3.8", "act": "3", "lane": "A", "weeks": [9, 9], "title": "Shadow mode (optional)", "evidence": "study/shadow.md", "done": "Retrospective agreement on de-identified images; no live use", "depends": ["1.4", "2.3"]},
-
-    {"id": "4.1", "act": "4", "lane": "A", "weeks": [9, 10], "title": "Paper draft", "evidence": "paper/draft.md", "done": "Every number cites a report file; limitations section written first", "depends": ["1.6", "3.6"]},
-    {"id": "4.2", "act": "4", "lane": "A", "weeks": [10, 10], "title": "Poster", "evidence": "poster.html", "done": "Disclaimers verbatim; no figure without a report", "depends": ["1.6", "3.6"]},
-    {"id": "4.3", "act": "4", "lane": "A", "weeks": [10, 11], "title": "Demo script and rehearsals", "evidence": "docs/DEMO_SCRIPT.md", "done": "Two rehearsals, including the segment where it fails on purpose", "depends": ["1.7"]},
-    {"id": "4.4", "act": "4", "lane": "A", "weeks": [11, 11], "title": "Reproducibility test", "evidence": "docs/REPRODUCIBILITY.md", "done": "A clean clone reproduces the headline number within tolerance", "depends": ["1.4"]},
-    {"id": "4.5", "act": "4", "lane": "A", "weeks": [11, 11], "title": "Red-team day #2", "evidence": "docs/RED_TEAM.md", "done": "An external reader tries to falsify three claims; outcome logged", "depends": ["4.1"]},
-    {"id": "4.6", "act": "4", "lane": "A", "weeks": [12, 12], "title": "Submit", "evidence": "paper/SUBMITTED.md", "done": "Submission ID recorded; deadline verified on the venue's own site", "depends": ["4.1", "4.4", "4.5"]},
-
-    {"id": "5.1", "act": "5", "lane": "B", "weeks": [1, 1], "title": "UCI / UVRI approach", "evidence": "outreach/uci-uvri.md", "done": "Email sent with a one-page protocol sketch and a co-authorship offer", "depends": []},
-    {"id": "5.2", "act": "5", "lane": "B", "weeks": [2, 3], "title": "Makerere dermatology meeting", "evidence": "outreach/makerere.md", "done": "Twenty minutes with the unit; supervision question asked", "depends": []},
-    {"id": "5.3", "act": "5", "lane": "B", "weeks": [3, 3], "title": "Consortium author contact", "evidence": "outreach/consortium.md", "done": "Sent to a recent KS imaging paper's corresponding author, citing their protocol", "depends": []},
-    {"id": "5.4", "act": "5", "lane": "B", "weeks": [4, 5], "title": "Ethics amendment draft", "evidence": "docs/ethics/AMENDMENT.md", "done": "Ready to file the day a cohort appears", "depends": ["2.2"]},
-    {"id": "5.5", "act": "5", "lane": "B", "weeks": [6, 6], "title": "Six-week decision", "evidence": "docs/KS_DECISION.md", "done": "Written outcome: data, a clear no, or park with a date", "depends": ["5.1", "5.2", "5.3"], "gate": "S1-1"},
-    {"id": "5.6", "act": "5", "lane": "B", "weeks": [7, 8], "title": "KS cohort ingest", "evidence": "datasets/ks/verification.json", "done": "Blocked until 5.5 says yes; verified the same way as every other corpus", "depends": ["5.5"]},
-    {"id": "5.7", "act": "5", "lane": "B", "weeks": [8, 10], "title": "Train the third class", "evidence": "runs/ks-*/report.json", "done": "Blocked by 5.6; per-class support recorded, intervals reported", "depends": ["5.6"]},
-    {"id": "5.8", "act": "5", "lane": "B", "weeks": [10, 12], "title": "Lift the serving hold", "evidence": "model_manifest.json → serving.enabled = true", "done": "Blocked by 5.7 and by the ethics determination; not before both", "depends": ["5.7", "2.3"], "gate": "S1-1"}
+    {
+      "id": "0.1",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Fetch and verify PAD-UFES-20",
+      "size": "M",
+      "steps": [
+        "Run `bash scripts/fetch_padufes20.sh --check` and read the plan before pulling 3.35 GB",
+        "Run it with `--work ~/padufes`; rerun after any interruption — the download resumes",
+        "Read `padufes/verification.json`: 2,298 images, 1,373 patients, 1,641 lesions, per-class counts",
+        "Confirm every cancer label carries its biopsy flag and every patient a Fitzpatrick type",
+        "Convert once: `prepare_dataset.py --link hardlink --group-column patient_id`"
+      ],
+      "evidence": "padufes/verification.json",
+      "done": "2,298 rows, patient-grouped, biopsy flags complete, skin types present",
+      "risk": "The S3 zip can stall; the script resumes, so rerun rather than restart. If the archive 404s, stop and re-read the dataset page — do not substitute a dataset without recording the change.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.2",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "DermaMNIST smoke run",
+      "size": "S",
+      "steps": [
+        "Inside the venv: `pip install medmnist` (20 MB npz, downloaded on first use)",
+        "One epoch through `scripts/train_model.py` — the point is plumbing, not accuracy",
+        "Confirm `runs/smoke/report.json` exists and is stamped `valid: false`",
+        "Time the run on this hardware so week 2's estimate is real"
+      ],
+      "evidence": "runs/smoke/report.json",
+      "done": "The pipeline trains, writes a report, and refuses to call the run valid",
+      "risk": "A smoke run invites you to quote its number. It is `valid: false` by construction and never leaves the sandbox.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.3",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "SCIN access and schema check",
+      "size": "S",
+      "steps": [
+        "Read the public bucket `dx-scin-public-data` and pull only the case and label CSVs",
+        "Confirm the tone columns exist and note their exact names (self-reported vs estimated)",
+        "Count how many cases actually carry a tone label — this decides the strata in 1.5",
+        "Record the licence line and whether images are reachable from here"
+      ],
+      "evidence": "reports/scin_access.md",
+      "done": "The CSVs parse, the tone columns are named, and the licence line is recorded",
+      "risk": "Some paths may be read-only for an anonymous reader. If images are unreachable, record that now rather than discovering it in week 4.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.4",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Licence register complete",
+      "size": "S",
+      "steps": [
+        "One row per dataset named anywhere in the repo — including the rejected ones",
+        "Each row: licence, redistribution rule, gated yes/no, adopted in this cycle yes/no",
+        "Mark every request-gated source as not adoptable this cycle, with the reason",
+        "State plainly that no downloadable public source carries Kaposi sarcoma"
+      ],
+      "evidence": "docs/DATASET_SOURCES_IMMEDIATE.md",
+      "done": "Every dataset named anywhere in the repo has a licence line and a redistribution rule",
+      "risk": "A dataset named in the thesis without a licence line is a reviewer finding; the register is the cheapest defence you will ever write.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "0.5",
+      "act": "0",
+      "lane": "A",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "Data decision recorded",
+      "size": "S",
+      "steps": [
+        "Write the decision into the scope table in `REMEDIATION_STATUS.md`, dated",
+        "Name the training set, the evaluation set and the class that is absent",
+        "State what was rejected and why, in one line each",
+        "Anything not on the list becomes a new sprint with its own justification"
+      ],
+      "evidence": "REMEDIATION_STATUS.md",
+      "done": "One dated paragraph names the training set, the evaluation set and the missing class",
+      "risk": "Scope creeps back if the decision is not written down; an unwritten decision is a debate you have every Monday.",
+      "depends": [
+        "0.1",
+        "0.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.1",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        1,
+        2
+      ],
+      "title": "Patient-grouped split",
+      "size": "M",
+      "steps": [
+        "Group by `patient_id`, never by image — 1,641 lesions over 1,373 patients",
+        "Hold out roughly a fifth of the patients, stratified by diagnosis",
+        "Write `provenance.split` into `report.json`: seed, counts, hash of the id list",
+        "Add a test that asserts no `patient_id` appears in both splits, and keep it green"
+      ],
+      "evidence": "report.json → provenance.split",
+      "done": "No patient_id appears in both train and eval, and a test proves it",
+      "risk": "Some releases rename a patient per visit. Check the lesion-to-patient mapping before trusting the grouping; a leaky split invalidates every number downstream.",
+      "depends": [
+        "0.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.2",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "HAM10000 baseline run",
+      "size": "L",
+      "steps": [
+        "Fetch and verify with `scripts/fetch_and_verify_ham10000.sh` (published counts or nothing)",
+        "Train one configuration end to end, 224 px, one seed first",
+        "Record command, commit sha, config and data hash inside `report.json`",
+        "Keep it as a pipeline proof and a cross-check — not the headline"
+      ],
+      "evidence": "runs/ham-*/report.json",
+      "done": "One recorded command reproduces the run and report.json names the commit, config and data hash",
+      "risk": "HAM10000 is a different population from PAD-UFES-20. Mixing the two into one headline number would be a quiet lie; use it to prove the pipeline.",
+      "depends": [
+        "1.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.3",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "PAD-UFES-20 run",
+      "size": "L",
+      "steps": [
+        "Train on the grouped split from 1.1 with the label map in `scripts/label_maps/padufes20.json`",
+        "Report per-class n and recall with confidence intervals — MEL has very few images",
+        "Add two more seeds if time allows, and report the spread instead of the best seed",
+        "Write every configuration into `report.json` and store the checkpoint outside git"
+      ],
+      "evidence": "runs/pad-*/report.json",
+      "done": "The run reports per-class n, recall and CI, and the small MEL class is stated, not smoothed away",
+      "risk": "MEL is tiny. If recall swings across seeds, say so and widen the interval; do not 'fix' it with augmented copies of the same lesion.",
+      "depends": [
+        "1.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.4",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        3,
+        3
+      ],
+      "title": "Freeze artefact v1",
+      "size": "M",
+      "steps": [
+        "Pick the run: the one whose report you would defend line by line",
+        "Run `scripts/freeze_model.py`; the sha256 lands in `model_manifest.json`",
+        "Set `status: frozen`, keep `serving.enabled: false`, and record the split hash",
+        "Verify from a fresh shell that the hash matches the stored file"
+      ],
+      "evidence": "model_manifest.json",
+      "done": "status: frozen, sha256 matches the file, serving.enabled: false, verification is one command",
+      "risk": "Freezing too early locks in a split you will want to change. Freeze only after the leakage test in 1.1 is green.",
+      "depends": [
+        "1.1",
+        "1.3"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.5",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "SCIN tone-stratified evaluation",
+      "size": "L",
+      "steps": [
+        "Score SCIN clinical images with the frozen artefact only — no retraining",
+        "Stratify by the self-reported tone column, and separately by the estimated one",
+        "Per stratum: n, the metric, and a confidence interval; empty strata are absent, not zero",
+        "Write `reports/eval_scin.json` and record the manifest hash it was computed against"
+      ],
+      "evidence": "reports/eval_scin.json",
+      "done": "Per-stratum n and CI are present, empty strata are absent rather than zero, and the manifest hash is recorded",
+      "risk": "If SCIN carries no melanoma, a melanoma recall line would be a fiction. Restrict to the benign head and calibration, and restate the plan (kill criterion k2).",
+      "depends": [
+        "1.4",
+        "0.3"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.6",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "Tone Gap Ledger",
+      "size": "M",
+      "steps": [
+        "Table: stratum, n, metric, interval, gap against the lightest stratum",
+        "Bold the worst stratum and write one paragraph saying what it means",
+        "No composite fairness score — a single number hides the failure you are reporting",
+        "Link each row to the row in `reports/eval_scin.json` that produced it"
+      ],
+      "evidence": "docs/TONE_GAP_LEDGER.md",
+      "done": "The ledger includes the worst stratum and says in words what it implies",
+      "risk": "An aggregate score invites the reader to conclude 'fair enough'. Publish the table.",
+      "depends": [
+        "1.5"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.7",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        4,
+        5
+      ],
+      "title": "Failure Museum, twelve cases",
+      "size": "M",
+      "steps": [
+        "Sample 12 errors by error type, not by which heatmap looks best",
+        "Include at least three cases from the darkest strata in the ledger",
+        "One Grad-CAM per case and exactly one sentence on why it failed",
+        "Note the licence position before publishing any image"
+      ],
+      "evidence": "docs/FAILURE_MUSEUM.md",
+      "done": "Twelve cases with Grad-CAM and one honest sentence each",
+      "risk": "Curating only flattering failures defeats the artefact. Fix the sampling rule before you look at the images.",
+      "depends": [
+        "1.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.8",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Calibration report",
+      "size": "M",
+      "steps": [
+        "Reliability diagram per class, plus the calibration error, on the frozen artefact",
+        "Fit any temperature on the validation split only",
+        "Recompute on the held-out split and store before and after",
+        "State in one sentence what a confidence of 0.8 means operationally"
+      ],
+      "evidence": "reports/calibration.json",
+      "done": "Before and after calibration are both stored, and the file records which split was fitted on",
+      "risk": "Fitting temperature on the evaluation split is leakage with a friendly name. The file must record the split.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "1.9",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Out-of-distribution probe",
+      "size": "S",
+      "steps": [
+        "Score a handful of images from a source the model never saw, at the same resolution",
+        "Record the confidence drop and what the errors look like",
+        "Write `study/ood.md`: what OOD looks like in practice, with no clinical claim",
+        "Feed the worst cases into the Failure Museum shortlist"
+      ],
+      "evidence": "study/ood.md",
+      "done": "The note states what the model does when the input is not from its training distribution",
+      "risk": "'It generalises well' is the trap. Report the drop, including the cases where confidence stays high and wrong.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "1.10",
+      "act": "1",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Red-team day #1",
+      "size": "S",
+      "steps": [
+        "Take every claim you intend to make and try to falsify it in one sitting",
+        "Log each attempt, the evidence found, and the outcome: kept, weakened, withdrawn",
+        "Fix the artefacts rather than softening the wording",
+        "Date and sign the entry in `docs/RED_TEAM.md`"
+      ],
+      "evidence": "docs/RED_TEAM.md",
+      "done": "Each planned claim has an entry: attempt, outcome, and what changed as a result",
+      "risk": "A red-team day that finds nothing usually means the attacks were too polite. Attack the split, the strata and the licence claims first.",
+      "depends": [
+        "1.6",
+        "1.8"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.1",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        2,
+        2
+      ],
+      "title": "Fill the exemption request",
+      "size": "S",
+      "steps": [
+        "Fill the four bracketed fields in `docs/IRB_EXEMPTION_REQUEST.md`",
+        "Read it once as a committee member looking for a reason to say no",
+        "Remove any claim the artefacts do not support (no clinical validity, no KS class)",
+        "Have the supervisor read it before it goes anywhere"
+      ],
+      "evidence": "docs/IRB_EXEMPTION_REQUEST.md",
+      "done": "No bracketed placeholder remains and the document claims nothing unmeasured",
+      "risk": "Overclaiming in the request is the fastest way to a refusal; describe the vignette study, not a diagnostic device.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "2.2",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        2,
+        2
+      ],
+      "title": "Submit to the committee",
+      "size": "S",
+      "steps": [
+        "Submit through the university channel and keep the receipt",
+        "Record the reference number, the date and the named contact in `docs/ethics/SUBMISSION.md`",
+        "Save the sent email with its attachments alongside it",
+        "Note the committee's stated turnaround, if it states one"
+      ],
+      "evidence": "docs/ethics/SUBMISSION.md",
+      "done": "A reference number and a submission date exist, and the sent email is archived",
+      "risk": "A submission with no receipt is indistinguishable from a draft. The receipt is the evidence you will be asked for in week 6.",
+      "depends": [
+        "2.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.3",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        5,
+        6
+      ],
+      "title": "Determination on file",
+      "size": "M",
+      "steps": [
+        "Chase once at week 4, once at week 5, in writing",
+        "Store the letter as `docs/ethics/DETERMINATION.pdf` — approval or refusal, both count",
+        "Map the letter's scope onto the vignette protocol in 3.1",
+        "If refused: record the reasons verbatim and decide against kill criterion k3"
+      ],
+      "evidence": "docs/ethics/DETERMINATION.pdf",
+      "done": "A committee wrote something, and the protocol's scope is checked against it",
+      "risk": "A verbal 'you are fine' is not a determination. Ask for it in writing while the conversation is friendly.",
+      "depends": [
+        "2.2"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "2.4",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        4,
+        4
+      ],
+      "title": "Retention scope re-check",
+      "size": "S",
+      "steps": [
+        "Read `SECURITY.md` §4 against what is actually on disk today",
+        "Confirm: synthetic and de-identified data only, no real patient images",
+        "Update the section if reality moved, and date the change",
+        "Link the section from the model card so a reader can find it"
+      ],
+      "evidence": "SECURITY.md §4",
+      "done": "The policy still matches what is actually held",
+      "risk": "A policy that describes a different repository than the one you have is worse than no policy: it reads as a claim.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "2.5",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        5,
+        5
+      ],
+      "title": "Escalation letter",
+      "size": "S",
+      "steps": [
+        "One short, polite follow-up naming the 14 Dec dependency",
+        "Copy the supervisor and the named contact from the receipt",
+        "State the fallback plainly: public data only, limitation in the abstract",
+        "Log the date sent in `docs/ethics/ESCALATION.md`"
+      ],
+      "evidence": "docs/ethics/ESCALATION.md",
+      "done": "A dated escalation exists that a reader could find in the email trail",
+      "risk": "Escalation without a stated consequence reads as nagging. Name the deadline and the fallback in the same paragraph.",
+      "depends": [
+        "2.2"
+      ],
+      "gate": null
+    },
+    {
+      "id": "2.6",
+      "act": "2",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Full-approval scoping note",
+      "size": "S",
+      "steps": [
+        "Write the one-page shape of a full approval track: protocol, consent, data agreement",
+        "State the realistic timeline (three to six months) and that it is outside this plan",
+        "Name what would move the project onto that track — real patient images only",
+        "Keep it as a plan, not a promise"
+      ],
+      "evidence": "docs/ethics/FULL_APPROVAL_SCOPE.md",
+      "done": "The note exists and explicitly keeps real patient data out of the twelve weeks",
+      "risk": "Letting the full-approval track leak into week 8 is how the degree slips a year.",
+      "depends": [
+        "2.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.1",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Vignette protocol fixed",
+      "size": "M",
+      "steps": [
+        "Fix the instrument: about 40 cases, blind, two arms, order randomised per participant",
+        "Four measures only: own decision, whether it changed, confidence 1–5, seconds to decide",
+        "State the power position honestly: twelve participants, within-subject, small effects",
+        "Freeze the wording before the pilot — wording changes after data collection are fatal"
+      ],
+      "evidence": "study/vignette_protocol.md",
+      "done": "The wording is frozen, the four measures are defined, and the power limit is stated",
+      "risk": "An instrument tuned after the first two participants cannot be analysed cleanly. Pilot, then freeze, then collect.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "3.2",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Ethics cover for the study",
+      "size": "S",
+      "steps": [
+        "Attach the determination (2.3) to the protocol",
+        "Check every element of the protocol against the letter's scope",
+        "If the letter is narrower, cut the protocol rather than stretching the letter",
+        "Record the mapping in `study/ethics_cover.md`"
+      ],
+      "evidence": "study/ethics_cover.md",
+      "done": "The study sits inside the determined scope, or the exemption covers it explicitly",
+      "risk": "A scope mismatch discovered in week 8 invalidates the data you already collected.",
+      "depends": [
+        "2.3"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "3.3",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        7
+      ],
+      "title": "Pilot with two participants",
+      "size": "M",
+      "steps": [
+        "Run the whole instrument with two colleagues, timing included",
+        "Watch for ambiguous wording rather than explaining it away",
+        "Fix the instrument, then re-freeze it and note the change in the protocol",
+        "Keep pilot data out of the analysis set and say so"
+      ],
+      "evidence": "study/pilot.md",
+      "done": "Two dry runs completed, the instrument amended once, and the change is dated",
+      "risk": "Pilot data leaking into the main set is a silent inflation of n. Label it and exclude it.",
+      "depends": [
+        "3.1",
+        "3.2"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "3.4",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        7
+      ],
+      "title": "Recruit twelve participants",
+      "size": "M",
+      "steps": [
+        "Identify dermatologists, residents and final-year students; keep a list of roles only",
+        "No names in the repository — a participant code is enough",
+        "Book 30-minute slots across weeks 7 and 8, with two spares",
+        "Tell each person what the study is not: no patient contact, no clinical use"
+      ],
+      "evidence": "study/participants.csv",
+      "done": "Twelve slots booked against participant codes, with no identifiers stored",
+      "risk": "Recruitment slippage is the most common schedule failure in a twelve-week plan. Book spares in week 7, not week 8.",
+      "depends": [
+        "3.3"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.5",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        7,
+        8
+      ],
+      "title": "Run the sessions",
+      "size": "L",
+      "steps": [
+        "Run each session identically: same instructions, same order rule",
+        "Capture responses into `study/responses.csv` — codes, decisions, confidence, seconds",
+        "Stop immediately if a participant is uncomfortable; that is not data, it is a signal",
+        "Note any deviation from the protocol in a dated log entry"
+      ],
+      "evidence": "study/responses.csv",
+      "done": "Twelve completed sessions, de-identified, with deviations logged",
+      "risk": "Unlogged deviations are what a reviewer finds first. One line per session costs nothing now.",
+      "depends": [
+        "3.4"
+      ],
+      "gate": "S2-4"
+    },
+    {
+      "id": "3.6",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        8,
+        9
+      ],
+      "title": "Analysis",
+      "size": "M",
+      "steps": [
+        "Override rate, confidence shift and time change, each with an interval",
+        "Use a paired analysis within participant; state the test and its assumptions",
+        "Report the direction of every effect, including the ones that go against you",
+        "Write `study/analysis.json` and a two-paragraph plain-language summary"
+      ],
+      "evidence": "study/analysis.json",
+      "done": "Override rate, Δconfidence and Δtime are reported with intervals and a power caveat",
+      "risk": "With n=12, a p-value is a rumour. Lead with effect sizes and intervals.",
+      "depends": [
+        "3.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.7",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        8,
+        8
+      ],
+      "title": "The unflattering arm",
+      "size": "S",
+      "steps": [
+        "Take eight deliberately difficult or out-of-distribution images",
+        "Score the model on them separately and report the failure rate",
+        "Keep them in the same instrument so the contrast is visible",
+        "Publish the comparison next to the main result, not in an appendix"
+      ],
+      "evidence": "study/hard_cases.json",
+      "done": "A separate failure rate on hard cases is reported beside the main result",
+      "risk": "Reviewers trust a paper that shows its own worst case; they discount one that does not.",
+      "depends": [
+        "3.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "3.8",
+      "act": "3",
+      "lane": "A",
+      "weeks": [
+        9,
+        9
+      ],
+      "title": "Shadow mode (optional)",
+      "size": "M",
+      "steps": [
+        "Retrospective agreement only: de-identified images already in the evaluation set",
+        "No live use, no patient contact, no new data collection",
+        "Report agreement with the recorded reading, not with a clinician's live decision",
+        "Skip it without guilt if week 9 is already full"
+      ],
+      "evidence": "study/shadow.md",
+      "done": "Either a retrospective agreement analysis exists, or the omission is recorded",
+      "risk": "Shadow mode drifting into live use is the one line this project must never cross.",
+      "depends": [
+        "3.6"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.1",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        9,
+        10
+      ],
+      "title": "Paper draft",
+      "size": "L",
+      "steps": [
+        "Draft to the workshop length; one claim per paragraph",
+        "Every number gets a citation to a `report.json` path and a commit",
+        "Limitations section names the missing KS class and the single-cohort problem",
+        "Leave the abstract to last, after the numbers stop moving"
+      ],
+      "evidence": "paper/draft.md",
+      "done": "Every number in the draft carries a file citation, and no claim outruns its evidence",
+      "risk": "A number written from memory is the one an examiner checks first. Cite or delete.",
+      "depends": [
+        "1.6",
+        "3.6"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.2",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        10,
+        10
+      ],
+      "title": "Poster",
+      "size": "M",
+      "steps": [
+        "Build on the existing poster template so the disclaimers stay verbatim",
+        "One figure per claim: ledger, calibration, failure museum",
+        "The dark-skin gap gets a panel of its own, not a footnote",
+        "Print once early to check the type size at arm's length"
+      ],
+      "evidence": "poster.html",
+      "done": "Disclaimers verbatim, every figure traceable, and the gap visible without narration",
+      "risk": "A poster that hides the gap looks strong for ten seconds and weak for the whole session.",
+      "depends": [
+        "4.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.3",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        10,
+        11
+      ],
+      "title": "Demo script and rehearsals",
+      "size": "M",
+      "steps": [
+        "Eight minutes: what it does, why, where it fails, what it cannot do, what would change that",
+        "Include one live failure from the Failure Museum and let it land",
+        "Rehearse twice — once to a colleague, once to a non-specialist",
+        "Keep an offline fallback: screenshots and a recorded run for a dead network"
+      ],
+      "evidence": "docs/DEMO_SCRIPT.md",
+      "done": "Two rehearsals completed, one with a non-specialist, and the offline fallback exists",
+      "risk": "A demo that only shows successes invites exactly the question it cannot answer.",
+      "depends": [
+        "4.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.4",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        11,
+        11
+      ],
+      "title": "Reproducibility test",
+      "size": "M",
+      "steps": [
+        "Fresh clone on a clean machine, no cached artefacts",
+        "Run the documented command and compare against the frozen report within a stated tolerance",
+        "Record the hardware and the wall-clock time next to the result",
+        "Fix the instructions, not the numbers, when they disagree"
+      ],
+      "evidence": "docs/REPRODUCIBILITY.md",
+      "done": "A stranger reproduces the recorded result from a clean clone using only the docs",
+      "risk": "'It works on my machine' with a cached checkpoint is not reproducibility. Delete the cache first.",
+      "depends": [
+        "1.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.5",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        11,
+        11
+      ],
+      "title": "Red-team day #2",
+      "size": "S",
+      "steps": [
+        "Give an external reader the poster and three claims to falsify",
+        "Log attempts and outcomes in `docs/RED_TEAM.md`, dated",
+        "Withdraw or weaken any claim the artefacts cannot carry",
+        "Re-run the definition-of-done script at the end of the day"
+      ],
+      "evidence": "docs/RED_TEAM.md",
+      "done": "An external reader tried to falsify three claims and the outcome is written down",
+      "risk": "Internal review finds internal problems. This one has to be somebody who owes you nothing.",
+      "depends": [
+        "4.2"
+      ],
+      "gate": null
+    },
+    {
+      "id": "4.6",
+      "act": "4",
+      "lane": "A",
+      "weeks": [
+        12,
+        12
+      ],
+      "title": "Submit",
+      "size": "M",
+      "steps": [
+        "Verify the workshop deadline on its own site on the day — never from memory",
+        "Check the submission system's format requirements against the draft",
+        "Submit the Lane A paper even if Lane B is still open",
+        "Store the confirmation as `paper/SUBMITTED.md` with the date and the reference"
+      ],
+      "evidence": "paper/SUBMITTED.md",
+      "done": "A submission confirmation exists, dated, against a deadline verified that day",
+      "risk": "Planning against a remembered deadline is how work misses by a week.",
+      "depends": [
+        "4.4",
+        "4.5"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.1",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        1,
+        1
+      ],
+      "title": "UCI / UVRI approach",
+      "size": "S",
+      "steps": [
+        "Two hundred words, one ask, one attachment: a one-page protocol sketch",
+        "Name the KS imaging sub-study you are asking about, with its citation",
+        "Offer co-authorship and a named collaborator on their side",
+        "Log the date, the addressee and the follow-up date in `outreach/uci-uvri.md`"
+      ],
+      "evidence": "outreach/uci-uvri.md",
+      "done": "A dated email exists with the ask, the citation and the follow-up date recorded",
+      "risk": "A vague ask gets a vague no. One protocol sketch beats a page of enthusiasm.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.2",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        2,
+        3
+      ],
+      "title": "Makerere dermatology meeting",
+      "size": "M",
+      "steps": [
+        "Request twenty minutes with the dermatology unit, not a data request",
+        "Bring one page: what the artefact does, what it cannot do, what you need",
+        "Ask which route they would trust for supervised, de-identified access",
+        "Write the answer down the same day"
+      ],
+      "evidence": "outreach/makerere.md",
+      "done": "The meeting happened and the recommended access route is written down with a name",
+      "risk": "A consultant supervisor converts a personal ask into an institutional one; ask for the route, not for images.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.3",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        3,
+        3
+      ],
+      "title": "Consortium author contact",
+      "size": "S",
+      "steps": [
+        "Pick one recent African KS imaging paper with a data-sharing statement",
+        "Write to the corresponding author, citing their own protocol back to them",
+        "Ask specifically about an amendment to an existing approval",
+        "Log the contact and the response date"
+      ],
+      "evidence": "outreach/consortium.md",
+      "done": "A named corresponding author has been written to, with the citation and date recorded",
+      "risk": "Broadcast emails to five groups get answered by none. One careful letter beats five.",
+      "depends": [],
+      "gate": null
+    },
+    {
+      "id": "5.4",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        4,
+        5
+      ],
+      "title": "Ethics amendment draft",
+      "size": "M",
+      "steps": [
+        "Draft the amendment now so a yes does not wait on paperwork",
+        "Scope it to retrospective, de-identified images under their approval",
+        "Leave the data-transfer terms blank until a partner names them",
+        "Have it read by whoever wrote the exemption request"
+      ],
+      "evidence": "docs/ethics/AMENDMENT.md",
+      "done": "A draft amendment exists that only needs a partner's name and a signature",
+      "risk": "Starting the amendment after the yes costs four to six weeks you do not have.",
+      "depends": [
+        "5.1"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.5",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        6,
+        6
+      ],
+      "title": "Six-week decision",
+      "size": "S",
+      "steps": [
+        "On 14 Dec, read the three outreach logs and decide against kill criterion k4",
+        "Write the decision with its reasons in `docs/KS_DECISION.md`, dated",
+        "If the answer is no: convert Lane B into a protocol chapter",
+        "Announce the decision in the Monday gate review the same week"
+      ],
+      "evidence": "docs/KS_DECISION.md",
+      "done": "A dated decision exists: data in hand, or the pause documented as attempted",
+      "risk": "A decision nobody wrote down gets re-litigated every week. Date it and move on.",
+      "depends": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ],
+      "gate": null
+    },
+    {
+      "id": "5.6",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        7,
+        8
+      ],
+      "title": "KS cohort ingest",
+      "size": "L",
+      "steps": [
+        "Same discipline as PAD-UFES-20: verify before training, never after",
+        "Check patient grouping, pathology confirmation and the licence or data agreement",
+        "Write `datasets/ks/verification.json` with counts, gaps and the agreement on file",
+        "If any check fails, stop — do not train on a cohort you cannot describe"
+      ],
+      "evidence": "datasets/ks/verification.json",
+      "done": "The cohort verifies like PAD-UFES-20 and the data agreement is on file",
+      "risk": "A cohort that arrives without an agreement is not data, it is a liability. Stop and ask.",
+      "depends": [
+        "5.5"
+      ],
+      "gate": "IRB"
+    },
+    {
+      "id": "5.7",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        8,
+        10
+      ],
+      "title": "Train the third class",
+      "size": "L",
+      "steps": [
+        "Keep the two-class frozen artefact intact while the three-class run is experimental",
+        "Retrain with KS added, grouped by patient, with per-class n and CI reported",
+        "Re-run the tone-stratified evaluation on the new artefact",
+        "Freeze as v2 only after the new ledger and museum exist"
+      ],
+      "evidence": "runs/ks-*/report.json",
+      "done": "A three-class artefact exists with a report, a ledger and a failure museum of its own",
+      "risk": "Overwriting v1 with v2 destroys the comparison the paper needs. Keep both.",
+      "depends": [
+        "5.6"
+      ],
+      "gate": "S1-1"
+    },
+    {
+      "id": "5.8",
+      "act": "5",
+      "lane": "B",
+      "weeks": [
+        10,
+        12
+      ],
+      "title": "Lift the serving hold",
+      "size": "M",
+      "steps": [
+        "Only after a frozen three-class artefact with its own evaluation exists",
+        "Flip `serving.enabled` in `model_manifest.json` deliberately, with the reason recorded",
+        "Re-read the serving checklist and the security section before flipping it",
+        "Update the model card and the dashboard copy in the same commit"
+      ],
+      "evidence": "model_manifest.json → serving.enabled = true",
+      "done": "The hold is lifted only where a frozen artefact and its evaluation justify it",
+      "risk": "Lifting the hold to demo something is the failure mode this gate exists to prevent.",
+      "depends": [
+        "5.7"
+      ],
+      "gate": "S1-1"
+    }
   ]
 }
 </script>
@@ -568,146 +1995,198 @@
   "use strict";
 
   var DATA = JSON.parse(document.getElementById("roadmap-data").textContent);
-  var STORE_KEY = "derma-roadmap-v1";
   var TOTAL_WEEKS = DATA.meta.weeks;
+  var STORE_KEY = "derma-roadmap-v2";
+  var MONTHS = DATA.meta.months || [];
+  var WEEK_DATES = {};
+  DATA.meta.weekDates.forEach(function (w) { WEEK_DATES[w.week] = w.dates; });
+
+  var BY_ID = {};
+  DATA.tasks.forEach(function (task) { BY_ID[task.id] = task; });
+  var ACT = {};
+  DATA.acts.forEach(function (act) { ACT[act.id] = act; });
+  var GATE = {};
+  DATA.gates.forEach(function (gate) { GATE[gate.id] = gate; });
 
   var state = {
     view: "timeline",
     lane: "all",
     status: "open",
-    query: "",
     week: null,
+    query: "",
+    done: {},
+    steps: {},
     scenarios: {},
-    done: {}
+    selected: null
   };
 
-  /* ---------- persistence ---------- */
+  /* ------------------------------ storage ------------------------------ */
   function load() {
+    var saved = null;
     try {
       var raw = window.localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      state.done = saved.done || {};
-      state.scenarios = saved.scenarios || {};
-    } catch (err) { /* private mode, or corrupt value: start clean */ }
+      if (raw) saved = JSON.parse(raw);
+    } catch (error) { saved = null; }
+    if (!saved || typeof saved !== "object") return;
+    state.done = saved.done && typeof saved.done === "object" ? saved.done : {};
+    state.steps = saved.steps && typeof saved.steps === "object" ? saved.steps : {};
+    state.scenarios = saved.scenarios && typeof saved.scenarios === "object" ? saved.scenarios : {};
+    if (saved.view) state.view = saved.view;
   }
+
   function save() {
     try {
       window.localStorage.setItem(STORE_KEY, JSON.stringify({
-        done: state.done, scenarios: state.scenarios
+        done: state.done,
+        steps: state.steps,
+        scenarios: state.scenarios,
+        view: state.view
       }));
-    } catch (err) { /* nothing to do: the page still works */ }
+    } catch (error) { /* private mode, sandboxed iframe: the page still works */ }
   }
 
-  /* ---------- helpers ---------- */
+  /* ------------------------------ helpers ------------------------------ */
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
       Object.keys(attrs).forEach(function (key) {
-        if (key === "text") node.textContent = attrs[key];
-        else if (key === "class") node.className = attrs[key];
-        else node.setAttribute(key, attrs[key]);
+        var value = attrs[key];
+        if (value === null || value === undefined || value === false) return;
+        if (key === "text") node.textContent = value;
+        else if (key === "html") node.innerHTML = value;
+        else if (key === "class") node.className = value;
+        else node.setAttribute(key, value === true ? "" : value);
       });
     }
     (children || []).forEach(function (child) {
-      if (child) node.appendChild(child);
+      if (child === null || child === undefined) return;
+      node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
     });
     return node;
   }
 
-  function tasks() { return DATA.tasks; }
-  function byId(id) {
-    for (var i = 0; i < DATA.tasks.length; i++) {
-      if (DATA.tasks[i].id === id) return DATA.tasks[i];
-    }
-    return null;
-  }
-  function actName(id) {
-    for (var i = 0; i < DATA.acts.length; i++) {
-      if (DATA.acts[i].id === id) return DATA.acts[i].name;
-    }
-    return "Act " + id;
-  }
   function isDone(task) { return Boolean(state.done[task.id]); }
+
+  function stepState(task) {
+    var marks = state.steps[task.id] || [];
+    var done = 0;
+    for (var i = 0; i < task.steps.length; i++) if (marks[i]) done++;
+    return { done: done, total: task.steps.length };
+  }
+
   function isParked(task) {
     var parked = false;
-    Object.keys(state.scenarios).forEach(function (scenarioId) {
-      if (!state.scenarios[scenarioId]) return;
-      var scenario = null;
-      for (var i = 0; i < DATA.scenarios.length; i++) {
-        if (DATA.scenarios[i].id === scenarioId) scenario = DATA.scenarios[i];
-      }
-      if (scenario && scenario.impact.indexOf(task.id) !== -1) parked = true;
+    DATA.scenarios.forEach(function (scenario) {
+      if (state.scenarios[scenario.id] && scenario.impact.indexOf(task.id) !== -1) parked = true;
     });
     return parked;
   }
-  function isImpacted(task) { return isParked(task); }
-  function matches(task) {
-    if (state.lane !== "all" && task.lane !== state.lane) return false;
-    if (state.status === "open" && isDone(task)) return false;
-    if (state.status === "done" && !isDone(task)) return false;
-    if (state.week !== null && !(task.weeks[0] <= state.week && task.weeks[1] >= state.week)) {
-      return false;
-    }
-    if (state.query) {
-      var haystack = [
-        task.id, task.title, task.evidence, task.done, actName(task.act),
-        "lane " + task.lane
-      ].join(" ").toLowerCase();
-      if (haystack.indexOf(state.query.toLowerCase()) === -1) return false;
-    }
-    return true;
-  }
-  function visible() { return tasks().filter(matches); }
 
-  /* ---------- week helper ---------- */
+  function actName(id) { return ACT[id] ? ACT[id].name : "Act " + id; }
+
+  function weekLabel(n) {
+    return "W" + n + (WEEK_DATES[n] ? " · " + WEEK_DATES[n] : "");
+  }
+
   function currentWeek() {
     var start = new Date(DATA.meta.start + "T00:00:00");
     var now = new Date();
     var days = Math.floor((now - start) / 86400000);
     if (isNaN(days)) return 1;
-    var week = Math.floor(days / 7) + 1;
-    return Math.max(1, Math.min(TOTAL_WEEKS, week));
+    return Math.max(1, Math.min(TOTAL_WEEKS, Math.floor(days / 7) + 1));
   }
 
-  /* ---------- rendering: chrome ---------- */
-  function renderGates() {
-    var host = document.getElementById("gates");
-    host.textContent = "";
-    DATA.gates.forEach(function (gate) {
-      host.appendChild(el("div", { class: "gate" }, [
-        el("span", { class: "dot " + gate.state }),
-        el("div", {}, [
-          el("b", { text: gate.name + " (" + gate.id + ")" }),
-          el("small", { text: gate.note })
-        ])
-      ]));
-    });
+  function tasks() { return DATA.tasks; }
+
+  function matches(task) {
+    if (state.lane !== "all" && task.lane !== state.lane) return false;
+    if (state.status === "open" && isDone(task)) return false;
+    if (state.status === "done" && !isDone(task)) return false;
+    if (state.week !== null && !(task.weeks[0] <= state.week && task.weeks[1] >= state.week)) return false;
+    if (state.query) {
+      var haystack = [
+        task.id, task.title, task.evidence, task.done, task.risk,
+        task.steps.join(" "), actName(task.act), "lane " + task.lane, "size " + task.size,
+        task.gate ? task.gate : ""
+      ].join(" ").toLowerCase();
+      if (haystack.indexOf(state.query.toLowerCase()) === -1) return false;
+    }
+    return true;
   }
 
-  function renderKill() {
-    var host = document.getElementById("kill");
+  function visible() { return tasks().filter(matches); }
+
+  function dependents(id) {
+    return tasks().filter(function (task) { return task.depends.indexOf(id) !== -1; });
+  }
+
+  /* ------------------------------ chrome ------------------------------ */
+  function renderFacts() {
+    var host = document.getElementById("facts");
     host.textContent = "";
-    DATA.kill.forEach(function (item) {
-      host.appendChild(el("li", {}, [
-        el("b", { text: item.when }),
-        el("span", { text: item.then })
-      ]));
+    [
+      ["Owner", DATA.meta.owner],
+      ["Horizon", DATA.meta.start + " → " + DATA.meta.end],
+      ["Weeks", String(TOTAL_WEEKS)],
+      ["Tasks", String(tasks().length)],
+      ["Updated", DATA.meta.updated]
+    ].forEach(function (pair) {
+      host.appendChild(el("span", { class: "fact" }, [pair[0] + " ", el("b", { text: pair[1] })]));
     });
+    document.getElementById("pageTitle").textContent = DATA.meta.title;
+    document.getElementById("pageSubtitle").textContent = DATA.meta.subtitle;
+    document.getElementById("totalCount").textContent = String(tasks().length);
+    document.getElementById("nAll").textContent = String(tasks().length);
+    document.getElementById("nA").textContent = String(tasks().filter(function (t) { return t.lane === "A"; }).length);
+    document.getElementById("nB").textContent = String(tasks().filter(function (t) { return t.lane === "B"; }).length);
+  }
+
+  function renderRail() {
+    var host = document.getElementById("rail");
+    host.textContent = "";
+    var now = currentWeek();
+    for (var week = 1; week <= TOTAL_WEEKS; week++) {
+      (function (n) {
+        var inWeek = tasks().filter(function (task) { return task.weeks[0] <= n && task.weeks[1] >= n; });
+        var parked = inWeek.length > 0 && inWeek.every(isParked);
+        var button = el("button", {
+          type: "button",
+          "aria-pressed": state.week === n ? "true" : "false",
+          "aria-label": "Week " + n + ", " + (WEEK_DATES[n] || "") + ", " + inWeek.length + " tasks",
+          class: (n === now ? "now " : "") + (parked ? "parked" : ""),
+          title: inWeek.length + " tasks this week"
+        }, [
+          el("b", { text: "W" + n }),
+          el("small", { text: WEEK_DATES[n] || "" }),
+          el("em", { text: inWeek.length + "t" })
+        ]);
+        button.addEventListener("click", function () {
+          state.week = state.week === n ? null : n;
+          render();
+        });
+        host.appendChild(button);
+      })(week);
+    }
   }
 
   function renderScenarios() {
     var host = document.getElementById("scenarios");
-    while (host.children.length > 1) host.removeChild(host.lastChild);
+    host.textContent = "";
+    host.appendChild(el("span", { class: "label", text: "What if…" }));
     DATA.scenarios.forEach(function (scenario) {
-      var input = el("input", { type: "checkbox", "aria-label": scenario.label });
+      var input = el("input", { type: "checkbox", id: "sc-" + scenario.id });
       input.checked = Boolean(state.scenarios[scenario.id]);
       input.addEventListener("change", function () {
         state.scenarios[scenario.id] = input.checked;
         save();
         render();
       });
-      host.appendChild(el("label", { class: "switch" }, [input, el("span", { text: scenario.label })]));
+      var label = el("label", { class: "switch", for: "sc-" + scenario.id }, [
+        input,
+        el("span", { class: "box", "aria-hidden": "true" }),
+        el("span", { text: scenario.label })
+      ]);
+      host.appendChild(label);
     });
   }
 
@@ -723,60 +2202,113 @@
     banner.className = "banner show";
     text.textContent = "";
     active.forEach(function (scenario) {
-      text.appendChild(el("div", {}, [
+      var weeks = scenario.impact.map(function (id) {
+        var task = BY_ID[id];
+        return task ? "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") : "";
+      }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+      text.appendChild(el("p", {}, [
         el("b", { text: scenario.label + " → " }),
-        el("span", { text: scenario.effect })
+        el("span", { text: scenario.effect + " " }),
+        el("span", { class: "mit", text: "Parks " + scenario.impact.length + " tasks (" +
+          scenario.impact.join(", ") + ") in " + weeks.join(", ") + "." })
+      ]));
+      text.appendChild(el("p", { class: "mit", text: "What you do instead: " + scenario.mitigation }));
+    });
+  }
+
+  function renderSide() {
+    var gates = document.getElementById("gates");
+    gates.textContent = "";
+    DATA.gates.forEach(function (gate) {
+      var using = tasks().filter(function (task) { return task.gate === gate.id; }).length;
+      gates.appendChild(el("div", { class: "gate" }, [
+        el("span", { class: "dot " + gate.state }),
+        el("div", {}, [
+          el("b", { text: gate.name }),
+          el("small", { text: gate.note }),
+          using ? el("span", { class: "uses", text: "gates " + using + " task" + (using === 1 ? "" : "s") }) : null
+        ])
+      ]));
+    });
+
+    var kill = document.getElementById("kill");
+    kill.textContent = "";
+    DATA.kill.forEach(function (criterion) {
+      kill.appendChild(el("li", {}, [
+        el("b", { text: criterion.when }),
+        el("span", { text: " — " + criterion.then })
+      ]));
+    });
+
+    var rhythm = document.getElementById("rhythm");
+    rhythm.textContent = "";
+    DATA.meta.rhythm.forEach(function (entry) {
+      rhythm.appendChild(el("div", { class: "week-row" }, [
+        el("span", { class: "id", text: entry.day.slice(0, 3) }),
+        el("span", { class: "t", text: entry.ritual + " — " + entry.output })
       ]));
     });
   }
 
-  function renderRail() {
-    var host = document.getElementById("rail");
+  function renderThisWeek() {
+    var host = document.getElementById("thisWeek");
     host.textContent = "";
-    var now = currentWeek();
-    for (var week = 1; week <= TOTAL_WEEKS; week++) {
-      (function (weekNumber) {
-        var inWeek = tasks().filter(function (task) {
-          return task.weeks[0] <= weekNumber && task.weeks[1] >= weekNumber;
-        });
-        var parked = inWeek.length > 0 && inWeek.every(isParked);
-        var button = el("button", {
-          type: "button",
-          class: (weekNumber === now ? "now " : "") + (parked ? "parked" : ""),
-          "aria-pressed": state.week === weekNumber ? "true" : "false",
-          title: inWeek.length + " tasks this week"
-        }, [
-          el("b", { text: "W" + weekNumber }),
-          el("small", { text: inWeek.length + " task" + (inWeek.length === 1 ? "" : "s") })
-        ]);
-        button.addEventListener("click", function () {
-          state.week = state.week === weekNumber ? null : weekNumber;
-          render();
-        });
-        host.appendChild(button);
-      })(week);
+    var week = state.week || currentWeek();
+    var inWeek = tasks().filter(function (task) { return task.weeks[0] <= week && task.weeks[1] >= week; });
+    host.appendChild(el("div", { class: "empty-note", text: weekLabel(week) + " · " +
+      inWeek.filter(isDone).length + " of " + inWeek.length + " done" }));
+    if (!inWeek.length) {
+      host.appendChild(el("p", { class: "empty-note", text: "Nothing scheduled in this week." }));
+      return;
     }
+    inWeek.forEach(function (task) {
+      var tick = el("button", {
+        class: "tick", type: "button", role: "checkbox",
+        "aria-checked": isDone(task) ? "true" : "false",
+        "aria-label": "Mark " + task.title + " done"
+      }, [el("span", { text: isDone(task) ? "✓" : "" })]);
+      tick.addEventListener("click", function (event) {
+        event.stopPropagation();
+        toggle(task.id);
+      });
+      var row = el("div", { class: "week-row" + (isDone(task) ? " done" : "") }, [
+        el("span", { class: "id", text: task.id }),
+        el("span", { class: "t", text: task.title }),
+        tick
+      ]);
+      row.addEventListener("click", function () { openDrawer(task.id); });
+      host.appendChild(row);
+    });
   }
 
-  function updateProgress() {
-    var total = tasks().length;
-    var done = tasks().filter(isDone).length;
-    document.getElementById("doneCount").textContent = String(done);
-    document.getElementById("totalCount").textContent = String(total);
-    var circumference = 2 * Math.PI * 16;
-    var ring = document.getElementById("ringValue");
-    ring.setAttribute("stroke-dasharray", circumference.toFixed(2));
-    ring.setAttribute("stroke-dashoffset",
-      (circumference * (1 - (total ? done / total : 0))).toFixed(2));
+  /* ------------------------------ views ------------------------------ */
+  function axis() {
+    var months = el("div", { class: "months" });
+    MONTHS.forEach(function (month) {
+      months.appendChild(el("div", {
+        class: "month",
+        style: "grid-column:" + month.from + " / " + (month.to + 1),
+        text: month.label
+      }));
+    });
+    var ticks = el("div", { class: "ticks" });
+    var now = currentWeek();
+    for (var n = 1; n <= TOTAL_WEEKS; n++) {
+      ticks.appendChild(el("span", { class: n === now ? "now" : "", text: n === now ? "W" + n : String(n) }));
+    }
+    return el("div", { class: "row axis", "aria-hidden": "true" }, [
+      el("div", { class: "row-label" }, [
+        el("span", { class: "id", text: "Week" }),
+        el("span", { class: "title", text: DATA.meta.start + " → " + DATA.meta.end })
+      ]),
+      el("div", { class: "track" }, [months, ticks])
+    ]);
   }
-
-  /* ---------- rendering: views ---------- */
-  function weekColumns() { return TOTAL_WEEKS; }
 
   function barFor(task) {
     var span = task.weeks[1] - task.weeks[0] + 1;
-    var left = ((task.weeks[0] - 1) / weekColumns()) * 100;
-    var width = (span / weekColumns()) * 100;
+    var left = ((task.weeks[0] - 1) / TOTAL_WEEKS) * 100;
+    var width = (span / TOTAL_WEEKS) * 100;
     var classes = ["bar", "lane-" + task.lane.toLowerCase()];
     if (isDone(task)) classes.push("done");
     if (isParked(task)) { classes.push("parked"); classes.push("impacted"); }
@@ -786,69 +2318,64 @@
       class: classes.join(" "),
       style: "left:" + left + "%;width:calc(" + width + "% - 2px)",
       title: task.title + " · " + task.evidence,
-      "aria-label": task.title + ", weeks " + task.weeks[0] + " to " + task.weeks[1]
+      "aria-label": task.title + ", weeks " + task.weeks[0] + " to " + task.weeks[1] +
+        (task.gate ? ", needs gate " + task.gate : "")
     }, [el("span", { text: "W" + task.weeks[0] + (span > 1 ? "–" + task.weeks[1] : "") })]);
     bar.addEventListener("click", function () { openDrawer(task.id); });
     return bar;
+  }
+
+  function rowFor(task) {
+    var steps = stepState(task);
+    var label = el("button", { class: "row-label", type: "button" }, [
+      el("span", { class: "id", text: task.id }),
+      el("span", { class: "title", text: task.title }),
+      el("span", { class: "mini", text: steps.done + "/" + steps.total }),
+      task.gate ? el("span", { class: "mini", text: "◆" }) : null
+    ]);
+    label.addEventListener("click", function () { openDrawer(task.id); });
+    var row = el("div", {
+      class: "row" + (isDone(task) ? " done" : "") + (state.selected === task.id ? " selected" : ""),
+      "data-task": task.id
+    }, [label, el("div", { class: "track" }, [barFor(task)])]);
+    return row;
   }
 
   function renderTimeline(list) {
     var host = document.getElementById("view");
     host.textContent = "";
     if (!list.length) {
-      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc or reset the filters." }));
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc to clear them." }));
       return;
     }
-    var now = currentWeek();
-    var axisTrack = el("div", { class: "track", "aria-hidden": "true" });
-    for (var weekNumber = 1; weekNumber <= weekColumns(); weekNumber++) {
-      (function (n) {
-        axisTrack.appendChild(el("span", {
-          class: n === now ? "now" : "",
-          text: n === now ? "W" + n + "·now" : "W" + n
-        }));
-      })(weekNumber);
-    }
-    host.appendChild(el("div", { class: "row axis" }, [
-      el("div", { class: "row-label", "aria-hidden": "true" }, [
-        el("span", { class: "id", text: "Week" }),
-        el("span", { class: "title", text: "2026-11-03 → 2027-01-26" })
-      ]),
-      axisTrack
-    ]));
-
+    host.appendChild(axis());
     DATA.acts.forEach(function (act) {
       var inAct = list.filter(function (task) { return task.act === act.id; });
       if (!inAct.length) return;
       var group = el("div", { class: "act-group" });
       group.appendChild(el("div", { class: "act-head" }, [
         el("h3", { text: "Act " + act.id + " — " + act.name }),
-        el("span", { text: inAct.length + " task" + (inAct.length === 1 ? "" : "s") })
+        el("span", { class: "goal", text: act.goal }),
+        el("span", { class: "meta", text: inAct.length + " task" + (inAct.length === 1 ? "" : "s") })
       ]));
-      inAct.forEach(function (task) {
-        var label = el("button", { class: "row-label", type: "button" }, [
-          el("span", { class: "id", text: task.id }),
-          el("span", { class: "title", text: task.title })
-        ]);
-        label.addEventListener("click", function () { openDrawer(task.id); });
-        group.appendChild(el("div", { class: "row" }, [
-          label,
-          el("div", { class: "track" }, [barFor(task)])
-        ]));
-      });
+      inAct.forEach(function (task) { group.appendChild(rowFor(task)); });
       host.appendChild(group);
     });
   }
 
   function cardFor(task) {
+    var steps = stepState(task);
     var classes = ["card", "lane-" + task.lane.toLowerCase()];
     if (isDone(task)) classes.push("done");
-    if (isImpacted(task)) classes.push("impacted");
-    var card = el("button", { type: "button", class: classes.join(" ") }, [
+    if (state.selected === task.id) classes.push("selected");
+    if (isParked(task)) classes.push("impacted");
+    var card = el("button", { type: "button", class: classes.join(" "), "data-task": task.id }, [
       el("div", { class: "card-title", text: task.title }),
       el("div", { class: "card-meta" }, [
         el("span", { text: "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") }),
-        el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: "Lane " + task.lane }),
+        el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: task.lane }),
+        el("span", { class: "tag s", text: task.size }),
+        el("span", { text: steps.done + "/" + steps.total + " steps" }),
         task.gate ? el("span", { class: "tag g", text: "gate" }) : null
       ])
     ]);
@@ -860,7 +2387,7 @@
     var host = document.getElementById("view");
     host.textContent = "";
     if (!list.length) {
-      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters." }));
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc to clear them." }));
       return;
     }
     var board = el("div", { class: "board" });
@@ -870,8 +2397,9 @@
       var column = el("div", {});
       column.appendChild(el("div", { class: "col-head" }, [
         el("h3", { text: act.name }),
-        el("span", { text: inAct.length })
+        el("span", { class: "n", text: inAct.length + " · W" + act.weeks[0] + "–" + act.weeks[1] })
       ]));
+      column.appendChild(el("div", { class: "col-goal", text: act.goal }));
       inAct.forEach(function (task) { column.appendChild(cardFor(task)); });
       board.appendChild(column);
     });
@@ -882,38 +2410,47 @@
     var host = document.getElementById("view");
     host.textContent = "";
     if (!list.length) {
-      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters." }));
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc to clear them." }));
       return;
     }
     var table = el("table", { class: "list" });
-    var head = el("tr", {}, [
+    var head = el("thead", {}, [el("tr", {}, [
       el("th", { text: "" }),
       el("th", { text: "Task" }),
       el("th", { text: "Weeks" }),
       el("th", { text: "Evidence" }),
-      el("th", { text: "Lane" })
-    ]);
-    table.appendChild(el("thead", {}, [head]));
+      el("th", { text: "Lane" }),
+      el("th", { text: "Steps" })
+    ])]);
+    table.appendChild(head);
     var body = el("tbody", {});
     list.forEach(function (task) {
-      var check = el("button", {
-        class: "check", type: "button", role: "checkbox",
+      var steps = stepState(task);
+      var tick = el("button", {
+        class: "tick", type: "button", role: "checkbox",
         "aria-checked": isDone(task) ? "true" : "false",
         "aria-label": "Mark " + task.title + " done"
       }, [el("span", { text: isDone(task) ? "✓" : "" })]);
-      check.addEventListener("click", function (event) {
+      tick.addEventListener("click", function (event) {
         event.stopPropagation();
         toggle(task.id);
       });
-      var row = el("tr", { class: isDone(task) ? "done" : "" }, [
-        el("td", {}, [check]),
+      var row = el("tr", {
+        class: (isDone(task) ? "done " : "") + (state.selected === task.id ? "selected" : ""),
+        "data-task": task.id
+      }, [
+        el("td", {}, [tick]),
         el("td", {}, [
           el("span", { class: "t", text: task.title }),
-          el("div", { style: "font-size:11px;color:var(--muted)", text: task.id + " · " + actName(task.act) })
+          el("div", {}, [
+            el("span", { class: "id", text: task.id + " · " + actName(task.act) }),
+            task.gate ? el("span", { class: "tag g", style: "margin-left:6px", text: "gate " + task.gate }) : null
+          ])
         ]),
         el("td", { text: "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") }),
         el("td", {}, [el("code", { text: task.evidence })]),
-        el("td", {}, [el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: task.lane })])
+        el("td", {}, [el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: task.lane })]),
+        el("td", { text: steps.done + "/" + steps.total })
       ]);
       row.addEventListener("click", function () { openDrawer(task.id); });
       body.appendChild(row);
@@ -922,97 +2459,216 @@
     host.appendChild(table);
   }
 
-  /* ---------- drawer ---------- */
-  function openDrawer(id) {
-    var task = byId(id);
-    if (!task) return;
-    var body = document.getElementById("drawerBody");
-    body.textContent = "";
-
-    var deps = task.depends.length
-      ? task.depends.map(function (dep) {
-          var parent = byId(dep);
-          return parent ? dep + " " + parent.title : dep;
-        }).join(" · ")
-      : "none";
-
-    body.appendChild(el("div", { class: "card-meta" }, [
-      el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: "Lane " + task.lane }),
-      el("span", { text: "Act " + task.act + " — " + actName(task.act) }),
-      task.gate ? el("span", { class: "tag g", text: "gate " + task.gate }) : null
-    ]));
-    body.appendChild(el("h3", { id: "drawerTitle", text: task.title }));
-
-    var list = el("dl", { class: "kv" }, []);
-    function pair(key, value, isCode) {
-      list.appendChild(el("dt", { text: key }));
-      list.appendChild(el("dd", {}, [isCode ? el("code", { text: value }) : el("span", { text: value })]));
+  function renderProgress() {
+    var done = tasks().filter(isDone).length;
+    var total = tasks().length;
+    document.getElementById("doneCount").textContent = String(done);
+    var ring = document.getElementById("ringValue");
+    if (ring) {
+      var circumference = 2 * Math.PI * 17;
+      ring.setAttribute("stroke-dasharray", circumference.toFixed(1));
+      ring.setAttribute("stroke-dashoffset", (circumference * (1 - (total ? done / total : 0))).toFixed(1));
     }
-    pair("Weeks", "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? " – W" + task.weeks[1] : ""));
-    pair("Evidence", task.evidence, true);
-    pair("Depends on", deps);
-    body.appendChild(list);
-
-    body.appendChild(el("div", { class: "why" }, [
-      el("b", { text: "Done when: " }),
-      el("span", { text: task.done })
-    ]));
-
-    if (isParked(task)) {
-      body.appendChild(el("div", { class: "why", style: "margin-top:10px;background:var(--amber-soft)" }, [
-        el("b", { text: "Parked by a scenario: " }),
-        el("span", { text: "this task is deferred under the assumption you switched on. It is not cancelled — it is waiting on a decision." })
-      ]));
-    }
-
-    var actions = el("div", { class: "actions" });
-    var toggleButton = el("button", {
-      class: "chip" + (isDone(task) ? "" : " coral"),
-      type: "button",
-      "aria-pressed": isDone(task) ? "true" : "false",
-      text: isDone(task) ? "Mark as open" : "Mark done (evidence exists)"
-    });
-    toggleButton.addEventListener("click", function () {
-      toggle(task.id);
-      openDrawer(task.id);
-    });
-    actions.appendChild(toggleButton);
-    body.appendChild(actions);
-
-    document.getElementById("drawer").className = "drawer open";
   }
 
-  function closeDrawer() {
-    document.getElementById("drawer").className = "drawer";
-  }
-
-  function toggle(id) {
-    if (state.done[id]) delete state.done[id];
-    else state.done[id] = true;
-    save();
-    render();
-  }
-
-  /* ---------- orchestration ---------- */
   function render() {
     var list = visible();
-    var host = document.getElementById("view");
     document.getElementById("viewTitle").textContent =
       state.view.charAt(0).toUpperCase() + state.view.slice(1);
     document.getElementById("resultCount").textContent =
-      list.length + " of " + tasks().length + " tasks";
+      list.length + " of " + tasks().length + " tasks" + (state.week !== null ? " · " + weekLabel(state.week) : "");
 
     if (state.view === "timeline") renderTimeline(list);
     else if (state.view === "board") renderBoard(list);
     else renderList(list);
 
-    void host;
-    updateProgress();
-    renderRail();
+    renderProgress();
+    renderThisWeek();
     renderBanner();
+    renderRail();
+    document.querySelectorAll(".views button").forEach(function (button) {
+      button.setAttribute("aria-pressed", button.getAttribute("data-view") === state.view ? "true" : "false");
+    });
   }
 
-  function bindChips() {
+  /* ------------------------------ drawer ------------------------------ */
+  var lastFocus = null;
+
+  function openDrawer(id) {
+    var task = BY_ID[id];
+    if (!task) return;
+    lastFocus = document.activeElement;
+    state.selected = id;
+    document.getElementById("drawerId").textContent =
+      task.id + " · Act " + task.act + " — " + actName(task.act);
+    document.getElementById("drawerTitle").textContent = task.title;
+
+    var body = document.getElementById("drawerBody");
+    body.textContent = "";
+
+    var meta = el("div", { class: "sheet-meta" });
+    meta.appendChild(el("span", { class: "tag s", text: "W" + task.weeks[0] +
+      (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") + " · " + (WEEK_DATES[task.weeks[0]] || "") }));
+    meta.appendChild(el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: "Lane " + task.lane }));
+    meta.appendChild(el("span", { class: "tag s", text: "size " + task.size }));
+    if (isDone(task)) meta.appendChild(el("span", { class: "tag done", text: "done" }));
+    if (isParked(task)) meta.appendChild(el("span", { class: "tag g", text: "parked by a scenario" }));
+    if (task.gate) meta.appendChild(el("span", { class: "tag g", text: "gate " + task.gate }));
+    body.appendChild(meta);
+
+    if (task.gate && GATE[task.gate]) {
+      body.appendChild(el("div", { class: "risk" }, [
+        el("b", { text: GATE[task.gate].name + ": " }),
+        el("span", { text: GATE[task.gate].note })
+      ]));
+    }
+
+    var steps = stepState(task);
+    body.appendChild(el("h3", { text: "Steps — " + steps.done + " of " + steps.total }));
+    var list = el("ul", { class: "steps" });
+    var marks = state.steps[task.id] || [];
+    task.steps.forEach(function (text, index) {
+      var on = Boolean(marks[index]);
+      var box = el("button", {
+        class: "box", type: "button", role: "checkbox",
+        "aria-checked": on ? "true" : "false",
+        "aria-label": text.replace(/`/g, "")
+      }, [el("span", { text: on ? "✓" : "" })]);
+      box.addEventListener("click", function () {
+        var current = state.steps[task.id] || [];
+        current[index] = !current[index];
+        state.steps[task.id] = current;
+        save();
+        openDrawer(id);
+        render();
+      });
+      var line = el("li", { class: on ? "on" : "" }, [box, el("span", { class: "txt", text: text })]);
+      list.appendChild(line);
+    });
+    body.appendChild(list);
+
+    var kv = el("dl", { class: "kv" });
+    kv.appendChild(el("dt", { text: "Evidence file" }));
+    kv.appendChild(el("dd", {}, [el("code", { text: task.evidence })]));
+    kv.appendChild(el("dt", { text: "Done when" }));
+    kv.appendChild(el("dd", { text: task.done }));
+    body.appendChild(kv);
+
+    body.appendChild(el("h3", { text: "What goes wrong" }));
+    body.appendChild(el("div", { class: "risk", text: task.risk }));
+
+    if (task.depends.length) {
+      body.appendChild(el("h3", { text: "Depends on" }));
+      var deps = el("div", { class: "deps" });
+      task.depends.forEach(function (dep) {
+        var chip = el("button", { class: "dep", type: "button", text: dep + " · " + (BY_ID[dep] ? BY_ID[dep].title : dep) });
+        chip.addEventListener("click", function () { openDrawer(dep); });
+        deps.appendChild(chip);
+      });
+      body.appendChild(deps);
+    }
+
+    var blocked = dependents(id);
+    if (blocked.length) {
+      body.appendChild(el("h3", { text: "Blocks" }));
+      var blocks = el("div", { class: "deps" });
+      blocked.forEach(function (task2) {
+        var chip = el("button", { class: "dep", type: "button", text: task2.id + " · " + task2.title });
+        chip.addEventListener("click", function () { openDrawer(task2.id); });
+        blocks.appendChild(chip);
+      });
+      body.appendChild(blocks);
+    }
+
+    document.getElementById("drawerToggle").textContent = isDone(task) ? "Mark open" : "Mark done";
+    document.getElementById("drawerToggle").className = "btn " + (isDone(task) ? "" : "primary");
+    document.getElementById("drawer").className = "drawer open";
+    document.getElementById("drawer").setAttribute("data-task", id);
+    setHash(id);
+    document.querySelectorAll(".sheet .close")[0].focus();
+    render();
+  }
+
+  function closeDrawer() {
+    var drawer = document.getElementById("drawer");
+    if (!drawer.className.includes("open")) return;
+    drawer.className = "drawer";
+    drawer.removeAttribute("data-task");
+    setHash(null);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    lastFocus = null;
+    render();
+  }
+
+  function setHash(id) {
+    var next = id ? "#t=" + id : "";
+    if (window.location.hash === next) return;
+    try {
+      if (id) window.location.hash = "t=" + id;
+      else window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    } catch (error) { /* file:// in some browsers refuses history writes */ }
+  }
+
+  function readHash() {
+    var match = /(?:^|[#&])t=([0-9.]+)/.exec(window.location.hash || "");
+    return match ? match[1] : null;
+  }
+
+  /* ------------------------------ actions ------------------------------ */
+  function toggle(id) {
+    if (state.done[id]) delete state.done[id];
+    else state.done[id] = true;
+    save();
+    render();
+    var drawer = document.getElementById("drawer");
+    if (drawer.className.includes("open") && drawer.getAttribute("data-task") === id) openDrawer(id);
+  }
+
+  function buildStatus() {
+    var lines = [];
+    lines.push("### " + DATA.meta.title + " — status " + DATA.meta.updated);
+    lines.push("");
+    DATA.acts.forEach(function (act) {
+      var inAct = tasks().filter(function (task) { return task.act === act.id; });
+      if (!inAct.length) return;
+      var done = inAct.filter(isDone).length;
+      lines.push("**Act " + act.id + " — " + act.name + "** (" + done + "/" + inAct.length + ")");
+      inAct.forEach(function (task) {
+        var steps = stepState(task);
+        var mark = isDone(task) ? "x" : " ";
+        var detail = steps.done + "/" + steps.total + " steps";
+        lines.push("- [" + mark + "] " + task.id + " " + task.title +
+          " — W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") +
+          " — " + detail + " — evidence: " + task.evidence);
+      });
+      lines.push("");
+    });
+    var parked = tasks().filter(isParked);
+    lines.push("Parked by a scenario: " + (parked.length ? parked.map(function (t) { return t.id; }).join(", ") : "none"));
+    lines.push("Gates: " + DATA.gates.map(function (g) { return g.id + " " + g.state; }).join(" · "));
+    lines.push("No performance figures are reported here; anything unmeasured is not yet measured.");
+    return lines.join("\n");
+  }
+
+  function openModal(text) {
+    document.getElementById("modalText").value = text;
+    document.getElementById("modal").className = "modal open";
+    document.getElementById("modalText").focus();
+    document.getElementById("modalText").select();
+  }
+
+  function closeModal() {
+    document.getElementById("modal").className = "modal";
+  }
+
+  /* ------------------------------ wiring ------------------------------ */
+  function bindToolbar() {
+    var search = document.getElementById("q");
+    search.addEventListener("input", function () {
+      state.query = search.value.trim();
+      render();
+    });
+
     document.querySelectorAll(".chip[data-lane]").forEach(function (chip) {
       chip.addEventListener("click", function () {
         state.lane = chip.getAttribute("data-lane");
@@ -1022,6 +2678,7 @@
         render();
       });
     });
+
     document.querySelectorAll(".chip[data-status]").forEach(function (chip) {
       chip.addEventListener("click", function () {
         state.status = chip.getAttribute("data-status");
@@ -1031,73 +2688,155 @@
         render();
       });
     });
+
     document.querySelectorAll(".views button").forEach(function (button) {
       button.addEventListener("click", function () {
         state.view = button.getAttribute("data-view");
-        document.querySelectorAll(".views button").forEach(function (other) {
-          other.setAttribute("aria-pressed", other === button ? "true" : "false");
-        });
+        save();
         render();
+      });
+    });
+
+    document.getElementById("reset").addEventListener("click", function () {
+      state.done = {};
+      state.steps = {};
+      save();
+      render();
+      if (document.getElementById("drawer").className.includes("open")) closeDrawer();
+    });
+
+    document.getElementById("copy").addEventListener("click", function () {
+      openModal(buildStatus());
+    });
+
+    document.getElementById("modalSelect").addEventListener("click", function () {
+      var area = document.getElementById("modalText");
+      area.focus();
+      area.select();
+    });
+
+    document.getElementById("drawerToggle").addEventListener("click", function () {
+      var id = document.getElementById("drawer").getAttribute("data-task");
+      if (id) toggle(id);
+    });
+
+    document.getElementById("drawerCopy").addEventListener("click", function () {
+      var id = document.getElementById("drawer").getAttribute("data-task");
+      var task = BY_ID[id];
+      if (!task) return;
+      openModal([
+        "**" + task.id + " — " + task.title + "**",
+        "",
+        "- weeks: W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") +
+          " (" + (WEEK_DATES[task.weeks[0]] || "") + ")",
+        "- lane: " + task.lane + " · act " + task.act + " — " + actName(task.act) + " · size " + task.size,
+        "- evidence: `" + task.evidence + "`",
+        "- done when: " + task.done,
+        "- risk: " + task.risk,
+        "- steps:",
+        task.steps.map(function (step, index) {
+          var marks = state.steps[task.id] || [];
+          return "  - [" + (marks[index] ? "x" : " ") + "] " + step;
+        }).join("\n")
+      ].join("\n"));
+    });
+
+    document.querySelectorAll("[data-close]").forEach(function (node) {
+      node.addEventListener("click", function () {
+        closeDrawer();
+        closeModal();
       });
     });
   }
 
+  function moveSelection(delta) {
+    var list = visible();
+    if (!list.length) return;
+    var index = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].id === state.selected) index = i;
+    index = index === -1 ? (delta > 0 ? 0 : list.length - 1) : (index + delta + list.length) % list.length;
+    state.selected = list[index].id;
+    render();
+    var node = document.querySelector('[data-task="' + state.selected + '"]');
+    if (node && node.scrollIntoView) node.scrollIntoView({ block: "nearest" });
+  }
+
+  function trapFocus(event) {
+    if (event.key !== "Tab") return;
+    var container = document.getElementById("modal").className.includes("open")
+      ? document.querySelector("#modal .card-box")
+      : (document.getElementById("drawer").className.includes("open")
+        ? document.querySelector("#drawer .sheet")
+        : null);
+    if (!container) return;
+    var focusable = container.querySelectorAll(
+      'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function bindKeys() {
+    document.addEventListener("keydown", trapFocus);
     document.addEventListener("keydown", function (event) {
       var target = event.target;
       var typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
       if (event.key === "/" && !typing) {
         event.preventDefault();
         document.getElementById("q").focus();
-      } else if (event.key === "Escape") {
+        return;
+      }
+      if (event.key === "Escape") {
         var input = document.getElementById("q");
-        if (input.value) { input.value = ""; state.query = ""; render(); }
+        closeModal();
         closeDrawer();
+        if (input && input.value) { input.value = ""; state.query = ""; render(); }
         if (state.week !== null) { state.week = null; render(); }
-      } else if (!typing && (event.key === "1" || event.key === "2" || event.key === "3")) {
-        var map = { "1": "timeline", "2": "board", "3": "list" };
-        state.view = map[event.key];
-        document.querySelectorAll(".views button").forEach(function (button) {
-          button.setAttribute("aria-pressed",
-            button.getAttribute("data-view") === state.view ? "true" : "false");
-        });
+        return;
+      }
+      if (typing) return;
+      if (event.key === "1" || event.key === "2" || event.key === "3") {
+        state.view = { "1": "timeline", "2": "board", "3": "list" }[event.key];
+        save();
         render();
+        return;
+      }
+      if (event.key === "j") { event.preventDefault(); moveSelection(1); return; }
+      if (event.key === "k") { event.preventDefault(); moveSelection(-1); return; }
+      if (event.key === "Enter" && state.selected) { openDrawer(state.selected); }
+    });
+    window.addEventListener("hashchange", function () {
+      var id = readHash();
+      if (id) { if (BY_ID[id]) openDrawer(id); }
+      else {
+        var drawer = document.getElementById("drawer");
+        if (drawer.className.includes("open")) drawer.className = "drawer";
       }
     });
   }
 
   function init() {
     load();
-    renderGates();
-    renderKill();
+    renderFacts();
+    renderSide();
     renderScenarios();
-    bindChips();
+    bindToolbar();
     bindKeys();
-
-    var search = document.getElementById("q");
-    search.addEventListener("input", function () {
-      state.query = search.value.trim();
-      render();
-    });
-
-    document.getElementById("reset").addEventListener("click", function () {
-      state.done = {};
-      save();
-      render();
-    });
-
-    document.querySelectorAll("[data-close]").forEach(function (node) {
-      node.addEventListener("click", closeDrawer);
-    });
-
     render();
+    var id = readHash();
+    if (id && BY_ID[id]) openDrawer(id);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();
 </script>
 </body>

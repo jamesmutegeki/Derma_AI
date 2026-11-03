@@ -130,7 +130,7 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | --- | --- | --- | --- |
 | **S8-1** | PAD-UFES-20 can be fetched, verified and converted in one command, and the verifier refuses a copy where a lesion spans two patients, a cancer lacks its biopsy flag, a skin type is missing, or an image is absent | `scripts/fetch_padufes20.sh`, `scripts/verify_padufes20.py`, `tests/test_s8_padufes_ingest.py` (9 tests) | done |
 | **S8-2** | The roadmap exists as something you can put on a wall: A3, offline, no invented numbers, same lanes and gates as the markdown | `docs/roadmap_wallchart.html`, `tests/test_s7_sources_and_roadmap.py` (13 tests total) | done |
-| **S8-3** | The roadmap is an instrument, not prose: one offline file with the 43 tasks, dependencies, gates and kill criteria as data, filterable by lane/week/search, four "what if" scenarios that park the affected tasks, and tick-box progress kept in the browser only — no invented numbers, both holds stated | `docs/roadmap.html`, `tests/test_s8_roadmap_interactive.py` (12 tests) | done |
+| **S8-3** | The roadmap is an instrument, not prose: one data file (43 tasks, 173 steps, dependencies, gates, kill criteria, four what-if scenarios) rendered into an interactive offline page *and* the markdown task tables, so the two cannot drift; lane/week/search filters, per-task drawer with steps that tick individually, scenario parking, browser-only progress, deep links, no invented numbers | `docs/roadmap_data.json`, `docs/roadmap_template.html`, `scripts/build_roadmap.py`, `docs/roadmap.html`, `tests/test_s8_roadmap_interactive.py` (12 tests) | done |
 
 ## Scope decisions
 
