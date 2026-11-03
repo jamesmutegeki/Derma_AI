@@ -124,6 +124,13 @@ its DOI; `LICENSE`, `CITATION.cff`, `MODEL_CARD.md`, `.env.example`,
 | **S7-1** | A dataset you can start on today, with no request form: PAD-UFES-20 (phone images, biopsy-proven cancers, Fitzpatrick labels, CC BY 4.0, direct download), DermaMNIST (`pip install medmnist`), SCIN (public bucket) | `docs/DATASET_SOURCES_IMMEDIATE.md`, `docs/DATASET_CARD_PAD_UFES_20.md`, `docs/DATASET_CARD_DERMAMNIST.md`, label maps | done |
 | **S7-2** | The twelve-week plan to completion: two lanes, dated weeks, evidence file per deliverable, kill criteria, risk register | `docs/ROADMAP.md`, `tests/test_s7_sources_and_roadmap.py` (9 tests) | done |
 
+## Sprint 8 -- making the answer executable
+
+| ID | Requirement | Acceptance test(s) | Status |
+| --- | --- | --- | --- |
+| **S8-1** | PAD-UFES-20 can be fetched, verified and converted in one command, and the verifier refuses a copy where a lesion spans two patients, a cancer lacks its biopsy flag, a skin type is missing, or an image is absent | `scripts/fetch_padufes20.sh`, `scripts/verify_padufes20.py`, `tests/test_s8_padufes_ingest.py` (9 tests) | done |
+| **S8-2** | The roadmap exists as something you can put on a wall: A3, offline, no invented numbers, same lanes and gates as the markdown | `docs/roadmap_wallchart.html`, `tests/test_s7_sources_and_roadmap.py` (13 tests total) | done |
+
 ## Scope decisions
 
 | Date | Decision | Effect |

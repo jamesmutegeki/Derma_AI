@@ -11,6 +11,19 @@ data (or the answer) arrives **immediately**.
 
 ---
 
+## One command to start
+
+```bash
+bash scripts/fetch_padufes20.sh --check     # licences, sizes, plan -- downloads nothing
+bash scripts/fetch_padufes20.sh --work ~/padufes     # ~3.35 GB, then verify + convert
+```
+
+It downloads PAD-UFES-20 from Mendeley, then **refuses to convert** unless
+`scripts/verify_padufes20.py` passes: every metadata row joined to an image, every
+lesion belonging to exactly one patient (so a patient-grouped split is possible),
+every cancer row carrying its biopsy flag, and a Fitzpatrick value on every row.
+Exit 3 means the copy is not trainable, and the script stops.
+
 ## The short answer
 
 | Rank | Source | Time to data | What it is | Use it for |

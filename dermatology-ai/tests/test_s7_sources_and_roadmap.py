@@ -105,3 +105,42 @@ def test_roadmap_definition_of_done_matches_the_gates(app_dir):
     assert "definition_of_done.sh" in tail
     assert "serving.enabled: false" in tail
     assert "[ ]" in tail  # an actual checklist, not a paragraph
+
+
+# --------------------------------------------------------------------------
+# The wall chart: a plan you can print, not a deck you can hide in
+# --------------------------------------------------------------------------
+
+def test_wallchart_is_self_contained_and_printable(app_dir):
+    html = (app_dir / "docs" / "roadmap_wallchart.html").read_text(encoding="utf-8")
+    assert "@page" in html and "A3 landscape" in html
+    assert "../assets/logo-mark.png" in html
+    # Offline clinics, no supply chain: no remote fonts, scripts or images.
+    assert "http://" not in html and "https://" not in html
+    assert "<script" not in html
+
+
+def test_wallchart_keeps_the_two_lanes_and_the_pause(app_dir):
+    html = (app_dir / "docs" / "roadmap_wallchart.html").read_text(encoding="utf-8")
+    assert "Lane A" in html and "Lane B" in html
+    assert "paused 2026-10-31" in html
+    assert "gate 1A" in html
+
+
+def test_wallchart_dates_match_the_roadmap(app_dir):
+    html = (app_dir / "docs" / "roadmap_wallchart.html").read_text(encoding="utf-8")
+    for week in range(1, 13):
+        assert f"W{week} ·" in html, f"week {week} missing"
+    assert "2026-11-03" in html and "2027-01-26" in html
+
+
+def test_wallchart_carries_the_disclaimer(app_dir):
+    html = (app_dir / "docs" / "roadmap_wallchart.html").read_text(encoding="utf-8")
+    assert "Not a medical device" in html
+    assert "No Business Associate Agreement (BAA)" in html
+    assert "Do not use with real patient data" in html
+
+
+def test_wallchart_invents_no_metrics(app_dir):
+    html = (app_dir / "docs" / "roadmap_wallchart.html").read_text(encoding="utf-8")
+    assert not re.search(r"(accuracy|AUC|sensitivity|recall)\s*(of|:|=)?\s*0?\.\d+", html, re.I)

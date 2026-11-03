@@ -2,6 +2,8 @@
 
 **Written:** 2026-11-03 · **Horizon:** 12 weeks (to ~2027-01-26) + an open lane
 **Owner:** J. Mutegeki · **Status:** active
+**Printable version:** [`roadmap_wallchart.html`](./roadmap_wallchart.html) — A3
+landscape, no external assets, print it and put it above the desk
 
 ---
 
@@ -57,7 +59,7 @@ the *third class*, not the project.
 
 | # | Deliverable | Evidence file | Done when |
 | --- | --- | --- | --- |
-| 0.1 | PAD-UFES-20 downloaded and verified | `padufes_verification.json` | 2,298 images, 1,373 patients, all cancer labels biopsy-proven |
+| 0.1 | PAD-UFES-20 downloaded and verified (`bash scripts/fetch_padufes20.sh --work ~/padufes`) | `padufes_verification.json` | 2,298 images, 1,373 patients, all cancer labels biopsy-proven |
 | 0.2 | DermaMNIST smoke run | `runs/smoke/report.json` (`valid: false`) | pipeline trains and reports, no claim implied |
 | 0.3 | Licence register | `docs/DATASET_SOURCES_IMMEDIATE.md` | every dataset has a licence line and a redistribution rule |
 | 0.4 | Data decision recorded | `REMEDIATION_STATUS.md` scope table | PAD-UFES-20 + HAM10000 for training, SCIN for tone, DDI as stretch |

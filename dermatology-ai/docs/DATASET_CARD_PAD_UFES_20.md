@@ -14,6 +14,16 @@
 | Used for | **Training lane A** (`benign` vs `melanoma`) with PAD-UFES-20 + HAM10000 |
 | Caveat | No Kaposi sarcoma. BCC/SCC/ACK are excluded, never merged into `benign`. Split by patient, not by image |
 
+## Ingest
+
+```bash
+bash scripts/fetch_padufes20.sh --work ~/padufes
+```
+
+Downloads, verifies (patient grouping, biopsy flags, skin types, class counts)
+and converts with hardlinks. It stops on any verification failure, so a partial
+archive cannot become a training set.
+
 ## Why this dataset matters here
 
 HAM10000 is dermatoscopic and Austrian; this project's deployment is a phone

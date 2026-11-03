@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dermatology System — 12-week wall chart</title>
+<!--
+  Print this on A3 landscape and put it where you will see it every morning.
+  It is a plan, not a report: it contains dates, files and gates, and no
+  performance figures. Numbers live in report.json or they do not exist.
+-->
+<style>
+  :root {
+    --navy: #113B65;
+    --coral: #E66461;
+    --ink: #16202B;
+    --muted: #5C6B7A;
+    --line: #DCE3EA;
+    --paper: #FFFFFF;
+    --wash: #F5F8FB;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--wash);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    width: 420mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 12mm 14mm;
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    gap: 6mm;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 6mm;
+    border-bottom: 3px solid var(--navy);
+    padding-bottom: 4mm;
+  }
+  header img { width: 16mm; height: 16mm; }
+  .titles h1 {
+    font-size: 26pt;
+    letter-spacing: -0.4pt;
+    color: var(--navy);
+    line-height: 1.05;
+  }
+  .titles p { font-size: 10.5pt; color: var(--muted); margin-top: 2mm; }
+  .stamp {
+    margin-left: auto;
+    text-align: right;
+    font-size: 8.5pt;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .stamp strong { color: var(--coral); font-size: 10pt; }
+
+  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .lane {
+    border: 1.5px solid var(--line);
+    border-radius: 3mm;
+    padding: 4mm 5mm;
+    background: var(--wash);
+  }
+  .lane h2 {
+    font-size: 11pt;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+    margin-bottom: 2.5mm;
+  }
+  .lane.a h2 { color: var(--navy); }
+  .lane.b h2 { color: var(--coral); }
+  .lane p { font-size: 9pt; line-height: 1.45; color: var(--ink); }
+  .lane .tag {
+    display: inline-block;
+    font-size: 7.5pt;
+    letter-spacing: 0.5pt;
+    text-transform: uppercase;
+    padding: 1mm 2.5mm;
+    border-radius: 2mm;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    margin-top: 2.5mm;
+  }
+
+  h2.section {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1.2pt;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5mm;
+  }
+
+  .weeks {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3mm;
+  }
+  .week {
+    border-left: 3px solid var(--navy);
+    padding: 2mm 0 2mm 3mm;
+    font-size: 8pt;
+    line-height: 1.35;
+  }
+  .week b { display: block; font-size: 8.5pt; color: var(--navy); }
+  .week span { color: var(--muted); font-size: 7.5pt; }
+  .week.hot { border-left-color: var(--coral); }
+  .week.hot b { color: var(--coral); }
+
+  .grid3 { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 5mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  th, td { text-align: left; padding: 1.6mm 2mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.6pt; color: var(--muted); }
+  td.gate { white-space: nowrap; }
+  .pill {
+    display: inline-block; padding: 0.6mm 2mm; border-radius: 2mm;
+    font-size: 7pt; letter-spacing: 0.3pt;
+  }
+  .pill.open { background: #FDECEC; color: #A8332F; }
+  .pill.done { background: #E8F3EC; color: #1F6B3F; }
+  .pill.hold { background: #FFF4E5; color: #8A5A00; }
+
+  ul { list-style: none; font-size: 8.5pt; line-height: 1.5; }
+  ul li { padding-left: 5mm; position: relative; margin-bottom: 1mm; }
+  ul li::before {
+    content: "";
+    position: absolute; left: 0; top: 1.4mm;
+    width: 2.6mm; height: 2.6mm;
+    border: 1.2px solid var(--navy);
+    border-radius: 0.6mm;
+  }
+  .kill li::before { border-color: var(--coral); }
+  .kill li { color: var(--ink); }
+
+  footer {
+    margin-top: auto;
+    border-top: 1px solid var(--line);
+    padding-top: 3mm;
+    display: flex;
+    justify-content: space-between;
+    gap: 6mm;
+    font-size: 7.5pt;
+    color: var(--muted);
+  }
+  footer strong { color: var(--ink); }
+
+  @media print {
+    body { background: #fff; }
+    .sheet { margin: 0; padding: 10mm 12mm; width: auto; min-height: auto; }
+    @page { size: A3 landscape; margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header>
+    <img src="../assets/logo-mark.png" alt="Dermatology System">
+    <div class="titles">
+      <h1>Twelve weeks to a defensible study</h1>
+      <p>Two lanes, six acts, one rule: no number without a report.</p>
+    </div>
+    <div class="stamp">
+      <strong>2026-11-03 → 2027-01-26</strong><br>
+      Owner: J. Mutegeki<br>
+      Research prototype — not a medical device
+    </div>
+  </header>
+
+  <div class="lanes">
+    <div class="lane a">
+      <h2>Lane A — buildable now</h2>
+      <p>PAD-UFES-20 + HAM10000 → benign vs melanoma. Frozen artefact, serving held.
+         Tone-stratified evaluation on SCIN with the worst stratum published.
+         Ships even if Lane B never lands.</p>
+      <span class="tag">PAD-UFES-20 · HAM10000 · SCIN</span>
+    </div>
+    <div class="lane b">
+      <h2>Lane B — partner-gated</h2>
+      <p>Kaposi sarcoma cohort via UCI/UVRI, Makerere dermatology, or an African KS
+         consortium. Ethics amendment, then the third class, then serving unheld.
+         Six-week rule: no answer by 14 Dec → protocol chapter, not a stall.</p>
+      <span class="tag">paused 2026-10-31 · gate 1A</span>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="section">The weeks</h2>
+    <div class="weeks">
+      <div class="week"><b>W1 · 3–9 Nov</b><span>data in, smoke run, split fixed</span></div>
+      <div class="week hot"><b>W2 · 10–16 Nov</b><span>first real run · ethics submitted</span></div>
+      <div class="week"><b>W3 · 17–23 Nov</b><span>frozen artefact v1</span></div>
+      <div class="week"><b>W4 · 24–30 Nov</b><span>SCIN eval · Gap Ledger</span></div>
+      <div class="week"><b>W5 · 1–7 Dec</b><span>Failure Museum · escalate ethics</span></div>
+      <div class="week hot"><b>W6 · 8–14 Dec</b><span>red-team #1 · KS six-week rule</span></div>
+      <div class="week"><b>W7 · 15–21 Dec</b><span>clinician sessions 1–6</span></div>
+      <div class="week"><b>W8 · 22–28 Dec</b><span>sessions 7–12 · analysis</span></div>
+      <div class="week"><b>W9 · 29 Dec–4 Jan</b><span>reproducibility test</span></div>
+      <div class="week"><b>W10 · 5–11 Jan</b><span>demo build · abstract</span></div>
+      <div class="week"><b>W11 · 12–18 Jan</b><span>red-team #2 · final numbers</span></div>
+      <div class="week hot"><b>W12 · 19–26 Jan</b><span>demo day · submit</span></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div>
+      <h2 class="section">Gates</h2>
+      <table>
+        <tr><th>Gate</th><th>State</th></tr>
+        <tr><td>S1-1 frozen artefact</td><td class="gate"><span class="pill hold">paused · KS</span></td></tr>
+        <tr><td>S2-4 runbook signed</td><td class="gate"><span class="pill done">closed</span></td></tr>
+        <tr><td>Retention policy</td><td class="gate"><span class="pill done">in force</span></td></tr>
+        <tr><td>IRB determination</td><td class="gate"><span class="pill open">pending</span></td></tr>
+        <tr><td>Clinician study</td><td class="gate"><span class="pill open">planned</span></td></tr>
+        <tr><td>Two red-team days</td><td class="gate"><span class="pill open">planned</span></td></tr>
+      </table>
+    </div>
+
+    <div>
+      <h2 class="section">Kill criteria</h2>
+      <ul class="kill">
+        <li>PAD-UFES-20 skin types unusable → HAM10000 train, SCIN eval, and say so.</li>
+        <li>SCIN has no melanoma → evaluate calibration only; restate, don't pretend.</li>
+        <li>No ethics answer by 14 Dec → public data only, limitation in the abstract.</li>
+        <li>No KS reply by 14 Dec → Lane B becomes a protocol chapter.</li>
+        <li>Dark-skin gap &gt; 20 points → that is the finding. Publish it.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="section">Done means all ten</h2>
+      <ul>
+        <li>manifest frozen, hash verified, serving held</li>
+        <li>tone-stratified report with the worst stratum</li>
+        <li>Tone Gap Ledger with n and intervals</li>
+        <li>Failure Museum, twelve cases</li>
+        <li>ethics determination or written refusal on file</li>
+        <li>clinician study analysed, twelve participants</li>
+        <li>two red-team entries and the fixes</li>
+        <li>stranger reproduces the headline from a clean clone</li>
+        <li>disclaimer unchanged on every artefact</li>
+        <li>no claim of clinical validity, KS class, or an African cohort</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <div><strong>Evidence first.</strong> Every number on a slide traces to
+      <code>runs/&lt;date&gt;/report.json</code> and <code>model_manifest.json</code>.
+      Everything else is an opinion.</div>
+    <div style="text-align:right">Research prototype • Not a medical device • No Business Associate Agreement (BAA)<br>
+      Do not use with real patient data</div>
+  </footer>
+
+</div>
+</body>
+</html>
