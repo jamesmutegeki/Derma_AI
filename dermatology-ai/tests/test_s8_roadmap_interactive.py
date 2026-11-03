@@ -83,10 +83,16 @@ def test_markdown_task_tables_are_generated_from_the_same_data(app_dir):
 # Offline and self-contained: a clinic laptop with no network
 # --------------------------------------------------------------------------
 
+SVG_NS = "http://www.w3.org/2000/svg"
+
+
 def test_the_page_is_offline_and_self_contained(app_dir):
     html = _page(app_dir)
-    assert "http://" not in html and "https://" not in html
+    # The only permitted URL-shaped string is the inert SVG namespace.
+    rest = html.replace(SVG_NS, "")
+    assert "http://" not in rest and "https://" not in rest, re.findall(r"https?://[^\"'\s]+", rest)
     assert "<link" not in html
+    assert "fetch(" not in html and "XMLHttpRequest" not in html and "@import" not in html
     assert re.findall(r"<img[^>]+src=\"([^\"]+)\"", html) == ["../assets/logo-mark.png"]
     assert "@media print" in html and "@page" in html
 
@@ -142,6 +148,44 @@ def test_every_act_has_work_and_a_stated_goal(app_dir):
         assert len(in_act) >= 3, f"act {act['id']} has {len(in_act)} tasks"
         assert act["goal"].strip() and act["why"].strip()
     assert {task["lane"] for task in plan["tasks"]} == {"A", "B"}
+
+
+def test_every_week_carries_its_own_plan(app_dir):
+    plan = _data(app_dir)
+    weeks = plan["weeks"]
+    assert [entry["week"] for entry in weeks] == list(range(1, plan["meta"]["weeks"] + 1))
+    dates = {entry["week"]: entry["dates"] for entry in plan["meta"]["weekDates"]}
+    for entry in weeks:
+        assert entry["dates"] == dates[entry["week"]], f"week {entry['week']} dates disagree"
+        for field in ("laneA", "ethics", "study", "writing"):
+            assert str(entry[field]).strip(), f"week {entry['week']} has no {field}"
+        for column in entry.get("key", []):
+            assert column in ("laneA", "ethics", "study", "writing")
+
+
+def test_the_markdown_calendar_is_generated_from_the_same_weeks(app_dir):
+    text = (app_dir / MARKDOWN).read_text(encoding="utf-8")
+    assert "<!-- BEGIN:calendar (generated from docs/roadmap_data.json) -->" in text
+    block = text.split("<!-- BEGIN:calendar", 1)[1].split("<!-- END:calendar -->", 1)[0]
+    rows = re.findall(r"^\| (\d{1,2}) \| ", block, re.M)
+    assert len(rows) == 12, f"expected 12 dated week rows, found {len(rows)}"
+    for entry in _data(app_dir)["weeks"]:
+        key = set(entry.get("key", []))
+        cells = [
+            f"**{entry[column]}**" if column in key else entry[column]
+            for column in ("laneA", "ethics", "study", "writing")
+        ]
+        expected = f"| {entry['week']} | {entry['dates']} | " + " | ".join(cells) + " |"
+        assert expected in block, f"week {entry['week']} drifted: {expected}"
+
+
+def test_the_page_exposes_the_detail_it_promises(app_dir):
+    html = _page(app_dir)
+    # Views, the week sheet, dependency map, deep links and progress export.
+    for hook in ('data-view="map"', 'id="openWeek"', 'id="modalExport"', 'id="modalImport"',
+                 '"w=" + n', '"t=" + id', "chainOf", "weekMarkdown"):
+        assert hook in html, f"the page is missing {hook}"
+    assert "derma-roadmap-v2" in html
 
 
 def test_dependencies_scenarios_and_gates_all_resolve(app_dir):

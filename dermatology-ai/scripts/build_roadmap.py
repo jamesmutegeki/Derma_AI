@@ -5,8 +5,9 @@
 plan. This script renders two things from it:
 
 * ``docs/roadmap.html``  -- the interactive page (JSON inlined, no network calls)
-* the task tables inside ``docs/ROADMAP.md`` -- between ``BEGIN``/``END``
-  markers, so the markdown and the page can never drift apart
+* the task tables and the twelve-week calendar inside ``docs/ROADMAP.md`` --
+  between ``BEGIN``/``END`` markers, so the markdown and the page can never
+  drift apart
 
 Run it after editing the data file::
 
@@ -94,6 +95,20 @@ def validate(plan: dict) -> None:
             if dep not in ids:
                 problems.append(f"{task['id']}: depends on unknown task {dep}")
 
+    weeks = plan.get("weeks", [])
+    if [w.get("week") for w in weeks] != list(range(1, int(meta.get("weeks", 0)) + 1)):
+        problems.append("weeks must be one entry per week, in order, 1..weeks")
+    for entry in weeks:
+        for field in ("dates", "laneA", "ethics", "study", "writing"):
+            if not str(entry.get(field, "")).strip():
+                problems.append(f"week {entry.get('week')}: {field} is empty")
+        dates = {int(w["week"]): w["dates"] for w in meta.get("weekDates", [])}
+        if dates.get(int(entry.get("week", 0))) != entry.get("dates"):
+            problems.append(f"week {entry.get('week')}: dates disagree with meta.weekDates")
+        for column in entry.get("key", []):
+            if column not in ("laneA", "ethics", "study", "writing"):
+                problems.append(f"week {entry.get('week')}: cannot highlight {column!r}")
+
     for scenario in plan.get("scenarios", []):
         if not scenario.get("impact"):
             problems.append(f"scenario {scenario.get('id')} parks nothing")
@@ -139,6 +154,29 @@ def table_rows(plan: dict, act_id: str) -> str:
     return "\n".join(rows)
 
 
+CALENDAR_HEADER = (
+    "| Week | Dates | Lane A | Act 2 (ethics) | Act 3 (study) | Writing |\n"
+    "| --- | --- | --- | --- | --- | --- |"
+)
+
+
+def calendar_block(plan: dict) -> str:
+    rows = []
+    for entry in plan["weeks"]:
+        key = set(entry.get("key", []))
+        cells = []
+        for column in ("laneA", "ethics", "study", "writing"):
+            text = str(entry[column]).replace("|", "\\|")
+            cells.append(f"**{text}**" if column in key else text)
+        rows.append(f"| {entry['week']} | {entry['dates']} | " + " | ".join(cells) + " |")
+    return "\n".join([
+        "<!-- BEGIN:calendar (generated from docs/roadmap_data.json) -->",
+        CALENDAR_HEADER,
+        *rows,
+        "<!-- END:calendar -->",
+    ])
+
+
 def generated_block(plan: dict, act_id: str) -> str:
     return "\n".join([
         begin(act_id),
@@ -157,7 +195,13 @@ def update_markdown(text: str, plan: dict) -> str:
         if not pattern.search(text):
             raise PlanError(f"ROADMAP.md has no {begin(act_id)} … {end(act_id)} block")
         text = pattern.sub(generated_block(plan, act_id), text, count=1)
-    return text
+
+    calendar = re.compile(
+        re.escape("<!-- BEGIN:calendar (generated from docs/roadmap_data.json) -->")
+        + r".*?" + re.escape("<!-- END:calendar -->"), re.S)
+    if not calendar.search(text):
+        raise PlanError("ROADMAP.md has no BEGIN:calendar … END:calendar block")
+    return calendar.sub(calendar_block(plan), text, count=1)
 
 
 def main(argv: list[str] | None = None) -> int:

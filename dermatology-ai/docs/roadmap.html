@@ -235,6 +235,8 @@
   .panel-head .count { font-size: 11.5px; color: var(--muted); }
   .panel-body { padding: 14px 16px; }
   .panel > h2 { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .panel > h2.with-action { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .panel > h2 .chip { text-transform: none; letter-spacing: 0; font-size: 10.5px; padding: 2px 8px; }
   .legend {
     display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted);
     padding: 9px 16px 0;
@@ -468,6 +470,57 @@
   }
   .modal .row-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
+  /* ---------------- map ---------------- */
+  .map-wrap { overflow-x: auto; }
+  .map { width: 100%; min-width: 720px; height: auto; display: block; }
+  .map text { font-family: var(--mono); }
+  .map .mact { font-size: 9.5px; fill: var(--muted); }
+  .map .mweek { font-size: 9.5px; fill: var(--muted); text-anchor: middle; }
+  .map .mweek.now { fill: var(--coral); font-weight: 700; }
+  .map .mband { fill: var(--wash); }
+  .map .mrule { stroke: var(--line); stroke-width: 1; }
+  .map .medge { stroke: var(--line-strong); stroke-width: 1; fill: none; }
+  .map .medge.live { stroke: var(--coral); stroke-width: 1.4; }
+  .map .mnode { cursor: pointer; }
+  .map .mnode rect {
+    fill: var(--navy); rx: 4; stroke: transparent; stroke-width: 1.5;
+  }
+  .map .mnode.lane-b rect { fill: var(--coral); }
+  .map .mnode.done rect { fill: var(--green); }
+  .map .mnode.parked rect { fill: var(--line-strong); stroke-dasharray: 3 2; }
+  .map .mnode text { font-size: 9px; fill: var(--on-accent); }
+  .map .mnode.parked text { fill: var(--muted); }
+  .map .mnode.sel rect { stroke: var(--ink); }
+  .map .mnode.dim { opacity: .25; }
+  .map .medge.dim { opacity: .2; }
+  .map .mnode:focus-visible rect { stroke: var(--ink); stroke-width: 2; }
+  .map-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 10px; }
+  .map-note { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+
+  /* ---------------- week sheet ---------------- */
+  .week-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 6px; }
+  .week-cell { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+  .week-cell h4 {
+    margin: 0 0 4px; font-size: 9.5px; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .week-cell p { margin: 0; font-size: 12.5px; }
+  .week-cell.key { border-color: var(--coral); background: var(--coral-soft); }
+  .week-list { list-style: none; margin: 0; padding: 0; }
+  .week-list li { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .week-list li:last-child { border-bottom: 0; }
+  .week-list .id { font: 10.5px var(--mono); color: var(--muted); flex: none; width: 30px; }
+  .week-list .t { font-size: 12.5px; flex: 1 1 auto; }
+  .week-list .gate { font-size: 9.5px; color: var(--amber); border: 1px solid var(--amber); border-radius: 999px; padding: 0 6px; flex: none; }
+  .week-list li.done .t { color: var(--muted); text-decoration: line-through; }
+  .import-note { min-height: 18px; font-size: 12px; color: var(--coral); }
+
+  mark { background: color-mix(in srgb, var(--coral) 28%, transparent); color: inherit; border-radius: 2px; }
+  .track .nowline {
+    position: absolute; top: -2px; bottom: -2px; width: 1px;
+    background: color-mix(in srgb, var(--coral) 65%, transparent); pointer-events: none;
+  }
+
   /* ---------------- footer ---------------- */
   footer {
     max-width: 1400px; margin: 0 auto; padding: 22px 20px 60px; color: var(--muted);
@@ -577,9 +630,10 @@
     </div>
 
     <div class="views" role="group" aria-label="View">
-      <button data-view="timeline" aria-pressed="true">Timeline</button>
-      <button data-view="board" aria-pressed="false">Board</button>
-      <button data-view="list" aria-pressed="false">List</button>
+      <button data-view="timeline" aria-pressed="true" title="Timeline — 1">Timeline</button>
+      <button data-view="board" aria-pressed="false" title="Board — 2">Board</button>
+      <button data-view="list" aria-pressed="false" title="List — 3">List</button>
+      <button data-view="map" aria-pressed="false" title="Dependency map — 4">Map</button>
     </div>
 
     <button class="chip" id="copy" title="Build a markdown status update">Copy status</button>
@@ -614,7 +668,7 @@
 
     <aside class="side">
       <section class="panel">
-        <h2>This week</h2>
+        <h2 class="with-action">This week <button class="chip" id="openWeek" title="Open the week sheet — w">Open sheet</button></h2>
         <div class="panel-body" id="thisWeek"></div>
       </section>
 
@@ -639,9 +693,10 @@
           <ul class="keys">
             <li><span>Search</span> <kbd>/</kbd></li>
             <li><span>Clear search, close, unfilter</span> <kbd>Esc</kbd></li>
-            <li><span>Timeline · Board · List</span> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></li>
+            <li><span>Timeline · Board · List · Map</span> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></li>
             <li><span>Move through tasks</span> <kbd>j</kbd> <kbd>k</kbd></li>
             <li><span>Open the task</span> <kbd>Enter</kbd></li>
+            <li><span>Open the week sheet</span> <kbd>w</kbd></li>
           </ul>
         </div>
       </section>
@@ -683,8 +738,11 @@
     <h2 id="modalTitle">Status update</h2>
     <p>Markdown, ready to paste into a supervisor email. Generated from the ticks in this browser.</p>
     <label class="sr-only" for="modalText">Status update text</label>
-    <textarea id="modalText" spellcheck="false"></textarea>
+    <textarea id="modalText" spellcheck="false" aria-describedby="modalNote"></textarea>
+    <p class="import-note" id="modalNote"></p>
     <div class="row-actions">
+      <button class="btn" id="modalExport" title="Show progress as JSON you can paste on another machine">Export JSON</button>
+      <button class="btn" id="modalImport" title="Read progress JSON from the box above">Import JSON</button>
       <button class="btn" id="modalSelect">Select all</button>
       <button class="btn primary" data-close>Done</button>
     </div>
@@ -792,6 +850,113 @@
       }
     ]
   },
+  "weeks": [
+    {
+      "week": 1,
+      "dates": "3–9 Nov",
+      "laneA": "PAD-UFES-20 in, smoke run, split fixed",
+      "ethics": "draft exemption request",
+      "study": "—",
+      "writing": "method section"
+    },
+    {
+      "week": 2,
+      "dates": "10–16 Nov",
+      "laneA": "first real training run",
+      "ethics": "submit",
+      "study": "instrument draft",
+      "writing": "data section",
+      "key": [
+        "ethics"
+      ]
+    },
+    {
+      "week": 3,
+      "dates": "17–23 Nov",
+      "laneA": "frozen artefact v1",
+      "ethics": "chase reference",
+      "study": "pilot with 2 people",
+      "writing": "results skeleton"
+    },
+    {
+      "week": 4,
+      "dates": "24–30 Nov",
+      "laneA": "SCIN eval + Gap Ledger",
+      "ethics": "—",
+      "study": "recruit 12",
+      "writing": "fairness section"
+    },
+    {
+      "week": 5,
+      "dates": "1–7 Dec",
+      "laneA": "Failure Museum",
+      "ethics": "escalate if silent",
+      "study": "schedule sessions",
+      "writing": "discussion"
+    },
+    {
+      "week": 6,
+      "dates": "8–14 Dec",
+      "laneA": "red-team #1",
+      "ethics": "6-week KS rule",
+      "study": "sessions 1–6",
+      "writing": "limitations",
+      "key": [
+        "ethics"
+      ]
+    },
+    {
+      "week": 7,
+      "dates": "15–21 Dec",
+      "laneA": "recalibrate / hold",
+      "ethics": "—",
+      "study": "sessions 7–12",
+      "writing": "—"
+    },
+    {
+      "week": 8,
+      "dates": "22–28 Dec",
+      "laneA": "freeze v2 (if needed)",
+      "ethics": "—",
+      "study": "analysis",
+      "writing": "—"
+    },
+    {
+      "week": 9,
+      "dates": "29 Dec–4 Jan",
+      "laneA": "reproducibility test",
+      "ethics": "—",
+      "study": "shadow mode",
+      "writing": "full draft"
+    },
+    {
+      "week": 10,
+      "dates": "5–11 Jan",
+      "laneA": "demo build",
+      "ethics": "—",
+      "study": "write-up",
+      "writing": "abstract"
+    },
+    {
+      "week": 11,
+      "dates": "12–18 Jan",
+      "laneA": "red-team #2",
+      "ethics": "—",
+      "study": "final numbers",
+      "writing": "revise"
+    },
+    {
+      "week": 12,
+      "dates": "19–26 Jan",
+      "laneA": "demo day",
+      "ethics": "file everything",
+      "study": "appendix",
+      "writing": "submit",
+      "key": [
+        "laneA"
+      ]
+    }
+  ],
   "acts": [
     {
       "id": "0",
@@ -2065,7 +2230,76 @@
     return node;
   }
 
+  var WEEK_BY_NUM = {};
+  (DATA.weeks || []).forEach(function (entry) { WEEK_BY_NUM[entry.week] = entry; });
+
   function isDone(task) { return Boolean(state.done[task.id]); }
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgEl(tag, attrs, children) {
+    var node = document.createElementNS(SVG_NS, tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (key) {
+        if (attrs[key] === null || attrs[key] === undefined) return;
+        if (key === "text") node.textContent = attrs[key];
+        else node.setAttribute(key, attrs[key]);
+      });
+    }
+    (children || []).forEach(function (child) {
+      if (child) node.appendChild(child);
+    });
+    return node;
+  }
+
+  function esc(text) {
+    return String(text).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+
+  function marked(text) {
+    var safe = esc(text);
+    if (!state.query) return safe;
+    var needle = state.query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    try {
+      return safe.replace(new RegExp(needle, "gi"), function (hit) {
+        return "<mark>" + hit + "</mark>";
+      });
+    } catch (error) {
+      return safe;
+    }
+  }
+
+  function nowline() {
+    var week = currentWeek();
+    return el("div", {
+      class: "nowline",
+      style: "left:calc(" + (((week - 1) + 0.5) / TOTAL_WEEKS) * 100 + "%)",
+      title: "This week: W" + week
+    });
+  }
+
+  function chainOf(id) {
+    var set = {};
+    set[id] = true;
+    var stack = [id];
+    while (stack.length) {
+      var current = stack.pop();
+      var task = BY_ID[current];
+      (task ? task.depends : []).forEach(function (dep) {
+        if (!set[dep]) { set[dep] = true; stack.push(dep); }
+      });
+    }
+    stack = [id];
+    while (stack.length) {
+      var from = stack.pop();
+      dependents(from).forEach(function (child) {
+        if (!set[child.id]) { set[child.id] = true; stack.push(child.id); }
+      });
+    }
+    return set;
+  }
 
   function stepState(task) {
     var marks = state.steps[task.id] || [];
@@ -2154,7 +2388,8 @@
           "aria-pressed": state.week === n ? "true" : "false",
           "aria-label": "Week " + n + ", " + (WEEK_DATES[n] || "") + ", " + inWeek.length + " tasks",
           class: (n === now ? "now " : "") + (parked ? "parked" : ""),
-          title: inWeek.length + " tasks this week"
+          title: (WEEK_BY_NUM[n] ? WEEK_BY_NUM[n].laneA + " · " : "") +
+            inWeek.length + " tasks — click to filter, double-click for the week sheet"
         }, [
           el("b", { text: "W" + n }),
           el("small", { text: WEEK_DATES[n] || "" }),
@@ -2164,6 +2399,7 @@
           state.week = state.week === n ? null : n;
           render();
         });
+        button.addEventListener("dblclick", function () { openWeek(n); });
         host.appendChild(button);
       })(week);
     }
@@ -2255,8 +2491,11 @@
     host.textContent = "";
     var week = state.week || currentWeek();
     var inWeek = tasks().filter(function (task) { return task.weeks[0] <= week && task.weeks[1] >= week; });
-    host.appendChild(el("div", { class: "empty-note", text: weekLabel(week) + " · " +
-      inWeek.filter(isDone).length + " of " + inWeek.length + " done" }));
+    var entry = WEEK_BY_NUM[week];
+    host.appendChild(el("div", { class: "empty-note", text: weekLabel(week) +
+      (entry ? " · " + entry.laneA : "") }));
+    host.appendChild(el("div", { class: "empty-note", text: inWeek.filter(isDone).length +
+      " of " + inWeek.length + " tasks ticked" + (entry ? " · writing: " + entry.writing : "") }));
     if (!inWeek.length) {
       host.appendChild(el("p", { class: "empty-note", text: "Nothing scheduled in this week." }));
       return;
@@ -2301,7 +2540,7 @@
         el("span", { class: "id", text: "Week" }),
         el("span", { class: "title", text: DATA.meta.start + " → " + DATA.meta.end })
       ]),
-      el("div", { class: "track" }, [months, ticks])
+      el("div", { class: "track" }, [months, ticks, nowline()])
     ]);
   }
 
@@ -2328,8 +2567,8 @@
   function rowFor(task) {
     var steps = stepState(task);
     var label = el("button", { class: "row-label", type: "button" }, [
-      el("span", { class: "id", text: task.id }),
-      el("span", { class: "title", text: task.title }),
+      el("span", { class: "id", html: marked(task.id) }),
+      el("span", { class: "title", html: marked(task.title) }),
       el("span", { class: "mini", text: steps.done + "/" + steps.total }),
       task.gate ? el("span", { class: "mini", text: "◆" }) : null
     ]);
@@ -2337,7 +2576,7 @@
     var row = el("div", {
       class: "row" + (isDone(task) ? " done" : "") + (state.selected === task.id ? " selected" : ""),
       "data-task": task.id
-    }, [label, el("div", { class: "track" }, [barFor(task)])]);
+    }, [label, el("div", { class: "track" }, [nowline(), barFor(task)])]);
     return row;
   }
 
@@ -2370,7 +2609,7 @@
     if (state.selected === task.id) classes.push("selected");
     if (isParked(task)) classes.push("impacted");
     var card = el("button", { type: "button", class: classes.join(" "), "data-task": task.id }, [
-      el("div", { class: "card-title", text: task.title }),
+      el("div", { class: "card-title", html: marked(task.title) }),
       el("div", { class: "card-meta" }, [
         el("span", { text: "W" + task.weeks[0] + (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") }),
         el("span", { class: "tag" + (task.lane === "B" ? " b" : ""), text: task.lane }),
@@ -2441,9 +2680,9 @@
       }, [
         el("td", {}, [tick]),
         el("td", {}, [
-          el("span", { class: "t", text: task.title }),
+          el("span", { class: "t", html: marked(task.title) }),
           el("div", {}, [
-            el("span", { class: "id", text: task.id + " · " + actName(task.act) }),
+            el("span", { class: "id", html: marked(task.id) + " · " + esc(actName(task.act)) }),
             task.gate ? el("span", { class: "tag g", style: "margin-left:6px", text: "gate " + task.gate }) : null
           ])
         ]),
@@ -2457,6 +2696,253 @@
     });
     table.appendChild(body);
     host.appendChild(table);
+  }
+
+  /* ------------------------------ map view ------------------------------ */
+  function renderMap(list) {
+    var host = document.getElementById("view");
+    host.textContent = "";
+    if (!list.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nothing matches those filters. Press Esc to clear them." }));
+      return;
+    }
+
+    var width = 1040, gutter = 104, top = 28, rowH = 24, headH = 20, gapAfter = 12;
+    var y = top;
+    var groups = [];
+    DATA.acts.forEach(function (act) {
+      var inAct = list.filter(function (task) { return task.act === act.id; });
+      if (!inAct.length) return;
+      var group = { act: act, headY: y, tasks: [] };
+      y += headH;
+      inAct.forEach(function (task) { group.tasks.push({ task: task, y: y }); y += rowH; });
+      y += gapAfter;
+      groups.push(group);
+    });
+    var height = y + 10;
+    var colW = (width - gutter - 12) / TOTAL_WEEKS;
+    function colX(week) { return gutter + (week - 1) * colW; }
+
+    var svg = svgEl("svg", {
+      class: "map", viewBox: "0 0 " + width + " " + height,
+      role: "group", "aria-label": "Dependency map, " + list.length + " tasks"
+    });
+
+    MONTHS.forEach(function (month, index) {
+      if (index % 2 === 0) return;
+      svg.appendChild(svgEl("rect", {
+        class: "mband", x: colX(month.from), y: 18,
+        width: colW * (month.to - month.from + 1), height: height - 22, opacity: "0.55"
+      }));
+    });
+
+    var now = currentWeek();
+    for (var n = 1; n <= TOTAL_WEEKS; n++) {
+      svg.appendChild(svgEl("text", {
+        class: "mweek" + (n === now ? " now" : ""),
+        x: colX(n) + colW / 2, y: 14, text: "W" + n
+      }));
+    }
+
+    var pos = {};
+    groups.forEach(function (group) {
+      var shortName = group.act.name.split(" —")[0];
+      if (shortName.length > 13) shortName = shortName.slice(0, 12) + "…";
+      svg.appendChild(svgEl("text", {
+        class: "mact", x: 2, y: group.headY + 11,
+        text: "Act " + group.act.id + " · " + shortName
+      }));
+      svg.appendChild(svgEl("line", {
+        class: "mrule", x1: 0, y1: group.headY + 16, x2: width, y2: group.headY + 16
+      }));
+      group.tasks.forEach(function (row) {
+        var span = row.task.weeks[1] - row.task.weeks[0] + 1;
+        pos[row.task.id] = {
+          x: colX(row.task.weeks[0]) + 2,
+          w: colW * span - 4,
+          y: row.y,
+          h: 16
+        };
+      });
+    });
+
+    var chain = state.selected && BY_ID[state.selected] ? chainOf(state.selected) : null;
+
+    tasks().forEach(function (task) {
+      if (!pos[task.id]) return;
+      task.depends.forEach(function (dep) {
+        if (!pos[dep]) return;
+        var from = pos[dep], to = pos[task.id];
+        var x1 = from.x + from.w, y1 = from.y + from.h / 2;
+        var x2 = to.x, y2 = to.y + to.h / 2;
+        var live = chain && chain[dep] && chain[task.id];
+        svg.appendChild(svgEl("path", {
+          class: "medge" + (live ? " live" : "") + (chain && !live ? " dim" : ""),
+          d: "M" + x1 + "," + y1 + " C" + (x1 + 16) + "," + y1 + " " +
+             (x2 - 16) + "," + y2 + " " + x2 + "," + y2
+        }));
+      });
+    });
+
+    tasks().forEach(function (task) {
+      var box = pos[task.id];
+      if (!box) return;
+      var classes = ["mnode", "lane-" + task.lane.toLowerCase()];
+      if (isDone(task)) classes.push("done");
+      if (isParked(task)) classes.push("parked");
+      if (state.selected === task.id) classes.push("sel");
+      if (chain && !chain[task.id]) classes.push("dim");
+      var node = svgEl("g", {
+        class: classes.join(" "), tabindex: "0", role: "button",
+        "aria-label": task.id + " " + task.title + ", weeks " + task.weeks[0] + " to " +
+          task.weeks[1] + (task.gate ? ", needs gate " + task.gate : "")
+      });
+      node.appendChild(svgEl("title", {
+        text: task.title + " · W" + task.weeks[0] +
+          (task.weeks[1] > task.weeks[0] ? "–" + task.weeks[1] : "") +
+          (task.gate ? " · gate " + task.gate : "")
+      }));
+      node.appendChild(svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: 4 }));
+      node.appendChild(svgEl("text", { x: box.x + 5, y: box.y + 11.5, text: task.id }));
+      node.addEventListener("click", function () { openDrawer(task.id, true); });
+      node.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDrawer(task.id, true);
+        }
+      });
+      svg.appendChild(node);
+    });
+
+    host.appendChild(el("p", {
+      class: "map-note",
+      text: "Each node sits in the week it starts; arrows are dependencies. Click one to light up its chain — " +
+        "everything it waits for, and everything that waits for it." + (state.selected && BY_ID[state.selected]
+          ? " Selected: " + state.selected + " — " + BY_ID[state.selected].title + "."
+          : "")
+    }));
+    host.appendChild(el("div", { class: "map-wrap" }, [svg]));
+    host.appendChild(el("div", { class: "map-legend" }, [
+      el("span", {}, [el("i", { style: "background:var(--navy)" }), "Lane A"]),
+      el("span", {}, [el("i", { style: "background:var(--coral)" }), "Lane B"]),
+      el("span", {}, [el("i", { style: "background:var(--green)" }), "done"]),
+      el("span", {}, [el("i", { style: "background:var(--line-strong)" }), "parked by a scenario"]),
+      el("span", { text: "◆ gate" })
+    ]));
+  }
+
+  /* ------------------------------ week sheet ------------------------------ */
+  function weekTasks(n) {
+    return tasks().filter(function (task) { return task.weeks[0] <= n && task.weeks[1] >= n; });
+  }
+
+  function openWeek(n) {
+    var entry = WEEK_BY_NUM[n];
+    if (!entry) return;
+    lastFocus = document.activeElement;
+    drawerMode = "week";
+    drawerRef = n;
+    state.selected = null;
+
+    document.getElementById("drawerId").textContent = "Week " + n + " · " + entry.dates +
+      (entry.key ? " · decision week" : "");
+    document.getElementById("drawerTitle").textContent = entry.laneA;
+
+    var body = document.getElementById("drawerBody");
+    body.textContent = "";
+
+    var grid = el("div", { class: "week-grid" });
+    [["Lane A", "laneA"], ["Act 2 — ethics", "ethics"], ["Act 3 — study", "study"], ["Writing", "writing"]]
+      .forEach(function (pair) {
+        var isKey = (entry.key || []).indexOf(pair[1]) !== -1;
+        grid.appendChild(el("div", { class: "week-cell" + (isKey ? " key" : "") }, [
+          el("h4", { text: pair[0] }),
+          el("p", { text: entry[pair[1]] })
+        ]));
+      });
+    body.appendChild(grid);
+
+    var inWeek = weekTasks(n);
+    var done = inWeek.filter(isDone).length;
+    body.appendChild(el("h3", { text: "Tasks this week — " + done + " of " + inWeek.length + " done" }));
+    if (!inWeek.length) {
+      body.appendChild(el("p", { class: "empty-note", text: "Nothing scheduled." }));
+    } else {
+      var list = el("ul", { class: "week-list" });
+      inWeek.forEach(function (task) {
+        var tick = el("button", {
+          class: "tick", type: "button", role: "checkbox",
+          "aria-checked": isDone(task) ? "true" : "false",
+          "aria-label": "Mark " + task.title + " done"
+        }, [el("span", { text: isDone(task) ? "✓" : "" })]);
+        tick.addEventListener("click", function (event) {
+          event.stopPropagation();
+          toggle(task.id);
+          openWeek(n);
+        });
+        var row = el("li", { class: isDone(task) ? "done" : "" }, [
+          tick,
+          el("span", { class: "id", text: task.id }),
+          el("span", { class: "t", text: task.title }),
+          task.gate ? el("span", { class: "gate", text: "◆ " + task.gate }) : null
+        ]);
+        row.addEventListener("click", function () { openDrawer(task.id); });
+        list.appendChild(row);
+      });
+      body.appendChild(list);
+    }
+
+    var gatesInPlay = [];
+    inWeek.forEach(function (task) {
+      if (task.gate && gatesInPlay.indexOf(task.gate) === -1) gatesInPlay.push(task.gate);
+    });
+    if (gatesInPlay.length) {
+      body.appendChild(el("h3", { text: "Gates in play" }));
+      gatesInPlay.forEach(function (id) {
+        var gate = GATE[id];
+        if (!gate) return;
+        body.appendChild(el("div", { class: "risk" }, [
+          el("b", { text: gate.name + " (" + gate.state + "): " }),
+          el("span", { text: gate.note })
+        ]));
+      });
+    }
+
+    body.appendChild(el("h3", { text: "Ritual" }));
+    var ritual = el("ul", { class: "week-list" });
+    DATA.meta.rhythm.forEach(function (entry2) {
+      ritual.appendChild(el("li", {}, [
+        el("span", { class: "id", text: entry2.day.slice(0, 3) }),
+        el("span", { class: "t", text: entry2.ritual + " — " + entry2.output })
+      ]));
+    });
+    body.appendChild(ritual);
+
+    var toggleButton = document.getElementById("drawerToggle");
+    toggleButton.style.display = "none";
+    document.getElementById("drawerCopy").textContent = "Copy week";
+    document.getElementById("drawer").className = "drawer open";
+    document.getElementById("drawer").setAttribute("data-week", String(n));
+    setHash("w=" + n);
+    document.querySelectorAll(".sheet .close")[0].focus();
+    render();
+  }
+
+  function weekMarkdown(n) {
+    var entry = WEEK_BY_NUM[n];
+    var lines = ["### Week " + n + " — " + entry.dates, ""];
+    lines.push("- Lane A: " + entry.laneA);
+    lines.push("- Act 2 (ethics): " + entry.ethics);
+    lines.push("- Act 3 (study): " + entry.study);
+    lines.push("- Writing: " + entry.writing);
+    lines.push("");
+    weekTasks(n).forEach(function (task) {
+      lines.push("- [" + (isDone(task) ? "x" : " ") + "] " + task.id + " " + task.title +
+        " — evidence: " + task.evidence);
+    });
+    lines.push("");
+    lines.push("No performance figures here; anything unmeasured is not yet measured.");
+    return lines.join("\n");
   }
 
   function renderProgress() {
@@ -2480,6 +2966,7 @@
 
     if (state.view === "timeline") renderTimeline(list);
     else if (state.view === "board") renderBoard(list);
+    else if (state.view === "map") renderMap(list);
     else renderList(list);
 
     renderProgress();
@@ -2493,11 +2980,18 @@
 
   /* ------------------------------ drawer ------------------------------ */
   var lastFocus = null;
+  var drawerMode = "task";
+  var drawerRef = null;
 
   function openDrawer(id) {
     var task = BY_ID[id];
     if (!task) return;
     lastFocus = document.activeElement;
+    drawerMode = "task";
+    drawerRef = id;
+    document.getElementById("drawer").removeAttribute("data-week");
+    document.getElementById("drawerToggle").style.display = "";
+    document.getElementById("drawerCopy").textContent = "Copy task";
     state.selected = id;
     document.getElementById("drawerId").textContent =
       task.id + " · Act " + task.act + " — " + actName(task.act);
@@ -2584,7 +3078,7 @@
     document.getElementById("drawerToggle").className = "btn " + (isDone(task) ? "" : "primary");
     document.getElementById("drawer").className = "drawer open";
     document.getElementById("drawer").setAttribute("data-task", id);
-    setHash(id);
+    setHash("t=" + id);
     document.querySelectorAll(".sheet .close")[0].focus();
     render();
   }
@@ -2594,24 +3088,33 @@
     if (!drawer.className.includes("open")) return;
     drawer.className = "drawer";
     drawer.removeAttribute("data-task");
+    drawer.removeAttribute("data-week");
+    drawerMode = "task";
+    drawerRef = null;
+    document.getElementById("drawerToggle").style.display = "";
+    document.getElementById("drawerCopy").textContent = "Copy task";
     setHash(null);
     if (lastFocus && lastFocus.focus) lastFocus.focus();
     lastFocus = null;
     render();
   }
 
-  function setHash(id) {
-    var next = id ? "#t=" + id : "";
+  function setHash(fragment) {
+    var next = fragment ? "#" + fragment : "";
     if (window.location.hash === next) return;
     try {
-      if (id) window.location.hash = "t=" + id;
+      if (fragment) window.location.hash = fragment;
       else window.history.replaceState(null, "", window.location.pathname + window.location.search);
     } catch (error) { /* file:// in some browsers refuses history writes */ }
   }
 
   function readHash() {
-    var match = /(?:^|[#&])t=([0-9.]+)/.exec(window.location.hash || "");
-    return match ? match[1] : null;
+    var hash = window.location.hash || "";
+    var task = /(?:^|[#&])t=([0-9.]+)/.exec(hash);
+    if (task) return { kind: "task", value: task[1] };
+    var week = /(?:^|[#&])w=([0-9]+)/.exec(hash);
+    if (week) return { kind: "week", value: Number(week[1]) };
+    return null;
   }
 
   /* ------------------------------ actions ------------------------------ */
@@ -2650,7 +3153,15 @@
     return lines.join("\n");
   }
 
+  function note(message, isError) {
+    var box = document.getElementById("modalNote");
+    if (!box) return;
+    box.textContent = message;
+    box.style.color = isError ? "var(--coral)" : "var(--green)";
+  }
+
   function openModal(text) {
+    note("", false);
     document.getElementById("modalText").value = text;
     document.getElementById("modal").className = "modal open";
     document.getElementById("modalText").focus();
@@ -2697,6 +3208,10 @@
       });
     });
 
+    document.getElementById("openWeek").addEventListener("click", function () {
+      openWeek(state.week || currentWeek());
+    });
+
     document.getElementById("reset").addEventListener("click", function () {
       state.done = {};
       state.steps = {};
@@ -2715,12 +3230,70 @@
       area.select();
     });
 
+    document.getElementById("modalExport").addEventListener("click", function () {
+      var area = document.getElementById("modalText");
+      area.value = JSON.stringify({
+        done: state.done, steps: state.steps, scenarios: state.scenarios
+      }, null, 2);
+      note("Progress copied as JSON. Paste it into the same box on another machine, then press Import.", false);
+      area.focus();
+      area.select();
+    });
+
+    document.getElementById("modalImport").addEventListener("click", function () {
+      var text = document.getElementById("modalText").value;
+      var incoming;
+      try {
+        incoming = JSON.parse(text);
+      } catch (error) {
+        note("That is not JSON. Press Export JSON to see the shape.", true);
+        return;
+      }
+      if (!incoming || typeof incoming !== "object") {
+        note("Expected an object with done, steps and scenarios.", true);
+        return;
+      }
+      var doneCount = 0;
+      var stepCount = 0;
+      var cleanDone = {};
+      var cleanSteps = {};
+      Object.keys(incoming.done || {}).forEach(function (id) {
+        if (BY_ID[id]) { cleanDone[id] = true; doneCount++; }
+      });
+      Object.keys(incoming.steps || {}).forEach(function (id) {
+        var task = BY_ID[id];
+        if (!task || !Array.isArray(incoming.steps[id])) return;
+        var marks = incoming.steps[id].map(function (v) { return Boolean(v); });
+        if (marks.length !== task.steps.length) return;
+        if (marks.indexOf(true) === -1) return;
+        cleanSteps[id] = marks;
+        stepCount += marks.filter(Boolean).length;
+      });
+      state.done = cleanDone;
+      state.steps = cleanSteps;
+      if (incoming.scenarios && typeof incoming.scenarios === "object") {
+        state.scenarios = {};
+        DATA.scenarios.forEach(function (scenario) {
+          if (incoming.scenarios[scenario.id]) state.scenarios[scenario.id] = true;
+        });
+      }
+      save();
+      render();
+      note("Imported " + doneCount + " finished tasks and " + stepCount + " step ticks." +
+        (Object.keys(incoming.done || {}).length > doneCount ? " Some ids were unknown and ignored." : ""), false);
+    });
+
     document.getElementById("drawerToggle").addEventListener("click", function () {
+      if (drawerMode !== "task") return;
       var id = document.getElementById("drawer").getAttribute("data-task");
       if (id) toggle(id);
     });
 
     document.getElementById("drawerCopy").addEventListener("click", function () {
+      if (drawerMode === "week") {
+        openModal(weekMarkdown(drawerRef));
+        return;
+      }
       var id = document.getElementById("drawer").getAttribute("data-task");
       var task = BY_ID[id];
       if (!task) return;
@@ -2803,10 +3376,15 @@
         return;
       }
       if (typing) return;
-      if (event.key === "1" || event.key === "2" || event.key === "3") {
-        state.view = { "1": "timeline", "2": "board", "3": "list" }[event.key];
+      if (event.key === "1" || event.key === "2" || event.key === "3" || event.key === "4") {
+        state.view = { "1": "timeline", "2": "board", "3": "list", "4": "map" }[event.key];
         save();
         render();
+        return;
+      }
+      if (event.key === "w") {
+        event.preventDefault();
+        openWeek(state.week || currentWeek());
         return;
       }
       if (event.key === "j") { event.preventDefault(); moveSelection(1); return; }
@@ -2814,8 +3392,9 @@
       if (event.key === "Enter" && state.selected) { openDrawer(state.selected); }
     });
     window.addEventListener("hashchange", function () {
-      var id = readHash();
-      if (id) { if (BY_ID[id]) openDrawer(id); }
+      var target = readHash();
+      if (target && target.kind === "task" && BY_ID[target.value]) openDrawer(target.value);
+      else if (target && target.kind === "week" && WEEK_BY_NUM[target.value]) openWeek(target.value);
       else {
         var drawer = document.getElementById("drawer");
         if (drawer.className.includes("open")) drawer.className = "drawer";
@@ -2831,8 +3410,9 @@
     bindToolbar();
     bindKeys();
     render();
-    var id = readHash();
-    if (id && BY_ID[id]) openDrawer(id);
+    var target = readHash();
+    if (target && target.kind === "task" && BY_ID[target.value]) openDrawer(target.value);
+    else if (target && target.kind === "week") openWeek(target.value);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

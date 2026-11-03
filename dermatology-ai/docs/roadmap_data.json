@@ -98,6 +98,113 @@
       }
     ]
   },
+  "weeks": [
+    {
+      "week": 1,
+      "dates": "3–9 Nov",
+      "laneA": "PAD-UFES-20 in, smoke run, split fixed",
+      "ethics": "draft exemption request",
+      "study": "—",
+      "writing": "method section"
+    },
+    {
+      "week": 2,
+      "dates": "10–16 Nov",
+      "laneA": "first real training run",
+      "ethics": "submit",
+      "study": "instrument draft",
+      "writing": "data section",
+      "key": [
+        "ethics"
+      ]
+    },
+    {
+      "week": 3,
+      "dates": "17–23 Nov",
+      "laneA": "frozen artefact v1",
+      "ethics": "chase reference",
+      "study": "pilot with 2 people",
+      "writing": "results skeleton"
+    },
+    {
+      "week": 4,
+      "dates": "24–30 Nov",
+      "laneA": "SCIN eval + Gap Ledger",
+      "ethics": "—",
+      "study": "recruit 12",
+      "writing": "fairness section"
+    },
+    {
+      "week": 5,
+      "dates": "1–7 Dec",
+      "laneA": "Failure Museum",
+      "ethics": "escalate if silent",
+      "study": "schedule sessions",
+      "writing": "discussion"
+    },
+    {
+      "week": 6,
+      "dates": "8–14 Dec",
+      "laneA": "red-team #1",
+      "ethics": "6-week KS rule",
+      "study": "sessions 1–6",
+      "writing": "limitations",
+      "key": [
+        "ethics"
+      ]
+    },
+    {
+      "week": 7,
+      "dates": "15–21 Dec",
+      "laneA": "recalibrate / hold",
+      "ethics": "—",
+      "study": "sessions 7–12",
+      "writing": "—"
+    },
+    {
+      "week": 8,
+      "dates": "22–28 Dec",
+      "laneA": "freeze v2 (if needed)",
+      "ethics": "—",
+      "study": "analysis",
+      "writing": "—"
+    },
+    {
+      "week": 9,
+      "dates": "29 Dec–4 Jan",
+      "laneA": "reproducibility test",
+      "ethics": "—",
+      "study": "shadow mode",
+      "writing": "full draft"
+    },
+    {
+      "week": 10,
+      "dates": "5–11 Jan",
+      "laneA": "demo build",
+      "ethics": "—",
+      "study": "write-up",
+      "writing": "abstract"
+    },
+    {
+      "week": 11,
+      "dates": "12–18 Jan",
+      "laneA": "red-team #2",
+      "ethics": "—",
+      "study": "final numbers",
+      "writing": "revise"
+    },
+    {
+      "week": 12,
+      "dates": "19–26 Jan",
+      "laneA": "demo day",
+      "ethics": "file everything",
+      "study": "appendix",
+      "writing": "submit",
+      "key": [
+        "laneA"
+      ]
+    }
+  ],
   "acts": [
     {
       "id": "0",

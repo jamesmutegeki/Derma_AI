@@ -2,10 +2,12 @@
 
 **Written:** 2026-11-03 · **Horizon:** 12 weeks (to ~2027-01-26) + an open lane
 **Owner:** J. Mutegeki · **Status:** active
-**Interactive version:** [`roadmap.html`](./roadmap.html) — filter by lane, week
-or search; open any task for its four steps, evidence file, definition of done and
-failure mode; tick it off (kept in this browser only); switch on a scenario to see
-what parks when it happens
+**Interactive version:** [`roadmap.html`](./roadmap.html) — four views (timeline,
+board, list, dependency map); filter by lane, week or search; open any task for its
+four steps, evidence file, definition of done and failure mode; open a **week sheet**
+for the week's lane, ethics, study and writing work; tick things off (kept in this
+browser only, exportable as JSON); switch on a scenario to see what parks when it
+happens
 **Printable version:** [`roadmap_wallchart.html`](./roadmap_wallchart.html) — A3
 landscape, no external assets, print it and put it above the desk
 
@@ -278,6 +280,7 @@ cut evidence.
 
 ## The 12-week calendar
 
+<!-- BEGIN:calendar (generated from docs/roadmap_data.json) -->
 | Week | Dates | Lane A | Act 2 (ethics) | Act 3 (study) | Writing |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 3–9 Nov | PAD-UFES-20 in, smoke run, split fixed | draft exemption request | — | method section |
@@ -286,12 +289,13 @@ cut evidence.
 | 4 | 24–30 Nov | SCIN eval + Gap Ledger | — | recruit 12 | fairness section |
 | 5 | 1–7 Dec | Failure Museum | escalate if silent | schedule sessions | discussion |
 | 6 | 8–14 Dec | red-team #1 | **6-week KS rule** | sessions 1–6 | limitations |
-| 7 | 15–21 Dec | recalibrate/hold | — | sessions 7–12 | — |
+| 7 | 15–21 Dec | recalibrate / hold | — | sessions 7–12 | — |
 | 8 | 22–28 Dec | freeze v2 (if needed) | — | analysis | — |
 | 9 | 29 Dec–4 Jan | reproducibility test | — | shadow mode | full draft |
 | 10 | 5–11 Jan | demo build | — | write-up | abstract |
 | 11 | 12–18 Jan | red-team #2 | — | final numbers | revise |
 | 12 | 19–26 Jan | **demo day** | file everything | appendix | submit |
+<!-- END:calendar -->
 
 ---
 
