@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Honest Triage Machine — a field guide to the project</title>
+<meta name="description" content="A plain-language, offline field guide to the Derma AI project: what it is, what it measures, what it refuses to claim, and the concepts it runs on.">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #FBF8F2;
+    --card: #FFFFFF;
+    --ink: #17202A;
+    --muted: #5F6B76;
+    --rule: #E3DCCC;
+    --navy: #113B65;
+    --coral: #C1443F;
+    --green: #1F6B3F;
+    --amber: #9A5B08;
+    --wash: #F3EEE2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 17px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  a { color: var(--navy); text-underline-offset: 3px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--wash); padding: .1em .35em; border-radius: 4px; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 3px; }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  .wide { max-width: 1080px; }
+
+  /* ---------- cover ---------- */
+  .cover { padding: 56px 0 34px; border-bottom: 1px solid var(--rule); }
+  .kicker {
+    font: 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+    color: var(--coral); margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(34px, 5.2vw, 58px); line-height: 1.02; margin: 0 0 16px; }
+  h1 em { font-style: italic; color: var(--coral); }
+  .standfirst { font-size: clamp(17px, 2.1vw, 21px); color: var(--muted); max-width: 40em; margin: 0 0 24px; }
+  .cover-meta { display: flex; gap: 10px; flex-wrap: wrap; font: 12px/1.4 var(--mono); color: var(--muted); }
+  .cover-meta span { border: 1px solid var(--rule); border-radius: 999px; padding: 5px 11px; background: var(--card); }
+  .cover-meta b { color: var(--ink); font-weight: 500; }
+
+  .honesty {
+    margin: 22px 0 0; padding: 14px 16px; background: var(--card);
+    border: 1px solid var(--rule); border-left: 3px solid var(--navy); border-radius: 4px;
+    font-size: 14px; line-height: 1.55; color: var(--muted);
+  }
+  .honesty b { color: var(--ink); }
+
+  /* ---------- rooms nav ---------- */
+  .rooms {
+    position: sticky; top: 0; z-index: 20; background: rgba(251, 248, 242, .94);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule);
+  }
+  .rooms-inner { max-width: 1080px; margin: 0 auto; padding: 9px 24px; display: flex; gap: 6px; overflow-x: auto; }
+  .rooms a {
+    font: 12px/1 var(--mono); text-decoration: none; color: var(--muted); white-space: nowrap;
+    border: 1px solid transparent; border-radius: 999px; padding: 6px 10px;
+  }
+  .rooms a:hover { border-color: var(--rule); background: var(--card); color: var(--navy); }
+  .rooms a.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  /* ---------- rooms ---------- */
+  .room { padding: 52px 0 10px; border-bottom: 1px solid var(--rule); }
+  .room-head { display: flex; gap: 18px; align-items: baseline; margin-bottom: 8px; }
+  .num {
+    font-family: var(--serif); font-size: 44px; line-height: 1; color: var(--rule);
+    min-width: 62px; letter-spacing: -.04em;
+  }
+  .room h2 { font-size: clamp(24px, 3.4vw, 34px); margin: 0; }
+  .room .lede { font-size: 18px; color: var(--muted); margin: 8px 0 24px 80px; max-width: 38em; }
+  @media (max-width: 640px) { .room .lede { margin-left: 0; } .room-head { gap: 12px; } .num { font-size: 32px; min-width: 44px; } }
+  .body { margin-left: 80px; max-width: 40em; }
+  @media (max-width: 640px) { .body { margin-left: 0; } }
+  .body p { font-size: 16.5px; }
+  .pull {
+    font-family: var(--serif); font-size: 21px; line-height: 1.35; color: var(--navy);
+    border-left: 3px solid var(--coral); padding: 2px 0 2px 16px; margin: 22px 0;
+  }
+
+  /* ---------- toy frame ---------- */
+  .toy {
+    margin: 24px 0 8px; background: var(--card); border: 1px solid var(--rule);
+    border-radius: 6px; overflow: hidden;
+  }
+  .toy-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 11px 16px; border-bottom: 1px solid var(--rule); background: var(--wash);
+  }
+  .toy-head h3 { font-family: var(--sans); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin: 0; color: var(--muted); font-weight: 600; }
+  .toy-head .demo {
+    margin-left: auto; font: 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--coral); border: 1px solid currentColor; border-radius: 999px; padding: 4px 8px;
+  }
+  .toy-body { padding: 18px 16px; }
+  .toy-note { font-size: 13.5px; color: var(--muted); margin: 10px 0 0; }
+
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; background: var(--card); }
+  .seg button {
+    border: 0; background: transparent; padding: 7px 14px; font-size: 13px; cursor: pointer; color: var(--muted);
+  }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+  .btn {
+    border: 1px solid var(--rule); background: var(--card); border-radius: 999px;
+    padding: 7px 14px; font-size: 13px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--navy); color: var(--navy); }
+
+  /* product toggle */
+  .product { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .product-card {
+    border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; background: var(--paper);
+  }
+  .product-card h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .product-card .big { font-family: var(--serif); font-size: 26px; line-height: 1.2; }
+  .product-card.bad { border-left: 3px solid var(--coral); }
+  .product-card.good { border-left: 3px solid var(--green); }
+  .product-card .why { font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+
+  /* class bars */
+  .bars { display: grid; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 78px 1fr 92px; gap: 10px; align-items: center; cursor: Pointer; }
+  .bar-row button {
+    all: unset; display: contents;
+  }
+  .bar-row .lab { font: 12.5px var(--mono); color: var(--ink); }
+  .bar-row .track { height: 20px; background: var(--wash); border-radius: 3px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--navy); border-radius: 3px; transition: width .4s ease; }
+  .bar-row.use-benign .fill { background: var(--green); }
+  .bar-row.use-mel .fill { background: var(--coral); }
+  .bar-row.skip .fill { background: #C9C2B2; }
+  .bar-row .n { font: 12px var(--mono); color: var(--muted); text-align: right; }
+  .bar-row[aria-pressed="true"] { background: var(--wash); border-radius: 4px; }
+  .bar-read { margin-top: 14px; border-top: 1px dashed var(--rule); padding-top: 12px; font-size: 14.5px; min-height: 66px; }
+  .bar-read b { color: var(--navy); }
+
+  /* split toy */
+  .split-svg { width: 100%; height: auto; display: block; max-height: 300px; }
+  .split-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .split-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .warn { color: var(--coral); font-weight: 600; }
+
+  /* attention toy */
+  .attn { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: center; }
+  @media (max-width: 640px) { .attn { grid-template-columns: 1fr; } }
+  .attn-svg { width: 100%; height: auto; }
+
+  /* ledger toy */
+  .scales { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  input[type="range"] { flex: 1 1 240px; accent-color: var(--navy); }
+  .readout { font: 13px var(--mono); color: var(--muted); }
+  .readout b { color: var(--ink); font-size: 15px; }
+  .ci-bar { position: relative; height: 34px; margin-top: 14px; background: var(--wash); border-radius: 3px; }
+  .ci-bar .band { position: absolute; top: 6px; bottom: 6px; background: color-mix(in srgb, var(--navy) 22%, transparent); border-left: 2px solid var(--navy); border-right: 2px solid var(--navy); }
+  .ci-bar .mid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--navy); }
+  .ci-bar .cap { position: absolute; bottom: -18px; font: 10.5px var(--mono); color: var(--muted); }
+
+  /* routes */
+  .routes { display: grid; gap: 10px; }
+  .route { border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); }
+  .route summary {
+    cursor: pointer; padding: 12px 14px; display: flex; gap: 10px; align-items: center;
+    font-size: 14.5px; list-style: none;
+  }
+  .route summary::-webkit-details-marker { display: none; }
+  .route summary::before { content: "+"; font: 15px var(--mono); color: var(--coral); width: 12px; }
+  .route[open] summary::before { content: "–"; }
+  .route .status { margin-left: auto; font: 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--amber); border: 1px solid currentColor; border-radius: 999px; padding: 3px 8px; }
+  .route .inside { padding: 0 14px 14px 36px; font-size: 14.5px; color: var(--muted); }
+  .route .inside b { color: var(--ink); }
+
+  /* weeks strip */
+  .weeks { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin: 6px 0 10px; }
+  .weeks div {
+    border: 1px solid var(--rule); border-radius: 3px; background: var(--card);
+    padding: 7px 4px; text-align: center; font: 10px var(--mono); color: var(--muted); position: relative;
+  }
+  .weeks div.mark { border-color: var(--coral); color: var(--coral); }
+  .weeks div.mark::after { content: "◆"; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 8px; }
+  @media (max-width: 640px) { .weeks { grid-template-columns: repeat(6, 1fr); } }
+  .milestones { list-style: none; margin: 12px 0 0; padding: 0; font-size: 14px; }
+  .milestones li { display: flex; gap: 10px; padding: 4px 0; }
+  .milestones .k { font: 11px var(--mono); color: var(--coral); width: 34px; flex: none; }
+
+  /* glossary */
+  .glossary-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 18px; }
+  .glossary-controls input {
+    flex: 1 1 260px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px;
+    background: var(--card); font-size: 15px;
+  }
+  .term { border-bottom: 1px solid var(--rule); padding: 14px 0; }
+  .term h3 { font-size: 18px; margin: 0 0 4px; }
+  .term .short { font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+  .term p { font-size: 15px; margin: 0 0 6px; }
+  .term .why { font-size: 13.5px; color: var(--coral); }
+  .term[hidden] { display: none; }
+  .no-hits { color: var(--muted); font-size: 14px; }
+
+  /* closing */
+  .cannot { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 20px 22px; margin: 18px 0; }
+  .cannot h3 { margin: 0 0 10px; font-size: 19px; }
+  .cannot ul { margin: 0; padding-left: 20px; }
+  .cannot li { margin-bottom: 7px; font-size: 15.5px; }
+  .cannot li b { color: var(--coral); }
+
+  footer { padding: 40px 0 70px; color: var(--muted); font-size: 13.5px; }
+  footer p { margin: 0 0 8px; }
+  footer b { color: var(--ink); }
+  footer .rule { border-top: 1px solid var(--rule); margin: 22px 0; }
+  .links { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+  .links a {
+    text-decoration: none; border: 1px solid var(--rule); border-radius: 999px;
+    padding: 6px 12px; font-size: 13px; background: var(--card);
+  }
+  .links a:hover { border-color: var(--navy); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+  @media print {
+    @page { size: A4; margin: 14mm; }
+    body { background: #fff; font-size: 11pt; }
+    .rooms, .seg, .btn, .glossary-controls { display: none !important; }
+    .room { break-inside: avoid; padding: 18px 0 4px; }
+    .toy { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="wrap">
+    <div class="kicker">A field guide · Kampala · 2026</div>
+    <h1>The Honest<br><em>Triage Machine</em></h1>
+    <p class="standfirst">
+      A dermatology prototype that does not diagnose. It sorts a queue, shows its homework,
+      publishes where it fails, and refuses to guess the one thing it has no data for.
+      Seven rooms, one idea at a time.
+    </p>
+    <div class="cover-meta">
+      <span><b>7</b> rooms</span>
+      <span><b>7</b> toys</span>
+      <span><b>14</b> concepts, in plain words</span>
+      <span><b>0</b> performance claims</span>
+    </div>
+
+    <div class="honesty">
+      <b>Read this first.</b> Every model number this project will ever quote is
+      <b>not yet measured</b>: it appears only after a frozen <code>model_manifest.json</code> and an
+      evaluation report exist. The toys on this page are <b>demonstrations of concepts</b>, not
+      measurements of the model. Kaposi sarcoma is <b>paused</b> (gate 1A, 2026-10-31) because no
+      downloadable public dataset contains it. Nothing here is a medical device.
+    </div>
+  </div>
+</header>
+
+<nav class="rooms" aria-label="Rooms">
+  <div class="rooms-inner" id="roomNav">
+    <a href="#r1">01 · The queue</a>
+    <a href="#r2">02 · The shelf</a>
+    <a href="#r3">03 · Two splits</a>
+    <a href="#r4">04 · The homework</a>
+    <a href="#r5">05 · The ledger</a>
+    <a href="#r6">06 · The locked door</a>
+    <a href="#r7">07 · Twelve weeks</a>
+    <a href="#glossary">Glossary</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- ================= 1 ================= -->
+  <section class="room" id="r1">
+    <div class="room-head"><span class="num">01</span><h2>The queue, not the answer</h2></div>
+    <p class="lede">At eight in the morning a nurse does not diagnose. She decides who the
+      dermatologist sees first. That decision is the product.</p>
+
+    <div class="body">
+      <p>A diagnosis ends an argument. A triage decision starts one: <em>see this one today,
+      review that one in two weeks, this one is routine.</em> It is also the thing a clinic can
+      act on when there are twenty patients and one dermatologist.</p>
+
+      <p>So the machine sorts. It puts a case in one of three lanes — <b>routine</b>,
+      <b>follow-up</b> in a short interval, or <b>urgent</b> — and it explains itself with a heat
+      map. The clinician keeps the decision, and can overrule it in one click. That is why the
+      study measures <em>override rate</em>, <em>confidence shift</em> and <em>time to decide</em>,
+      not "accuracy".</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 1 — two products from one model</h3><span class="demo">demonstration</span></div>
+        <div class="toy-body">
+          <div class="seg" role="group" aria-label="Which output the clinic sees">
+            <button type="button" data-product="diagnosis" aria-pressed="true">Output: a diagnosis</button>
+            <button type="button" data-product="triage" aria-pressed="false">Output: a triage lane</button>
+          </div>
+          <div class="product" id="productBox" style="margin-top:14px" aria-live="polite"></div>
+          <p class="toy-note">Same model, two very different claims. The left-hand claim needs
+            evidence this project does not have; the right-hand one is what the vignette study
+            actually tests.</p>
+        </div>
+      </div>
+
+      <div class="pull">If the machine is wrong about a lane, the next clinician catches it.
+        If a prototype is wrong about a diagnosis and nobody checks, the patient carries it home.</div>
+
+      <p>That asymmetry is the whole design brief. It is also why the project keeps its triage
+        logic everywhere, rather than amputating it to make a cleaner demo.</p>
+    </div>
+  </section>
+
+  <!-- ================= 2 ================= -->
+  <section class="room" id="r2">
+    <div class="room-head"><span class="num">02</span><h2>The shelf is lopsided</h2></div>
+    <p class="lede">The training shelf holds 2,298 phone photographs from Brazil. What it does
+      not hold matters more than what it does.</p>
+
+    <div class="body">
+      <p>PAD-UFES-20 is a real, open, downloadable dataset: 2,298 smartphone images,
+      1,373 patients, 1,641 lesions, every cancer confirmed by biopsy, and a Fitzpatrick skin
+      type for each patient. It was chosen because it can be fetched today, not because it is
+      perfect.</p>
+
+      <p>Look at the shape of it. One class is plentiful, one is scarce, and three are the wrong
+      kind of cancer for this project.</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 2 — the six diagnoses</h3><span class="demo">real counts</span></div>
+        <div class="toy-body">
+          <div class="bars" id="classBars"></div>
+          <div class="bar-read" id="classRead" aria-live="polite"></div>
+          <p class="toy-note">Tap a bar. Counts are the published PAD-UFES-20 figures
+            (CC BY 4.0); they are dataset facts, not model results.</p>
+        </div>
+      </div>
+
+      <p>The awkward part is the decision about what counts as "benign". Nevus and seborrhoeic
+        keratosis are benign. Basal-cell and squamous-cell carcinomas are malignant — and
+        <em>not</em> the classes this model handles. Folding them into "benign" would teach the
+        system to call a real cancer reassuring, so they are excluded from training and named in
+        the model card as an out-of-scope risk.</p>
+
+      <div class="pull">Fifty-two melanomas is not a dataset. It is a warning label that comes
+        with a dataset.</div>
+
+      <p>With n that small, a single split can swing the result. That is why every melanoma
+        number is reported with its interval — and why the failure cases are published, not
+        buried.</p>
+    </div>
+  </section>
+
+  <!-- ================= 3 ================= -->
+  <section class="room" id="r3">
+    <div class="room-head"><span class="num">03</span><h2>A split is a promise</h2></div>
+    <p class="lede">If the same person appears in training and in the test set, you are not
+      measuring the model. You are measuring its memory.</p>
+
+    <div class="body">
+      <p>Dermatology data arrives per lesion, but people have several lesions. Split by image and
+        a patient's mole on the left arm trains the model while their mole on the right arm is
+        used to grade it. The model scores beautifully and has learned the patient, not the
+        disease.</p>
+
+      <p>The fix costs one line of thinking and no money: split by <b>patient</b>. Everyone is
+        either in training or in evaluation, never both. A test then guards the promise so a
+        future refactor cannot quietly break it.</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 3 — the same nine lesions, two splits</h3><span class="demo">demonstration</span></div>
+        <div class="toy-body">
+          <div class="seg" role="group" aria-label="How the split is drawn">
+            <button type="button" data-split="image" aria-pressed="true">Split by image</button>
+            <button type="button" data-split="patient" aria-pressed="false">Split by patient</button>
+          </div>
+          <svg class="split-svg" id="splitSvg" viewBox="0 0 640 260" role="img" aria-labelledby="splitTitle"></svg>
+          <div class="split-legend">
+            <span><i style="background:var(--navy)"></i>training</span>
+            <span><i style="background:var(--coral)"></i>evaluation</span>
+            <span id="splitVerdict"></span>
+          </div>
+          <p class="toy-note">Three patients, three lesions each. In the image split one patient
+            lands on both sides — the dashed box — and every score becomes a memory test.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4 ================= -->
+  <section class="room" id="r4">
+    <div class="room-head"><span class="num">04</span><h2>Show your homework</h2></div>
+    <p class="lede">A confident label is not an explanation. A heat map is not an explanation
+      either — unless you look at what it is heating.</p>
+
+    <div class="body">
+      <p>The model can be right for the wrong reason: a ruler in the frame, a pen mark, a
+        tattoo. Those shortcuts are invisible in a score and obvious in a picture. So every
+        prototype output carries a Grad-CAM overlay showing which pixels moved the decision.</p>
+
+      <p>And because a flattering gallery is easy to curate, the project commits to publishing
+        the <b>Failures Museum</b>: twelve errors with their heat maps and one sentence each on
+        why they happened. It is the most persuasive honesty artefact you can put in front of a
+        clinician examiner.</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 4 — where the heat lands</h3><span class="demo">demonstration</span></div>
+        <div class="toy-body">
+          <div class="attn">
+            <svg class="attn-svg" viewBox="0 0 220 220" role="img" aria-labelledby="attnTitle">
+              <title id="attnTitle">A lesion with a heat map that can sit on the lesion or on the ruler beside it</title>
+              <defs>
+                <radialGradient id="heat" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#C1443F" stop-opacity=".85"/>
+                  <stop offset="60%" stop-color="#C1443F" stop-opacity=".35"/>
+                  <stop offset="100%" stop-color="#C1443F" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <rect x="8" y="8" width="204" height="204" rx="8" fill="#E7DCCB"/>
+              <circle cx="96" cy="116" r="34" fill="#8A5A44"/>
+              <circle cx="96" cy="116" r="22" fill="#6E4534"/>
+              <circle cx="88" cy="108" r="7" fill="#513026"/>
+              <g id="rulerMark">
+                <rect x="150" y="40" width="46" height="140" rx="4" fill="#F6F1E6" stroke="#B9AE99"/>
+                <g stroke="#7C7364" stroke-width="1.5">
+                  <line x1="154" y1="56" x2="168" y2="56"/><line x1="154" y1="76" x2="172" y2="76"/>
+                  <line x1="154" y1="96" x2="168" y2="96"/><line x1="154" y1="116" x2="172" y2="116"/>
+                  <line x1="154" y1="136" x2="168" y2="136"/><line x1="154" y1="156" x2="172" y2="156"/>
+                </g>
+              </g>
+              <circle id="heatBlob" cx="96" cy="116" r="56" fill="url(#heat)"/>
+            </svg>
+            <div>
+              <div class="seg" role="group" aria-label="Where the model is looking">
+                <button type="button" data-attn="lesion" aria-pressed="true">Heat on the lesion</button>
+                <button type="button" data-attn="shortcut" aria-pressed="false">Heat on the ruler</button>
+              </div>
+              <p style="margin:14px 0 0" id="attnText" aria-live="polite"></p>
+            </div>
+          </div>
+          <p class="toy-note">A deliberately crude illustration of a real failure mode, not a
+            claim about this model's attention.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5 ================= -->
+  <section class="room" id="r5">
+    <div class="room-head"><span class="num">05</span><h2>The ledger, not the score</h2></div>
+    <p class="lede">"Fair" is not a number you compute once. It is a table you publish, including
+      the row where you lose.</p>
+
+    <div class="body">
+      <p>The evaluation is stratified by skin tone: each Fitzpatrick stratum gets its own row,
+        with its own <code>n</code> and its own confidence interval. If a stratum has no cases, it
+        is <b>absent</b> from the table — never a tidy zero, which would read as "no errors".</p>
+
+      <p>Small strata produce wide intervals. That is arithmetic, not opinion — and seeing it is
+        the fastest way to understand why a single headline accuracy figure is close to useless on
+        this data.</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 5 — why n decides how much you can say</h3><span class="demo">arithmetic, not a result</span></div>
+        <div class="toy-body">
+          <div class="scales">
+            <label for="nRange" style="font-size:14px">Cases in the stratum <b id="nOut">120</b></label>
+            <input type="range" id="nRange" min="10" max="1200" step="10" value="120" aria-describedby="ciNote">
+          </div>
+          <div class="ci-bar" aria-hidden="true">
+            <div class="band" id="ciBand"></div>
+            <div class="mid" id="ciMid"></div>
+            <span class="cap" id="capLow" style="left:0">0</span>
+            <span class="cap" id="capHigh" style="right:0">1</span>
+          </div>
+          <p class="readout" style="margin-top:30px" id="ciNote" aria-live="polite"></p>
+          <p class="toy-note">Worst-case 95 % interval for a proportion with that many cases
+            (p = 0.5). It shows how much a small stratum can tell you; it is not a measurement of
+            the model.</p>
+        </div>
+      </div>
+
+      <div class="pull">No composite fairness score. A single number lets everyone relax. The
+        table does not.</div>
+
+      <p>So the deliverable is the <b>Tone Gap Ledger</b>: rows, intervals, and a sentence in
+        words about the worst stratum. If the gap is large, that becomes the finding — it does not
+        get tuned away.</p>
+    </div>
+  </section>
+
+  <!-- ================= 6 ================= -->
+  <section class="room" id="r6">
+    <div class="room-head"><span class="num">06</span><h2>The locked door</h2></div>
+    <p class="lede">Kaposi sarcoma matters most in exactly the population this model cannot
+      describe. There is no honest shortcut, so there is a gate.</p>
+
+    <div class="body">
+      <p>KS is a defining AIDS-related cancer in the region, and it appears in none of the
+        immediately downloadable public dermatology datasets. Training a third class on
+        demonstration images would produce a checkpoint that looks complete and means nothing. So
+        on 2026-10-31 the gate closed: <b>no KS class until a real cohort exists</b>, with serving
+        disabled in code so nothing can quietly ship.</p>
+
+      <p>The pause is only respectable if someone is working to end it. Three routes, each with a
+        written ask and a deadline:</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 6 — three doors, one deadline</h3><span class="demo">current status</span></div>
+        <div class="toy-body">
+          <div class="routes" id="routes"></div>
+          <p class="toy-note">If none has produced a dataset or a written refusal by
+            <b>14 December</b>, the thesis ships Lane A and presents Lane B as a designed,
+            unexecuted protocol — with the email trail as evidence of process.</p>
+        </div>
+      </div>
+
+      <p>Two things are permanently off the table: scraping KS images from the web, and shipping a
+        demonstration-only third class. Either one would invalidate the ethics section, the paper
+        and the degree in a single move.</p>
+    </div>
+  </section>
+
+  <!-- ================= 7 ================= -->
+  <section class="room" id="r7">
+    <div class="room-head"><span class="num">07</span><h2>Twelve weeks, five hard dates</h2></div>
+    <p class="lede">A plan is only real if it has dates you can miss.</p>
+
+    <div class="body">
+      <p>Work runs on two lanes. <b>Lane A</b> is buildable today: fetch the data, train, freeze,
+        evaluate across tones, run the clinician vignette study, write it up. <b>Lane B</b> is the
+        KS cohort, gated on partners. Lane A ships even if Lane B never lands — that is the single
+        most important decision in the plan.</p>
+
+      <div class="toy">
+        <div class="toy-head"><h3>Toy 7 — the horizon</h3><span class="demo">real dates</span></div>
+        <div class="toy-body">
+          <div class="weeks" id="weeks"></div>
+          <ul class="milestones" id="milestones"></ul>
+          <div class="links">
+            <a href="./roadmap.html">Open the interactive roadmap →</a>
+            <a href="./ROADMAP.md">Read the full plan</a>
+            <a href="./roadmap_wallchart.html">Print the wall chart</a>
+          </div>
+          <p class="toy-note">Marks are the dates the project actually turns on. The roadmap page
+            carries all 43 tasks with their evidence files and definitions of done.</p>
+        </div>
+      </div>
+
+      <p>Everything is evidence-first: a task counts as done when a file exists, not when it feels
+        finished. The repo's <code>definition_of_done.sh</code> is the referee, and the roadmap
+        page is generated from the same data as the markdown, so the plan cannot drift from
+        itself.</p>
+    </div>
+  </section>
+
+  <!-- ================= glossary ================= -->
+  <section class="room" id="glossary" style="border-bottom:0">
+    <div class="room-head"><span class="num">※</span><h2>The concepts, in plain words</h2></div>
+    <p class="lede">Fourteen terms the project runs on — searchable, no jargon left standing.</p>
+
+    <div class="body" style="max-width:44em">
+      <div class="glossary-controls">
+        <label class="sr-only" for="termSearch" style="position:absolute;left:-9999px">Filter terms</label>
+        <input id="termSearch" type="search" placeholder="Filter terms — try “leakage” or “gate”" autocomplete="off">
+        <button class="btn" type="button" id="clearTerms">Show all</button>
+      </div>
+      <div id="terms"></div>
+      <p class="no-hits" id="noHits" hidden>No term matches that. Try a shorter word.</p>
+    </div>
+  </section>
+
+  <section class="room" style="border-top:1px solid var(--rule)">
+    <div class="room-head"><span class="num">!</span><h2>What it cannot do</h2></div>
+    <p class="lede">The shortest honest summary of the project.</p>
+    <div class="body">
+      <div class="cannot">
+        <h3>Five things this prototype will never claim</h3>
+        <ul>
+          <li><b>No Kaposi sarcoma class.</b> Paused until a real cohort exists; serving is disabled in code.</li>
+          <li><b>No African cohort.</b> Training data is Brazilian; that limitation goes in the abstract, not a footnote.</li>
+          <li><b>No clinical validity.</b> It is a triage-ordering prototype under study, not a diagnostic device.</li>
+          <li><b>No performance figure yet.</b> Every accuracy, sensitivity and fairness number reads
+            <em>not yet measured</em> until a frozen manifest and its evaluation report exist.</li>
+          <li><b>No patient data.</b> Synthetic and de-identified only, under the retention policy in force.</li>
+        </ul>
+      </div>
+      <p>What it <em>can</em> claim: a reproducible pipeline, a tone-stratified evaluation that
+        publishes its worst row, a museum of its own failures, a frozen artefact whose hash you can
+        verify, and a twelve-week plan where every claim traces to a file.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="rule"></div>
+    <p><b>Research prototype · Not a medical device · No Business Associate Agreement (BAA) · Do not use with real patient data.</b></p>
+    <p>This page is one self-contained file: no network calls, no external fonts, no images to
+      fetch. It works on a laptop with no connection. Toy values are illustrative and are labelled
+      as such; dataset counts are the published PAD-UFES-20 figures.</p>
+    <div class="links">
+      <a href="./roadmap.html">Roadmap</a>
+      <a href="./ROADMAP.md">The plan</a>
+      <a href="../MODEL_CARD.md">Model card</a>
+      <a href="./GATE_OPTIONS.md">Gate 1A</a>
+      <a href="./DATASET_SOURCES_IMMEDIATE.md">Where the data comes from</a>
+      <a href="../REMEDIATION_STATUS.md">What is done</a>
+    </div>
+    <p style="margin-top:16px">Written 2026-11-03 · owner J. Mutegeki · every claim on this page
+      has a file behind it, or it says so.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 1 — the same model, two products                                */
+  /* ------------------------------------------------------------------ */
+  var productBox = document.getElementById("productBox");
+
+  var PRODUCTS = {
+    diagnosis: {
+      title: "A diagnosis",
+      big: "Melanoma",
+      why: "A claim about what the disease is — note that this card carries no number at all. " +
+           "It would need a validated device, pathology-backed " +
+           "ground truth across populations, and regulatory cover. This project has none of " +
+           "those, so it never says this."
+    },
+    triage: {
+      title: "A triage lane",
+      big: "Urgent — seen today",
+      why: "A claim about ordering, with the clinician still deciding. It is measurable in a " +
+           "vignette study: does the lane change the decision, the confidence, or the time taken?"
+    }
+  };
+
+  function renderProduct(which) {
+    var item = PRODUCTS[which];
+    productBox.textContent = "";
+    var card = document.createElement("div");
+    card.className = "product-card " + (which === "diagnosis" ? "bad" : "good");
+    var h = document.createElement("h4");
+    h.textContent = item.title;
+    var big = document.createElement("div");
+    big.className = "big";
+    big.textContent = item.big;
+    var why = document.createElement("div");
+    why.className = "why";
+    why.textContent = item.why;
+    card.appendChild(h);
+    card.appendChild(big);
+    card.appendChild(why);
+    productBox.appendChild(card);
+  }
+
+  document.querySelectorAll("[data-product]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      document.querySelectorAll("[data-product]").forEach(function (other) {
+        other.setAttribute("aria-pressed", other === button ? "true" : "false");
+      });
+      renderProduct(button.getAttribute("data-product"));
+    });
+  });
+  renderProduct("diagnosis");
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 2 — the six diagnoses                                           */
+  /* ------------------------------------------------------------------ */
+  var CLASSES = [
+    { code: "BCC", n: 845, use: "skip", role: "Basal-cell carcinoma — malignant, but not one of this project's classes",
+      note: "Dropped. It is a skin cancer the model would be asked about in a real clinic, so its absence is a stated limitation, not a silent omission." },
+    { code: "ACK", n: 730, use: "skip", role: "Actinic keratosis — pre-malignant",
+      note: "Dropped. Pre-malignant lesions sit between benign and malignant; forcing them into either side teaches the wrong lesson." },
+    { code: "NEV", n: 244, use: "benign", role: "Naevus — a mole, benign",
+      note: "Kept, as part of the benign head." },
+    { code: "SEK", n: 235, use: "benign", role: "Seborrhoeic keratosis — benign",
+      note: "Kept, as part of the benign head." },
+    { code: "SCC", n: 192, use: "skip", role: "Squamous-cell carcinoma — malignant",
+      note: "Dropped, for the same reason as BCC. Folding a cancer into 'benign' would be false reassurance." },
+    { code: "MEL", n: 52, use: "mel", role: "Melanoma — biopsy-proven",
+      note: "Kept, and feared. Fifty-two images is why every melanoma figure needs an interval next to it." }
+  ];
+
+  var bars = document.getElementById("classBars");
+  var read = document.getElementById("classRead");
+  var max = Math.max.apply(null, CLASSES.map(function (c) { return c.n; }));
+
+  CLASSES.forEach(function (item, index) {
+    var row = document.createElement("div");
+    row.className = "bar-row use-" + item.use + (item.use === "skip" ? " skip" : "");
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-pressed", "false");
+
+    var label = document.createElement("span");
+    label.className = "lab";
+    label.textContent = item.code;
+
+    var track = document.createElement("div");
+    track.className = "track";
+    var fill = document.createElement("div");
+    fill.className = "fill";
+    fill.style.width = Math.max(3, (item.n / max) * 100) + "%";
+    track.appendChild(fill);
+
+    var count = document.createElement("span");
+    count.className = "n";
+    count.textContent = item.n.toLocaleString("en-GB");
+
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(count);
+
+    function show() {
+      Array.prototype.forEach.call(bars.children, function (other) {
+        other.setAttribute("aria-pressed", "false");
+      });
+      row.setAttribute("aria-pressed", "true");
+      read.textContent = "";
+      var strong = document.createElement("b");
+      strong.textContent = item.code + " · " + item.role + ". ";
+      read.appendChild(strong);
+      read.appendChild(document.createTextNode(item.note));
+    }
+
+    row.addEventListener("click", show);
+    row.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        show();
+      }
+    });
+    bars.appendChild(row);
+  });
+
+  // open with the melanoma row, because it is the point of the room
+  bars.children[5].click();
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 3 — two splits                                                  */
+  /* ------------------------------------------------------------------ */
+  var splitSvg = document.getElementById("splitSvg");
+  var splitVerdict = document.getElementById("splitVerdict");
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  function svgNode(tag, attrs) {
+    var node = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    return node;
+  }
+
+  // nine lesions: patient A (0-2), B (3-5), C (6-8)
+  var LESIONS = [
+    { p: "A", x: 40, y: 60 }, { p: "A", x: 40, y: 120 }, { p: "A", x: 40, y: 180 },
+    { p: "B", x: 250, y: 60 }, { p: "B", x: 250, y: 120 }, { p: "B", x: 250, y: 180 },
+    { p: "C", x: 460, y: 60 }, { p: "C", x: 460, y: 120 }, { p: "C", x: 460, y: 180 }
+  ];
+
+  function drawSplit(mode) {
+    splitSvg.textContent = "";
+    var title = svgNode("title", { id: "splitTitle" });
+    title.textContent = mode === "image"
+      ? "Split by image: patient B has lesions in both training and evaluation"
+      : "Split by patient: whole patients are assigned to one side only";
+    splitSvg.appendChild(title);
+
+    var evalSet;
+    if (mode === "image") {
+      evalSet = [1, 4, 7];            // one lesion from each patient
+    } else {
+      evalSet = [6, 7, 8];            // all of patient C
+    }
+
+    // patient grouping boxes
+    [["A", 20], ["B", 230], ["C", 440]].forEach(function (pair) {
+      splitSvg.appendChild(svgNode("rect", {
+        x: pair[1], y: 30, width: 120, height: 190, rx: 10,
+        fill: "none", stroke: "#E3DCCC"
+      }));
+      var caption = svgNode("text", { x: pair[1] + 60, y: 22, "text-anchor": "middle",
+        "font-family": "ui-monospace, monospace", "font-size": "11", fill: "#5F6B76" });
+      caption.textContent = "patient " + pair[0];
+      splitSvg.appendChild(caption);
+    });
+
+    LESIONS.forEach(function (lesion, index) {
+      var isEval = evalSet.indexOf(index) !== -1;
+      splitSvg.appendChild(svgNode("circle", {
+        cx: lesion.x + 60, cy: lesion.y, r: 15,
+        fill: isEval ? "#C1443F" : "#113B65", opacity: ".9"
+      }));
+      var tag = svgNode("text", {
+        x: lesion.x + 60, y: lesion.y + 4, "text-anchor": "middle",
+        "font-family": "ui-monospace, monospace", "font-size": "10", fill: "#FBF8F2"
+      });
+      tag.textContent = isEval ? "eval" : "train";
+      splitSvg.appendChild(tag);
+    });
+
+    if (mode === "image") {
+      splitSvg.appendChild(svgNode("rect", {
+        x: 224, y: 34, width: 132, height: 184, rx: 12, fill: "none",
+        stroke: "#C1443F", "stroke-width": "2", "stroke-dasharray": "6 4"
+      }));
+      var note = svgNode("text", { x: 290, y: 240, "text-anchor": "middle",
+        "font-family": "ui-monospace, monospace", "font-size": "11", fill: "#C1443F" });
+      note.textContent = "patient B is on both sides";
+      splitSvg.appendChild(note);
+    } else {
+      var ok = svgNode("text", { x: 500, y: 240, "text-anchor": "middle",
+        "font-family": "ui-monospace, monospace", "font-size": "11", fill: "#1F6B3F" });
+      ok.textContent = "patient C never trains";
+      splitSvg.appendChild(ok);
+    }
+
+    splitVerdict.className = mode === "image" ? "warn" : "";
+    splitVerdict.textContent = mode === "image"
+      ? "Leakage: the score measures memory."
+      : "Clean: the score measures the model.";
+  }
+
+  document.querySelectorAll("[data-split]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      document.querySelectorAll("[data-split]").forEach(function (other) {
+        other.setAttribute("aria-pressed", other === button ? "true" : "false");
+      });
+      drawSplit(button.getAttribute("data-split"));
+    });
+  });
+  drawSplit("image");
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 4 — where the heat lands                                        */
+  /* ------------------------------------------------------------------ */
+  var heatBlob = document.getElementById("heatBlob");
+  var attnText = document.getElementById("attnText");
+
+  var ATTENTION = {
+    lesion: {
+      cx: 96, cy: 116,
+      text: "The heat sits on the lesion. That is the model doing the work you asked for — " +
+            "and it still has to be checked against the pathology, not admired."
+    },
+    shortcut: {
+      cx: 173, cy: 110,
+      text: "The heat sits on the ruler. The label may even be right, and the reason is wrong: " +
+            "the model has learned that photographs taken for measurement are the worrying ones. " +
+            "This is exactly what the Failures Museum exists to catch."
+    }
+  };
+
+  function setAttention(which) {
+    var item = ATTENTION[which];
+    heatBlob.setAttribute("cx", item.cx);
+    heatBlob.setAttribute("cy", item.cy);
+    attnText.textContent = item.text;
+  }
+
+  document.querySelectorAll("[data-attn]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      document.querySelectorAll("[data-attn]").forEach(function (other) {
+        other.setAttribute("aria-pressed", other === button ? "true" : "false");
+      });
+      setAttention(button.getAttribute("data-attn"));
+    });
+  });
+  setAttention("lesion");
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 5 — how much a stratum can tell you                             */
+  /* ------------------------------------------------------------------ */
+  var nRange = document.getElementById("nRange");
+  var nOut = document.getElementById("nOut");
+  var ciBand = document.getElementById("ciBand");
+  var ciMid = document.getElementById("ciMid");
+  var ciNote = document.getElementById("ciNote");
+
+  function renderInterval() {
+    var n = Number(nRange.value);
+    var half = 1.96 * Math.sqrt(0.25 / n);   // worst case, p = 0.5
+    var low = Math.max(0, 0.5 - half);
+    var high = Math.min(1, 0.5 + half);
+    nOut.textContent = n.toLocaleString("en-GB");
+    ciBand.style.left = low * 100 + "%";
+    ciBand.style.width = (high - low) * 100 + "%";
+    ciMid.style.left = "50%";
+    ciNote.textContent = "";
+    var strong = document.createElement("b");
+    strong.textContent = "±" + (half * 100).toFixed(1) + " points";
+    ciNote.appendChild(strong);
+    ciNote.appendChild(document.createTextNode(
+      " of uncertainty at n = " + n + ". " +
+      (n < 100
+        ? "At this size one case can move the number several points — an interval this wide is not a result, it is a shrug."
+        : n < 400
+          ? "Wide enough that any single-figure comparison between strata is a coin toss."
+          : "Narrow enough to compare strata — which is why dataset size is a fairness argument, not an engineering nicety.")
+    ));
+  }
+
+  nRange.addEventListener("input", renderInterval);
+  renderInterval();
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 6 — three doors                                                 */
+  /* ------------------------------------------------------------------ */
+  var ROUTES = [
+    {
+      name: "Uganda Cancer Institute / UVRI",
+      status: "no cohort yet",
+      inside: "<b>The ask:</b> retrospective, de-identified KS images under an approved protocol, " +
+              "with a named collaborator. <b>Why them:</b> KS is a defining AIDS-related malignancy " +
+              "in the region and they hold the images and the pathology. <b>First move:</b> a " +
+              "200-word email, a one-page protocol sketch, an offer to co-author."
+    },
+    {
+      name: "Makerere / Mulago dermatology",
+      status: "meeting requested",
+      inside: "<b>The ask:</b> twenty minutes, and the route they would trust for supervised, " +
+              "de-identified access. <b>Why them:</b> clinical photography already happens; a " +
+              "consultant supervisor turns a personal ask into an institutional one."
+    },
+    {
+      name: "International KS consortia",
+      status: "letter drafted",
+      inside: "<b>The ask:</b> a data-sharing appendix to an existing approval. <b>Why them:</b> " +
+              "multi-site African KS studies already have imaging sub-studies. <b>First move:</b> " +
+              "write to the corresponding author of one recent KS imaging paper, citing their own " +
+              "protocol back to them."
+    }
+  ];
+
+  var routesHost = document.getElementById("routes");
+  ROUTES.forEach(function (route, index) {
+    var details = document.createElement("details");
+    details.className = "route";
+    if (index === 0) details.open = true;
+    var summary = document.createElement("summary");
+    var name = document.createElement("span");
+    name.textContent = route.name;
+    var status = document.createElement("span");
+    status.className = "status";
+    status.textContent = route.status;
+    summary.appendChild(name);
+    summary.appendChild(status);
+    var inside = document.createElement("div");
+    inside.className = "inside";
+    inside.innerHTML = route.inside;   // static, authored strings only
+    details.appendChild(summary);
+    details.appendChild(inside);
+    routesHost.appendChild(details);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Toy 7 — the horizon                                                 */
+  /* ------------------------------------------------------------------ */
+  var WEEKS = [
+    { n: 1, dates: "3–9 Nov" }, { n: 2, dates: "10–16 Nov" }, { n: 3, dates: "17–23 Nov" },
+    { n: 4, dates: "24–30 Nov" }, { n: 5, dates: "1–7 Dec" }, { n: 6, dates: "8–14 Dec" },
+    { n: 7, dates: "15–21 Dec" }, { n: 8, dates: "22–28 Dec" }, { n: 9, dates: "29 Dec–4 Jan" },
+    { n: 10, dates: "5–11 Jan" }, { n: 11, dates: "12–18 Jan" }, { n: 12, dates: "19–26 Jan" }
+  ];
+  var MILESTONES = [
+    { week: 2, label: "Exemption request submitted" },
+    { week: 4, label: "Frozen artefact v1 and the Tone Gap Ledger" },
+    { week: 6, label: "14 Dec — ethics and Kaposi sarcoma cutoff" },
+    { week: 9, label: "Reproducibility test and full draft" },
+    { week: 12, label: "Demo day and submission" }
+  ];
+
+  var weeksHost = document.getElementById("weeks");
+  WEEKS.forEach(function (week) {
+    var marked = MILESTONES.some(function (m) { return m.week === week.n; });
+    var cell = document.createElement("div");
+    if (marked) cell.className = "mark";
+    cell.textContent = "W" + week.n;
+    cell.title = "Week " + week.n + " · " + week.dates;
+    weeksHost.appendChild(cell);
+  });
+
+  var milestoneHost = document.getElementById("milestones");
+  MILESTONES.forEach(function (item) {
+    var li = document.createElement("li");
+    var k = document.createElement("span");
+    k.className = "k";
+    k.textContent = "W" + item.week;
+    var text = document.createElement("span");
+    text.textContent = item.label;
+    li.appendChild(k);
+    li.appendChild(text);
+    milestoneHost.appendChild(li);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Glossary                                                            */
+  /* ------------------------------------------------------------------ */
+  var TERMS = [
+    { term: "Triage ordering",
+      short: "Sorting cases into routine, short-interval follow-up, or urgent.",
+      long: "The product. It is a ranking decision made under scarcity, not a diagnosis. It is " +
+            "measurable in a vignette study: did the lane change the clinician's decision, their " +
+            "confidence, or the time they took?",
+      why: "It is the only claim this prototype can defend with the evidence it has." },
+    { term: "Three-class head",
+      short: "Melanoma, benign, and Kaposi sarcoma — the third one paused.",
+      long: "The vision model's label space. With KS paused, only two classes are trained: " +
+            "melanoma and a benign head built from naevus and seborrhoeic keratosis.",
+      why: "Naming the missing class out loud is more honest than quietly reshaping the problem." },
+    { term: "Fitzpatrick skin type",
+      short: "A six-point scale for how skin responds to sun, I to VI.",
+      long: "Recorded per patient in the training data, and used to split the evaluation into " +
+            "strata so a good average cannot hide a bad tail.",
+      why: "It is the only fairness variable this project can actually measure." },
+    { term: "Stratum",
+      short: "One row of the ledger — everyone in one skin-tone group.",
+      long: "Each stratum gets its own n and its own interval. Strata with no cases are absent " +
+            "from the table, never written as zero.",
+      why: "A zero reads as 'no errors'. An absence reads as 'no data', which is the truth." },
+    { term: "Confidence interval",
+      short: "The range the real number is plausibly in.",
+      long: "Wider when n is small. With 52 melanomas, a point estimate without an interval is " +
+            "a rumour with a decimal point.",
+      why: "It turns 'the model scores X' into 'the model plausibly scores between…'." },
+    { term: "Grouped split",
+      short: "Split by patient, not by image.",
+      long: "Every patient lands in exactly one of training or evaluation. A test asserts it, " +
+            "so a later refactor cannot silently reintroduce leakage.",
+      why: "Without it you measure memory, and every downstream number is worthless." },
+    { term: "Leakage",
+      short: "The same information on both sides of a split.",
+      long: "Classically the same patient, or a near-duplicate image, appearing in training and " +
+            "evaluation. It inflates scores and hides the failure you needed to see.",
+      why: "It is the most common way a student project reports a number it cannot defend." },
+    { term: "Calibration",
+      short: "Whether '70 %' actually means seventy times in a hundred.",
+      long: "Measured with a reliability diagram and a calibration error, with any adjustment " +
+            "fitted on the validation split only — never on the test split.",
+      why: "A clinician cannot use a confident number that is not honest about its confidence." },
+    { term: "Grad-CAM",
+      short: "A heat map of which pixels moved the decision.",
+      long: "Useful for teaching and for catching shortcuts, such as a ruler or a pen mark in " +
+            "the frame. It is an aid to suspicion, not a proof of reasoning.",
+      why: "It is how the project shows its homework, and how the Failures Museum gets built." },
+    { term: "Failure Museum",
+      short: "Twelve curated errors, with heat maps and one sentence each.",
+      long: "Sampled by error type, including cases from the darkest strata, and published " +
+            "alongside the results rather than in an appendix.",
+      why: "Reviewers trust work that shows its worst case; they discount work that does not." },
+    { term: "Out-of-distribution",
+      short: "Input that does not look like the training data.",
+      long: "A different camera, a different clinic, a different population. The probe measures " +
+            "what the model does when it is out of its depth — including staying confident.",
+      why: "This is the realistic condition of a Kampala clinic, not an edge case." },
+    { term: "Frozen artefact",
+      short: "One checkpoint, one hash, one manifest — no quiet edits.",
+      long: "model_manifest.json records status, hash and provenance; evaluation can only run " +
+            "against a frozen artefact, and serving stays disabled until a gate opens.",
+      why: "It is the difference between a demo and a claim." },
+    { term: "Gate and kill criterion",
+      short: "A condition that must be true before a claim is allowed.",
+      long: "Gates (such as gate 1A) block work until evidence exists. Kill criteria say, in " +
+            "advance, what would make you abandon a plan — so a bad outcome cannot be argued away later.",
+      why: "They convert honesty from a personality trait into a mechanism." },
+    { term: "De-identified",
+      short: "No names, no identifiers, no way back to a person.",
+      long: "The retention policy in force (2026-10-30) covers synthetic or de-identified data " +
+            "only; the clinician study stores participant codes and no identifiers.",
+      why: "It is the boundary that keeps the twelve weeks inside an exemption rather than an approval." }
+  ];
+
+  var termHost = document.getElementById("terms");
+  var noHits = document.getElementById("noHits");
+  var termSearch = document.getElementById("termSearch");
+
+  TERMS.forEach(function (item) {
+    var block = document.createElement("div");
+    block.className = "term";
+    block.setAttribute("data-text", (item.term + " " + item.short + " " + item.long + " " + item.why).toLowerCase());
+
+    var h = document.createElement("h3");
+    h.textContent = item.term;
+    var short = document.createElement("p");
+    short.className = "short";
+    short.textContent = item.short;
+    var long = document.createElement("p");
+    long.textContent = item.long;
+    var why = document.createElement("p");
+    why.className = "why";
+    why.textContent = "Why it matters: " + item.why;
+
+    block.appendChild(h);
+    block.appendChild(short);
+    block.appendChild(long);
+    block.appendChild(why);
+    termHost.appendChild(block);
+  });
+
+  function filterTerms() {
+    var needle = termSearch.value.trim().toLowerCase();
+    var shown = 0;
+    Array.prototype.forEach.call(termHost.children, function (block) {
+      var hit = !needle || block.getAttribute("data-text").indexOf(needle) !== -1;
+      block.hidden = !hit;
+      if (hit) shown++;
+    });
+    noHits.hidden = shown !== 0;
+  }
+
+  termSearch.addEventListener("input", filterTerms);
+  document.getElementById("clearTerms").addEventListener("click", function () {
+    termSearch.value = "";
+    filterTerms();
+    termSearch.focus();
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Nav highlight                                                       */
+  /* ------------------------------------------------------------------ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll("#roomNav a"));
+  var targets = navLinks.map(function (link) {
+    return document.querySelector(link.getAttribute("href"));
+  }).filter(Boolean);
+
+  if ("IntersectionObserver" in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach(function (link) {
+          link.classList.toggle("on", link.getAttribute("href") === "#" + entry.target.id);
+        });
+      });
+    }, { rootMargin: "-30% 0px -60% 0px" });
+    targets.forEach(function (target) { observer.observe(target); });
+  }
+})();
+</script>
+</body>
+</html>

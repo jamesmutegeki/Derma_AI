@@ -8,6 +8,7 @@ Collection of my web applications and software projects.
 
 - [**Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis**](./dermatology-ai/) — AI-powered dermatology triage and diagnosis support system with clinician-in-the-loop (HITL) reinforcement learning.
 - [**Explainable Dermatology AI Poster**](./dermatology-ai/poster.html)
+- [**The Honest Triage Machine**](./dermatology-ai/docs/field-guide.html) — a seven-room, offline field guide that explains the project and the concepts it uses, in plain words
 
 
 
