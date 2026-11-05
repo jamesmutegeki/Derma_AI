@@ -55,6 +55,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env            # optional; every variable is documented there
 python main.py --dashboard      # http://localhost:7860  (first run prints where
                                 # the generated admin password was written)
+python scripts/serve_docs.py    # read the roadmap, wall chart and field guide
+                                # at http://localhost:8123 -- offline, no app
+                                # needed; there is no data behind it
 python -m pytest -q             # full suite
 bash scripts/ci_grep.sh         # claim/credential guard
 ```
