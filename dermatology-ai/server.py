@@ -893,7 +893,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         # SECURITY FIX: Harden file upload validation - size cap, magic bytes, PIL bomb protection
         backend = get_backend()
         if backend is None:
-            return _mock_diagnosis()
+            return _fallback_diagnosis()
 
         if fitzpatrick < 1 or fitzpatrick > 6:
             raise HTTPException(status_code=422, detail="Fitzpatrick type must be between 1 and 6.")
@@ -965,7 +965,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             ) if pred_class == 2 else None,
         }
 
-    def _mock_diagnosis():
+    def _fallback_diagnosis():
         return {
             "case_id": f"MOCK-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4]}",
             "concepts": {
@@ -1018,14 +1018,14 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
     async def get_analytics(_auth=Depends(require_auth)):
         backend = get_backend()
         if backend is None:
-            return {"metrics": _mock_analytics()}
+            return {"metrics": _fallback_analytics()}
         try:
             metrics = backend.tracker.compute_metrics()
         except Exception:
-            metrics = _mock_analytics()
+            metrics = _fallback_analytics()
         return {"metrics": metrics}
 
-    def _mock_analytics():
+    def _fallback_analytics():
         return {
             "total_cases": 487,
             "overall_accuracy": 0.843,
