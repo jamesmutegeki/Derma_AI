@@ -1,0 +1,34 @@
+{
+  "status": "placeholder",
+  "architecture": {
+    "model_type": "ConceptBottleneckModel",
+    "backbone": "hrnet_w18",
+    "num_classes": 3,
+    "num_concepts": 7,
+    "class_names": ["benign", "melanoma", "kaposi_sarcoma"],
+    "concept_names": [
+      "asymmetry",
+      "border_irregularity",
+      "color_variegation",
+      "diameter_large",
+      "melanin_density",
+      "inflammation",
+      "ulceration"
+    ]
+  },
+  "training": {
+    "datasets": ["HAM10000", "PASSION (local subset)"],
+    "split_strategy": "patient-level stratified",
+    "fitzpatrick_range": [1, 6],
+    "note": "Kaposi sarcoma class trained on synthetic data only; no real HAM10000 KS samples available."
+  },
+  "checkpoint": {
+    "sha256": null,
+    "path": "models/best_model.pth",
+    "note": "No frozen checkpoint available. Training paused pending Kaposi sarcoma cohort."
+  },
+  "evaluation": {
+    "fairness_metrics": ["urgent_lane_escalation_rate_by_fitzpatrick", "urgent_lane_escalation_rate_by_condition"],
+    "note": "PASSION evaluation not yet run; no metrics produced."
+  }
+}
