@@ -1,60 +1,55 @@
 #!/usr/bin/env python3
 """Evaluation of the CBM checkpoint on the PASSION for Dermatology dataset.
 
-Prerequisites (run once):
-  1. Download the PASSION dataset from https://passionderm.github.io/ .
-     The downloaded archive should contain a CSV (e.g. `metadata.csv`) and an
-     `images/` directory with JPEG files.
-  2. Extract the archive so that the CSV and images live under a folder, e.g.:
-        data/passion/metadata.csv
-        data/passion/images/<image_id>.jpg
-  3. Run the download script to standardize: python scripts/download_passion.py
-  4. Ensure the Python environment has the requirements from
-     `dermatology-ai/requirements.txt` (torch, timm, albumentations, etc.).
+This script evaluates the model's predicted triage lanes on the PASSION dataset
+as an external fairness cohort. It does NOT map PASSION conditions to "benign"
+because PASSION contains inflammatory/infectious conditions (Eczema, Fungal,
+Scabies, Others), not benign neoplasms.
 
-The script performs a deterministic 80/20 train-val split (seed 42), loads
-the pre-trained CBM checkpoint (`dermatology-ai/model_checkpoints/smoke_cbm.pt`),
-runs inference on the validation set, and prints the same set of metrics as
-the HAM10000 script.
+Instead, it computes:
+- Predicted triage lane distribution per Fitzpatrick type
+- Predicted triage lane distribution per condition
+- Urgent lane escalation rate per stratum (for fairness monitoring)
 """
 
 import os
 import sys
-import random
 import argparse
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import (
-    accuracy_score,
-    precision_recall_fscore_support,
-    confusion_matrix,
-    roc_auc_score,
-)
+from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import pandas as pd
 
-# Project imports (relative to repository root)
+# Project imports
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dermatology-ai'))
 from datasetEquity import DermDataset
 from model import DermatologyCBM
 from samplesEquity import MelaninNormalization
 
 
+# PASSION condition to index mapping (for reporting)
+PASSION_CONDITIONS = ['Eczema', 'Fungal', 'Scabies', 'Others']
+# Triage lane names
+TRIAGE_LANES = ['routine', 'follow_up', 'urgent']
+
+
 def build_dataset(csv_path, img_dir):
     """Create a DermDataset with the PASSION transforms.
-    The CSV must contain columns: `image_id`, `label`, `fitzpatrick_type`.
-    PASSION labels (Eczema, Fungal, Scabies, Others) are all benign inflammatory
-    conditions, so we map them to 'benign' for the 3-class triage model.
+    Keeps original PASSION labels for stratified reporting.
     """
-    import pandas as pd
     import tempfile
 
     df = pd.read_csv(csv_path)
-    # Map all PASSION inflammatory conditions to benign (class 0)
-    df = df.copy()
-    df['label'] = 'benign'
+    # Keep original labels - do NOT map to 'benign'
+
+    # Label map: PASSION conditions are all inflammatory/infectious
+    # The model was trained on 3-class (benign, melanoma, kaposi_sarcoma)
+    # We don't have a direct mapping, so we use a dummy mapping for the model
+    # The actual labels are preserved in label_orig for reporting
+    label_map = {cond: 0 for cond in PASSION_CONDITIONS}  # Map all to benign (0) for model input
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
         df.to_csv(f.name, index=False)
@@ -66,95 +61,60 @@ def build_dataset(csv_path, img_dir):
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ])
-    return DermDataset(csv_path=temp_csv, img_dir=img_dir, transform=transform)
+    return DermDataset(csv_path=temp_csv, img_dir=img_dir, transform=transform, label_map=label_map), temp_csv
 
 
-def deterministic_val_split(dataset, seed=42, train_frac=0.80):
-    random.seed(seed)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    split = int(train_frac * len(indices))
-    val_idx = indices[split:]
-    return Subset(dataset, val_idx)
-
-
-def evaluate(model, loader, device):
-    all_labels = []
-    all_preds = []
-    all_probs = []
-    model.eval()
-    with torch.no_grad():
-        for imgs, labels, _ in loader:
-            imgs = imgs.to(device)
-            logits, _ = model(imgs)
-            probs = F.softmax(logits, dim=1)
-            preds = torch.argmax(probs, dim=1)
-            all_labels.extend(labels.cpu().numpy())
-            all_preds.extend(preds.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())
-    acc = accuracy_score(all_labels, all_preds)
-    prec, rec, f1, _ = precision_recall_fscore_support(
-        all_labels, all_preds, average=None, labels=[0, 1, 2]
-    )
-    conf = confusion_matrix(all_labels, all_preds, labels=[0, 1, 2])
-    auroc = []
-    for i in range(3):
-        y_true = [1 if l == i else 0 for l in all_labels]
-        y_score = [p[i] for p in all_probs]
-        try:
-            auc = roc_auc_score(y_true, y_score)
-        except ValueError:
-            auc = float('nan')
-        auroc.append(auc)
-    return acc, prec, rec, f1, auroc, conf
-
-
-def evaluate_per_fitzpatrick(model, loader, device):
-    """Evaluate per-Fitzpatrick skin type."""
+def evaluate_fairness(model, loader, device):
+    """Evaluate predicted triage lanes per Fitzpatrick type and condition."""
     from collections import defaultdict
-    fitz_labels = defaultdict(list)
+
+    # Per-Fitzpatrick predictions
     fitz_preds = defaultdict(list)
-    fitz_probs = defaultdict(list)
+    fitz_conditions = defaultdict(list)
+
+    # Per-condition predictions
+    cond_preds = defaultdict(list)
 
     model.eval()
     with torch.no_grad():
-        for imgs, labels, fitz in loader:
+        for imgs, labels, fitz, labels_orig in loader:
             imgs = imgs.to(device)
             logits, _ = model(imgs)
             probs = F.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)
 
-            for l, p, pr, f in zip(labels.cpu().numpy(), preds.cpu().numpy(), probs.cpu().numpy(), fitz.cpu().numpy()):
-                fitz_labels[int(f)].append(l)
-                fitz_preds[int(f)].append(p)
-                fitz_probs[int(f)].append(pr)
+            for p, f, l_orig in zip(preds.cpu().numpy(), fitz.cpu().numpy(), labels_orig):
+                fitz_preds[int(f)].append(int(p))
+                fitz_conditions[int(f)].append(l_orig)
+                cond_preds[l_orig].append(int(p))
 
-    print("\n=== Per-Fitzpatrick Evaluation ===")
-    class_names = ['benign', 'melanoma', 'kaposi_sarcoma']
-    for fitz in range(1, 7):
-        if fitz not in fitz_labels or len(fitz_labels[fitz]) == 0:
-            continue
-        labels = fitz_labels[fitz]
-        preds = fitz_preds[fitz]
-        probs = fitz_probs[fitz]
-        n = len(labels)
-        acc = accuracy_score(labels, preds)
-        print(f"\n  Fitzpatrick Type {fitz} (n={n}):")
-        print(f"    Accuracy: {acc:.4f}")
-        prec, rec, f1, _ = precision_recall_fscore_support(
-            labels, preds, average=None, labels=[0, 1, 2]
-        )
-        for i, name in enumerate(class_names):
-            if i < len(prec):
-                print(f"    {name:15s} – Prec: {prec[i]:.4f}  Rec: {rec[i]:.4f}  F1: {f1[i]:.4f}")
+    return fitz_preds, fitz_conditions, cond_preds
+
+
+def compute_urgent_rate(predictions):
+    """Compute urgent lane rate from predictions."""
+    if len(predictions) == 0:
+        return 0.0
+    urgent_count = sum(1 for p in predictions if p == 2)  # 2 = urgent
+    return urgent_count / len(predictions)
+
+
+def print_distribution(name, predictions, total):
+    """Print lane distribution for a stratum."""
+    counts = [predictions.count(i) for i in range(3)]
+    rates = [c / total * 100 if total > 0 else 0 for c in counts]
+    print(f"  {name}: n={total}")
+    for i, (lane, count, rate) in enumerate(zip(TRIAGE_LANES, counts, rates)):
+        print(f"    {lane:12s}: {count:4d} ({rate:.1f}%)")
+    print(f"    Urgent rate: {rates[2]:.1f}%")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Evaluate CBM on PASSION (African-skin-tone) dataset'
+        description='Evaluate CBM predicted triage lanes on PASSION (fairness cohort)'
     )
     parser.add_argument(
-        '--data-dir', default='dermatology-ai/datasets/passion', help='Root folder with metadata.csv and images/'
+        '--data-dir', default='dermatology-ai/datasets/passion', help='Root folder with val_meta.csv and images/'
     )
     parser.add_argument(
         '--ckpt', default='dermatology-ai/model_checkpoints/smoke_cbm.pt', help='Path to CBM checkpoint'
@@ -177,7 +137,7 @@ def main():
     state = torch.load(args.ckpt, map_location=device, weights_only=True)
     model.load_state_dict(state)
 
-    # Build PASSION dataset
+    # Build PASSION dataset (keep original labels)
     csv_path = os.path.join(args.data_dir, 'val_meta.csv')
     img_dir = os.path.join(args.data_dir, 'images')
     if not os.path.isfile(csv_path) or not os.path.isdir(img_dir):
@@ -185,25 +145,60 @@ def main():
             f'Cannot find CSV at {csv_path} or image folder at {img_dir}.\n'
             'Please run the download script first: python scripts/download_passion.py'
         )
-    full_ds = build_dataset(csv_path, img_dir)
+
+    full_ds, temp_csv = build_dataset(csv_path, img_dir)
     val_loader = DataLoader(full_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    # Evaluate overall
-    acc, prec, rec, f1, auroc, conf = evaluate(model, val_loader, device)
+    # Evaluate fairness metrics
+    fitz_preds, fitz_conditions, cond_preds = evaluate_fairness(model, val_loader, device)
 
-    print('\n=== PASSION evaluation (20% hold-out) ===')
-    print(f'Overall accuracy: {acc:.4f}')
-    class_names = ['benign', 'melanoma', 'kaposi_sarcoma']
-    for i, name in enumerate(class_names):
-        print(
-            f'  {name:15s} – Prec: {prec[i]:.4f}  Rec: {rec[i]:.4f}  '
-            f'F1: {f1[i]:.4f}  AUROC: {auroc[i]:.4f}'
-        )
-    print('\nConfusion matrix (rows=true, cols=pred):')
-    print(conf)
+    print('\n=== PASSION Fairness Evaluation (Predicted Triage Lanes) ===')
+    print(f'Total validation samples: {len(full_ds)}')
 
     # Per-Fitzpatrick evaluation
-    evaluate_per_fitzpatrick(model, val_loader, device)
+    print("\n--- Per-Fitzpatrick Type ---")
+    for fitz in range(1, 7):
+        if fitz not in fitz_preds or len(fitz_preds[fitz]) == 0:
+            continue
+        preds = fitz_preds[fitz]
+        print_distribution(f"Fitzpatrick {fitz}", preds, len(preds))
+
+    # Per-condition evaluation
+    print("\n--- Per-Condition ---")
+    for cond in PASSION_CONDITIONS:
+        if cond not in cond_preds or len(cond_preds[cond]) == 0:
+            continue
+        preds = cond_preds[cond]
+        print_distribution(cond, preds, len(preds))
+
+    # Cross-tabulation: Fitzpatrick x Condition
+    print("\n--- Urgent Lane Rate by Fitzpatrick x Condition ---")
+    for fitz in range(1, 7):
+        if fitz not in fitz_preds or len(fitz_preds[fitz]) == 0:
+            continue
+        print(f"\n  Fitzpatrick {fitz}:")
+        for cond in PASSION_CONDITIONS:
+            # Get predictions for this fitz+condition combination
+            combo_preds = [
+                p for p, c in zip(fitz_preds[fitz], fitz_conditions[fitz])
+                if c == cond
+            ]
+            if len(combo_preds) == 0:
+                continue
+            urgent_rate = compute_urgent_rate(combo_preds)
+            print(f"    {cond:12s}: n={len(combo_preds):3d}, urgent_rate={urgent_rate:.3f}")
+
+    # Overall summary
+    all_preds = []
+    for preds in fitz_preds.values():
+        all_preds.extend(preds)
+
+    print(f"\n=== Overall Summary ===")
+    print(f"Total samples: {len(all_preds)}")
+    print_distribution("Overall", all_preds, len(all_preds))
+
+    # Cleanup
+    os.unlink(temp_csv)
 
 
 if __name__ == '__main__':

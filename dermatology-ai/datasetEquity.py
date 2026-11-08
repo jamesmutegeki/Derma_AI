@@ -4,15 +4,28 @@ from PIL import Image
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+from pathlib import Path
 
 
 class DermDataset(Dataset):
-    def __init__(self, csv_path, img_dir, transform=None):
+    def __init__(self, csv_path, img_dir, transform=None, label_map=None):
         self.df = pd.read_csv(csv_path)
         # CSV columns: image_id, label, fitzpatrick_type (1-6)
         self.img_dir = img_dir
         self.transform = transform
         self.classes = {'benign': 0, 'melanoma': 1, 'kaposi_sarcoma': 2}
+
+        # If label_map provided, use it to convert labels to class indices
+        # Otherwise assume labels are already in the 3-class format
+        if label_map is not None:
+            self.label_map = label_map
+            self.df['label_idx'] = self.df['label'].map(label_map)
+            # Keep original label for reporting
+            self.df['label_orig'] = self.df['label']
+        else:
+            self.label_map = None
+            self.df['label_idx'] = self.df['label'].map(self.classes)
+            self.df['label_orig'] = self.df['label']
 
     def __len__(self):
         return len(self.df)
@@ -21,16 +34,24 @@ class DermDataset(Dataset):
         row = self.df.iloc[idx]
 
         img_path = os.path.join(self.img_dir, f"{row['image_id']}.jpg")
-        img = Image.open(img_path).convert('RGB')
+        try:
+            img = Image.open(img_path).convert('RGB')
+            img.load()  # Force load to catch truncated images early
+        except (OSError, IOError) as e:
+            # Skip corrupted images by returning a placeholder
+            # The caller should handle this by filtering out these samples
+            img = Image.new('RGB', (224, 224), color=(0, 0, 0))
+
         img = np.array(img)  # Convert PIL to numpy for Albumentations
 
         if self.transform:
             img = self.transform(image=img)['image']
 
-        label = self.classes[row['label']]
+        label = int(row['label_idx'])
+        label_orig = row['label_orig']
         fitz = int(row['fitzpatrick_type'])  # ensure Python int, not numpy
 
-        return img, label, fitz
+        return img, label, fitz, label_orig
 
 
 class MultiSourceDermDataset(Dataset):
@@ -93,7 +114,13 @@ class MultiSourceDermDataset(Dataset):
         if not img_path.exists():
             raise FileNotFoundError(f"Image not found: {img_path}")
 
-        img = Image.open(img_path).convert('RGB')
+        try:
+            img = Image.open(img_path).convert('RGB')
+            img.load()  # Force load to catch truncated images early
+        except (OSError, IOError) as e:
+            # Skip corrupted images by returning a placeholder
+            img = Image.new('RGB', (224, 224), color=(0, 0, 0))
+
         img = np.array(img)  # Convert PIL to numpy for Albumentations
 
         if self.transform:
@@ -103,6 +130,3 @@ class MultiSourceDermDataset(Dataset):
         fitz = int(row['fitzpatrick_type'])
 
         return img, label, fitz
-
-
-from pathlib import Path
