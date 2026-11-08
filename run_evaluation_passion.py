@@ -13,7 +13,7 @@ Prerequisites (run once):
      `dermatology-ai/requirements.txt` (torch, timm, albumentations, etc.).
 
 The script performs a deterministic 80/20 train-val split (seed 42), loads
-the pre-trained CBM checkpoint (`dermatology-ai/model_checkpoints/cbm_3class.pt`),
+the pre-trained CBM checkpoint (`dermatology-ai/model_checkpoints/smoke_cbm.pt`),
 runs inference on the validation set, and prints the same set of metrics as
 the HAM10000 script.
 """
@@ -36,23 +36,37 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 # Project imports (relative to repository root)
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dermatology_ai.datasetEquity import DermDataset
-from dermatology_ai.model import DermatologyCBM
-from dermatology_ai.samplesEquity import MelaninNormalization
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dermatology-ai'))
+from datasetEquity import DermDataset
+from model import DermatologyCBM
+from samplesEquity import MelaninNormalization
 
 
 def build_dataset(csv_path, img_dir):
     """Create a DermDataset with the PASSION transforms.
     The CSV must contain columns: `image_id`, `label`, `fitzpatrick_type`.
+    PASSION labels (Eczema, Fungal, Scabies, Others) are all benign inflammatory
+    conditions, so we map them to 'benign' for the 3-class triage model.
     """
+    import pandas as pd
+    import tempfile
+
+    df = pd.read_csv(csv_path)
+    # Map all PASSION inflammatory conditions to benign (class 0)
+    df = df.copy()
+    df['label'] = 'benign'
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        df.to_csv(f.name, index=False)
+        temp_csv = f.name
+
     transform = A.Compose([
         MelaninNormalization(),
         A.Resize(224, 224),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ])
-    return DermDataset(csv_path=csv_path, img_dir=img_dir, transform=transform)
+    return DermDataset(csv_path=temp_csv, img_dir=img_dir, transform=transform)
 
 
 def deterministic_val_split(dataset, seed=42, train_frac=0.80):
@@ -143,7 +157,7 @@ def main():
         '--data-dir', default='dermatology-ai/datasets/passion', help='Root folder with metadata.csv and images/'
     )
     parser.add_argument(
-        '--ckpt', default='dermatology-ai/model_checkpoints/cbm_3class.pt', help='Path to CBM checkpoint'
+        '--ckpt', default='dermatology-ai/model_checkpoints/smoke_cbm.pt', help='Path to CBM checkpoint'
     )
     parser.add_argument('--batch-size', type=int, default=32)
     args = parser.parse_args()

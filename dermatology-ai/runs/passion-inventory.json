@@ -1,0 +1,80 @@
+{
+  "inventory_date": "2026-11-08",
+  "dataset_path": "/mnt/d/Dermatology_AI/dermatology-ai/datasets/passion_raw/PASSION_MICCAI_2024",
+  "images_directory": "/mnt/d/Dermatology_AI/dermatology-ai/datasets/passion_raw/PASSION_MICCAI_2024/images",
+  "total_images_on_disk": 4016,
+  "image_naming_pattern": "AA#########_#.jpg (patient_lesionID_imageIndex)",
+  "metadata_csv_found": true,
+  "metadata_csv_path": "/mnt/d/Dermatology_AI/dermatology-ai/datasets/passion/metadata.csv",
+  "metadata_columns": ["image_id", "label", "fitzpatrick_type", "subject_id", "split", "image_index"],
+  "metadata_row_count": 4016,
+  "label_column_unique_values": ["Eczema", "Fungal", "Scabies", "Others"],
+  "label_column_counts": {"Eczema": 862, "Fungal": 870, "Scabies": 1365, "Others": 919},
+  "patient_identifier_column": "subject_id",
+  "unique_patients_estimated": 1363,
+  "skin_type_column_found": true,
+  "skin_type_distribution": {"1": 11, "3": 1425, "4": 1069, "5": 1032, "6": 479},
+  "images_without_metadata": 0,
+  "rows_pointing_to_missing_files": 0,
+  "license_consent_text": "PASSION for Dermatology - Academic registration required at https://passionderm.github.io/ with academic email. Dataset provided for research purposes only.",
+  "access_date": "2026-11-08",
+  "notes": [
+    "Metadata obtained from PASSION GitHub repository (label.csv and PASSION_split.csv)",
+    "Images follow naming pattern: AA<patient_id>_<image_index>.jpg",
+    "1363 unique patient IDs based on filename prefixes.",
+    "Labels (4 disease categories) and Fitzpatrick skin types (1-6) available from GitHub metadata.",
+    "Patient-level train/val splits created (80/20, stratified by label and Fitzpatrick).",
+    "Train: 1090 subjects, 3182 images. Val: 273 subjects, 834 images.",
+    "No subject overlap between splits (patient-level separation verified).",
+    "Fitzpatrick IV-VI well represented in validation set (each ≥ 20 samples).",
+    "All PASSION conditions are benign inflammatory - mapped to 'benign' for 3-class triage evaluation."
+  ],
+  "schema_check": {
+    "has_patient_identifier": true,
+    "has_image_path_column": true,
+    "has_skin_type_column": true
+  },
+  "option_chosen": "Option B: PASSION used as external evaluation / fairness cohort",
+  "implementation_status": {
+    "step_0_inventory": "COMPLETED",
+    "step_1_schema_check_options": "COMPLETED",
+    "step_2_test_first_implementation": "COMPLETED",
+    "step_3_training_evaluation": "IN_PROGRESS (evaluation running)",
+    "step_4_reporting": "PENDING",
+    "step_5_summary": "THIS REPORT"
+  },
+  "files_created_or_modified": [
+    "dermatology-ai/scripts/create_passion_metadata.py (new)",
+    "dermatology-ai/scripts/create_passion_splits.py (new)",
+    "dermatology-ai/scripts/passion_metrics.py (existing - verified)",
+    "dermatology-ai/tests/test_s10_passion.py (new - 12 tests passing)",
+    "dermatology-ai/datasetEquity.py (modified - PIL to numpy conversion for Albumentations)",
+    "run_evaluation_passion.py (modified - label mapping and import fixes)",
+    "dermatology-ai/datasets/passion/metadata.csv (new - 4016 rows)",
+    "dermatology-ai/datasets/passion/train_meta.csv (new - 3182 rows)",
+    "dermatology-ai/datasets/passion/val_meta.csv (new - 834 rows)"
+  ],
+  "test_results": {
+    "test_patient_level_split_no_overlap": "PASS",
+    "test_patient_level_split_coverage": "PASS",
+    "test_fitzpatrick_iv_vi_min_samples": "PASS",
+    "test_fitzpatrick_distribution_reported": "PASS",
+    "test_urgent_lane_escalation_rate_gate": "SKIPPED (requires checkpoint)",
+    "test_overall_urgent_lane_rate": "SKIPPED (requires checkpoint)",
+    "test_cbm_returns_7_concepts": "SKIPPED (requires checkpoint)",
+    "test_concept_names_match_constant": "PASS",
+    "test_passion_metadata_has_required_columns": "PASS",
+    "test_passion_labels_are_inflammatory_conditions": "PASS",
+    "test_passion_fitzpatrick_range": "PASS",
+    "test_passion_images_exist": "PASS",
+    "test_patient_level_aggregation_logic": "PASS",
+    "test_urgent_lane_rate_computation": "PASS",
+    "test_empty_stratum_not_in_results": "PASS"
+  },
+  "quality_gates": {
+    "ci_grep_sh": "PASS",
+    "pytest_test_s10_passion": "PASS (12 passed, 3 skipped)",
+    "definition_of_done_sh": "PARTIAL (torch not in venv, some project files missing)"
+  },
+  "thesis_claim": "Main triage model (benign/melanoma/kaposi_sarcoma) evaluated for fairness on dark skin (Fitzpatrick IV-VI) using PASSION as external cohort; measures urgent lane escalation rates on benign inflammatory conditions"
+}

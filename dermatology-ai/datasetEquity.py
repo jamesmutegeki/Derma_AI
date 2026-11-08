@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from PIL import Image
 import torch
+import numpy as np
 from torch.utils.data import Dataset
 
 
@@ -21,9 +22,10 @@ class DermDataset(Dataset):
 
         img_path = os.path.join(self.img_dir, f"{row['image_id']}.jpg")
         img = Image.open(img_path).convert('RGB')
+        img = np.array(img)  # Convert PIL to numpy for Albumentations
 
         if self.transform:
-            img = self.transform(img)
+            img = self.transform(image=img)['image']
 
         label = self.classes[row['label']]
         fitz = int(row['fitzpatrick_type'])  # ensure Python int, not numpy
@@ -92,9 +94,10 @@ class MultiSourceDermDataset(Dataset):
             raise FileNotFoundError(f"Image not found: {img_path}")
 
         img = Image.open(img_path).convert('RGB')
+        img = np.array(img)  # Convert PIL to numpy for Albumentations
 
         if self.transform:
-            img = self.transform(img)
+            img = self.transform(image=img)['image']
 
         label = self.classes[row['label']]
         fitz = int(row['fitzpatrick_type'])
