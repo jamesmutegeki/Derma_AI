@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 from pathlib import Path
+import warnings
 
 
 class DermDataset(Dataset):
@@ -27,6 +28,23 @@ class DermDataset(Dataset):
             self.df['label_idx'] = self.df['label'].map(self.classes)
             self.df['label_orig'] = self.df['label']
 
+        # Scan for corrupted images at init time
+        self.corrupted_images = self._scan_corrupted_images()
+
+    def _scan_corrupted_images(self):
+        """Scan all images and return list of corrupted image_ids."""
+        corrupted = []
+        for img_id in self.df['image_id']:
+            img_path = os.path.join(self.img_dir, f"{img_id}.jpg")
+            try:
+                with Image.open(img_path) as img:
+                    img.load()
+            except (OSError, IOError) as e:
+                corrupted.append((img_id, str(e)))
+        if corrupted:
+            warnings.warn(f"Found {len(corrupted)} corrupted images in {self.img_dir}: {[c[0] for c in corrupted]}")
+        return corrupted
+
     def __len__(self):
         return len(self.df)
 
@@ -38,9 +56,8 @@ class DermDataset(Dataset):
             img = Image.open(img_path).convert('RGB')
             img.load()  # Force load to catch truncated images early
         except (OSError, IOError) as e:
-            # Skip corrupted images by returning a placeholder
-            # The caller should handle this by filtering out these samples
-            img = Image.new('RGB', (224, 224), color=(0, 0, 0))
+            # Re-raise instead of silently skipping - caller must handle
+            raise RuntimeError(f"Corrupted image {row['image_id']}: {e}")
 
         img = np.array(img)  # Convert PIL to numpy for Albumentations
 
@@ -118,8 +135,8 @@ class MultiSourceDermDataset(Dataset):
             img = Image.open(img_path).convert('RGB')
             img.load()  # Force load to catch truncated images early
         except (OSError, IOError) as e:
-            # Skip corrupted images by returning a placeholder
-            img = Image.new('RGB', (224, 224), color=(0, 0, 0))
+            # Re-raise instead of silently skipping
+            raise RuntimeError(f"Corrupted image {row['image_id']}: {e}")
 
         img = np.array(img)  # Convert PIL to numpy for Albumentations
 
