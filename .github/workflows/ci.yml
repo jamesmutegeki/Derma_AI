@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, pre-triage-removal]
+  pull_request:
+    branches: [main, pre-triage-removal]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd dermatology-ai
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Run ruff linting
+        run: |
+          cd dermatology-ai
+          source venv/bin/activate
+          ruff check .
+
+      - name: Run PASSION tests (S10)
+        run: |
+          cd dermatology-ai
+          source venv/bin/activate
+          python -m pytest tests/test_s10_passion.py -v
+
+      - name: Run definition of done checks
+        run: |
+          cd dermatology-ai
+          source venv/bin/activate
+          bash scripts/definition_of_done.sh
+
+      - name: Run ci_grep guards
+        run: |
+          cd dermatology-ai
+          source venv/bin/activate
+          bash scripts/ci_grep.sh
+
+      - name: Verify REMEDIATION_STATUS.md content
+        run: |
+          cd dermatology-ai
+          if ! grep -q "PASSION harness implemented and committed; dataset present as a local N-image subset; real-data evaluation not yet run; no metrics produced." REMEDIATION_STATUS.md; then
+            echo "REMEDIATION_STATUS.md does not contain the required sentence"
+            exit 1
+          fi
+
+      - name: Verify documentation links in README
+        run: |
+          cd dermatology-ai
+          if ! grep -q "MODEL_CARD.md" ../README.md; then
+            echo "README.md missing link to MODEL_CARD.md"
+            exit 1
+          fi
+          if ! grep -q "SECURITY.md" ../README.md; then
+            echo "README.md missing link to SECURITY.md"
+            exit 1
+          fi
+          if ! grep -q "docs/OPERATIONS.md" ../README.md; then
+            echo "README.md missing link to docs/OPERATIONS.md"
+            exit 1
+          fi
+          if ! grep -q "REMEDIATION_STATUS.md" ../README.md; then
+            echo "README.md missing link to REMEDIATION_STATUS.md"
+            exit 1
+          fi
