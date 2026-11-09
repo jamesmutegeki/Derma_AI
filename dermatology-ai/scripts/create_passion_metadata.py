@@ -13,8 +13,9 @@ This script creates an image-level metadata.csv with columns:
 - split: TRAIN/TEST (from PASSION_split.csv)
 """
 
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 # Paths
 LABEL_CSV = Path("/mnt/d/Dermatology_AI/dermatology-ai/datasets/passion/label.csv")

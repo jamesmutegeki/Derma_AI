@@ -18,12 +18,11 @@ After download, this script will:
 4. Map PASSION's 12 disease classes to our 3-class schema (benign, melanoma, kaposi_sarcoma)
 """
 
-import os
-import sys
-import zipfile
-import tarfile
 import shutil
+import tarfile
+import zipfile
 from pathlib import Path
+
 import pandas as pd
 import requests
 from tqdm import tqdm

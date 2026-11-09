@@ -1,11 +1,11 @@
-import pandas as pd
 import os
-from PIL import Image
-import torch
-import numpy as np
-from torch.utils.data import Dataset
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+from torch.utils.data import Dataset
 
 
 class DermDataset(Dataset):
@@ -39,7 +39,7 @@ class DermDataset(Dataset):
             try:
                 with Image.open(img_path) as img:
                     img.load()
-            except (OSError, IOError) as e:
+            except OSError as e:
                 corrupted.append((img_id, str(e)))
         if corrupted:
             warnings.warn(f"Found {len(corrupted)} corrupted images in {self.img_dir}: {[c[0] for c in corrupted]}")
@@ -55,7 +55,7 @@ class DermDataset(Dataset):
         try:
             img = Image.open(img_path).convert('RGB')
             img.load()  # Force load to catch truncated images early
-        except (OSError, IOError) as e:
+        except OSError as e:
             # Re-raise instead of silently skipping - caller must handle
             raise RuntimeError(f"Corrupted image {row['image_id']}: {e}")
 
@@ -134,7 +134,7 @@ class MultiSourceDermDataset(Dataset):
         try:
             img = Image.open(img_path).convert('RGB')
             img.load()  # Force load to catch truncated images early
-        except (OSError, IOError) as e:
+        except OSError as e:
             # Re-raise instead of silently skipping
             raise RuntimeError(f"Corrupted image {row['image_id']}: {e}")
 

@@ -6,10 +6,10 @@ Run: python seed_demo.py
 from __future__ import annotations
 
 import json
-import uuid
-import bcrypt
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import bcrypt
 
 HERE = Path(__file__).parent
 
@@ -25,7 +25,7 @@ def _hash_password(pw: str) -> str:
 
 
 def _ts(days_ago: int = 0):
-    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
+    return (datetime.now(UTC) - timedelta(days=days_ago)).isoformat()
 
 
 # =========================================================================

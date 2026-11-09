@@ -26,13 +26,11 @@ Notes:
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import sys
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 # Target directory inside your project
 PROJECT_DATA_DIR = Path(r"D:\Dermatology_AI\datasets")
@@ -241,6 +239,7 @@ def generate_synthetic_dataset(num_cases: int = 1000):
         image_id, label, fitzpatrick_type
     """
     import csv
+
     import numpy as np
     from PIL import Image
 

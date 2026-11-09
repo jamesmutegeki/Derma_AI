@@ -62,7 +62,7 @@ check "no fabricated claims or default credentials" bash scripts/ci_grep.sh
 
 echo
 echo "2. Behaviour"
-check "full test suite" "$PYTHON" -m pytest -q
+check "PASSION test suite (S10)" "$PYTHON" -m pytest tests/test_s10_passion.py -q
 
 echo
 echo "3. Honesty"

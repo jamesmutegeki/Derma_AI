@@ -12,17 +12,16 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
+import csv
+import io as python_io
 import json
 import logging
 import os
 import secrets
 import uuid
-import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import io as python_io
-import csv
-from typing import Optional, List
 
 import bcrypt
 import numpy as np
@@ -30,21 +29,27 @@ import uvicorn
 
 # SECURITY FIX: Prevent PIL decompression bomb attacks
 from PIL import Image
+
 Image.MAX_IMAGE_PIXELS = 10_000_000
 
 # SECURITY FIX: Rate limiting for auth endpoints
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 try:
     import torch
 except ImportError:
     torch = None
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +117,7 @@ async def _cleanup_expired_sessions():
     while True:
         try:
             await asyncio.sleep(300)  # Run every 5 minutes
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             expired = [
                 token for token, sess in _sessions.items()
                 if sess.get("expires_at") and now > datetime.fromisoformat(sess["expires_at"])
@@ -130,7 +135,7 @@ _SESSION_TTL = timedelta(hours=8)
 
 def _create_session(user_info: dict) -> str:
     token = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # SECURITY FIX: Add CSRF token to session for state-changing operations
     csrf_token = secrets.token_urlsafe(32)
     _sessions[token] = {**user_info, "created_at": now.isoformat(), "expires_at": (now + _SESSION_TTL).isoformat(), "csrf_token": csrf_token}
@@ -141,12 +146,14 @@ def _get_current_user(token: str = ""):
         raise HTTPException(status_code=401, detail="Not authenticated.")
     sess = _sessions[token]
     expires = sess.get("expires_at")
-    if expires and datetime.now(timezone.utc) > datetime.fromisoformat(expires):
+    if expires and datetime.now(UTC) > datetime.fromisoformat(expires):
         del _sessions[token]
         raise HTTPException(status_code=401, detail="Session expired.")
     return sess
 
 from fastapi import Header
+
+
 async def require_auth(authorization: str = Header("")):
     token = authorization.replace("Bearer ", "") if authorization else ""
     return _get_current_user(token)
@@ -198,7 +205,7 @@ def _log_activity(event: str, actor: str = "system", level: str = "info"):
         "event": event,
         "actor": actor,
         "level": level,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     })
     _save_activity(entries[-200:])  # keep last 200
 
@@ -213,7 +220,7 @@ def _load_patients() -> list:
     if PATIENTS_PATH.exists():
         try:
             return json.loads(PATIENTS_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return []
 
@@ -224,7 +231,7 @@ def _load_notes() -> dict:
     if NOTES_PATH.exists():
         try:
             return json.loads(NOTES_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return {}
 
@@ -300,7 +307,7 @@ def _load_doctors() -> dict:
     if DOCTORS_PATH.exists():
         try:
             return json.loads(DOCTORS_PATH.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return {"admins": [], "doctors": []}
 
@@ -494,13 +501,13 @@ class DoctorCreateRequest(BaseModel):
 
 
 class DoctorUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    nin: Optional[str] = None
-    title: Optional[str] = None
-    active: Optional[bool] = None
-    permissions: Optional[dict] = None
-    photo: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    nin: str | None = None
+    title: str | None = None
+    active: bool | None = None
+    permissions: dict | None = None
+    photo: str | None = None
 
 
 class AdminPasswordChangeRequest(BaseModel):
@@ -513,7 +520,7 @@ class DoctorResetPasswordRequest(BaseModel):
 
 
 class BulkDoctorAction(BaseModel):
-    doctor_ids: List[str]
+    doctor_ids: list[str]
     active: bool
 
 
@@ -567,11 +574,16 @@ def create_app() -> FastAPI:
         if _backend is not None:
             return _backend
         try:
-            from model import DermatologyCBM, CONCEPT_NAMES
-            from rl_module import PPOAgent, DermTriageEnv, FITZPATRICK_LABELS, TRIAGE_NAMES
             from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
+            from main import generate_mock_cases, seed_tracker, train_ppo_agent
             from metrics_tracker import FairnessTracker
-            from main import generate_mock_cases, train_ppo_agent, seed_tracker
+            from model import CONCEPT_NAMES, DermatologyCBM
+            from rl_module import (
+                FITZPATRICK_LABELS,
+                TRIAGE_NAMES,
+                DermTriageEnv,
+                PPOAgent,
+            )
 
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             logger.info("Initialising HRNet-CBM model on %s ...", device)
@@ -678,7 +690,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         return {
             "status": "healthy",
             "backend_loaded": backend is not None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     # -----------------------------------------------------------------------
@@ -700,7 +712,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                     break
         if not doctor:
             raise HTTPException(status_code=401, detail="Invalid email or password.")
-        doctor["last_login"] = datetime.now(timezone.utc).isoformat()
+        doctor["last_login"] = datetime.now(UTC).isoformat()
         _save_doctors(doc_data)
         name = doctor.get("name", req.email.split("@")[0].replace(".", " ").title())
         initials = "".join(w[0] for w in name.split()[:2])
@@ -750,17 +762,16 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
     async def create_patient(req: PatientRequest, _auth=Depends(require_csrf)):
         print("[DEBUG] create_patient called")
         patients = _load_patients()
-        new_id = req.id or f"PAT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{len(patients) + 1:04d}"
+        new_id = req.id or f"PAT-{datetime.now(UTC).strftime('%Y%m%d')}-{len(patients) + 1:04d}"
         existing_ids = {p["id"] for p in patients}
         if new_id in existing_ids:
             max_n = 0
-            today = datetime.now(timezone.utc).strftime('%Y%m%d')
+            today = datetime.now(UTC).strftime('%Y%m%d')
             for pid in existing_ids:
                 if pid.startswith(f"PAT-{today}-"):
                     try:
                         n = int(pid.split("-")[-1])
-                        if n > max_n:
-                            max_n = n
+                        max_n = max(max_n, n)
                     except ValueError:
                         pass
             new_id = f"PAT-{today}-{max_n + 1:04d}"
@@ -779,7 +790,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             "body_site": req.body_site,
             "status": req.status,
             "visits": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         patients.append(patient)
         _save_patients(patients)
@@ -802,7 +813,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                     "body_site": req.body_site,
                     "status": req.status,
                     "visits": p.get("visits", []),
-                    "created_at": p.get("created_at", datetime.now(timezone.utc).isoformat()),
+                    "created_at": p.get("created_at", datetime.now(UTC).isoformat()),
                 }
                 _save_patients(patients)
                 return {"status": "updated", "patient": patients[i]}
@@ -847,8 +858,8 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
             if p["id"] == patient_id:
                 visits = p.get("visits", [])
                 visit = {
-                    "id": f"VIS-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
-                    "date": req.date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "id": f"VIS-{datetime.now(UTC).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
+                    "date": req.date or datetime.now(UTC).strftime("%Y-%m-%d"),
                     "desc": req.desc,
                     "tag": req.tag,
                     "diagnosis": req.diagnosis,
@@ -857,7 +868,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                     "doctor_name": req.doctor_name,
                     "lesion_location": req.lesion_location,
                     "lesion_size": req.lesion_size,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                 }
                 visits.append(visit)
                 patients[i]["visits"] = visits
@@ -938,7 +949,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         ])
         model_action = backend.ppo_agent.evaluate(state_vec)
 
-        from rl_module import TRIAGE_NAMES, FITZPATRICK_LABELS
+        from rl_module import FITZPATRICK_LABELS, TRIAGE_NAMES
         triage_name = TRIAGE_NAMES[model_action]
 
         case_id = backend.next_case_id()
@@ -967,7 +978,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
 
     def _fallback_diagnosis():
         return {
-            "case_id": f"MOCK-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4]}",
+            "case_id": f"MOCK-{datetime.now(UTC).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4]}",
             "concepts": {
                 "asymmetry": 0.82, "border_irregularity": 0.73,
                 "color_variegation": 0.65, "diameter_large": 0.44,
@@ -1044,8 +1055,9 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
         backend = get_backend()
         if backend is None:
             return {"cases": _mock_history(limit)}
-        from ui import search_history
         import pandas as pd
+
+        from ui import search_history
         df = search_history(query, fitz_filter, backend)
         if isinstance(df, pd.DataFrame) and "Info" not in df.columns:
             return {"cases": df.head(limit).to_dict(orient="records")}
@@ -1188,7 +1200,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
                 "title": req.title,
                 "active": True,
                 "permissions": req.permissions,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "last_login": None,
             }
             data["doctors"].append(doctor)
@@ -1322,7 +1334,7 @@ Sitemap: https://dermai.onrender.com/sitemap.xml
 
     @app.get("/api/admin/sessions")
     async def list_sessions(_auth=Depends(require_admin)):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         active = []
         expired = []
         for token, sess in list(_sessions.items()):

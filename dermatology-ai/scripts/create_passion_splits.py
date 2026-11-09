@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Create train/val splits for PASSION dataset at patient level."""
 
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 from sklearn.model_selection import train_test_split
 
 METADATA_CSV = Path("/mnt/d/Dermatology_AI/dermatology-ai/datasets/passion/metadata.csv")
@@ -45,6 +46,7 @@ train_subjects_valid, val_subjects_valid = train_test_split(
 
 # Randomly assign invalid subjects
 import numpy as np
+
 np.random.seed(42)
 invalid_split = np.random.rand(len(subjects_invalid)) < 0.8
 train_subjects_invalid = subjects_invalid[invalid_split]

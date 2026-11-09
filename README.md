@@ -9,6 +9,12 @@ Collection of my web applications and software projects.
 - [**Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis**](./dermatology-ai/) — AI-powered dermatology triage and diagnosis support system with clinician-in-the-loop (HITL) reinforcement learning.
 - [**Explainable Dermatology AI Poster**](./dermatology-ai/poster.html/)
 
+## Documentation
+
+- [Model Card](./dermatology-ai/MODEL_CARD.md)
+- [Security Policy](./dermatology-ai/SECURITY.md)
+- [Operations Runbook](./dermatology-ai/docs/OPERATIONS.md)
+- [Remediation Status](./dermatology-ai/REMEDIATION_STATUS.md)
 
 
 # Derma_AI — Agent Task Instructions

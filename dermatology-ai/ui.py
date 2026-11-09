@@ -10,11 +10,8 @@ Four tabs:
 
 from __future__ import annotations
 
-import io
 import logging
-import uuid
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+from datetime import UTC, datetime
 
 import gradio as gr
 import numpy as np
@@ -23,9 +20,9 @@ import torch
 from PIL import Image as PILImage
 
 from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
-from metrics_tracker import FairnessTracker, CaseRecord
+from metrics_tracker import CaseRecord, FairnessTracker
 from model import CONCEPT_NAMES, DermatologyCBM, XAIExplainer
-from rl_module import FITZPATRICK_LABELS, PPOAgent, TRIAGE_NAMES, TRUE_LABEL_TO_TRIAGE
+from rl_module import FITZPATRICK_LABELS, TRIAGE_NAMES, PPOAgent
 from samplesEquity import inference_transform
 
 logger = logging.getLogger(__name__)
@@ -62,7 +59,7 @@ class AppState:
 
     def next_case_id(self) -> str:
         self._case_counter += 1
-        return f"UI-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{self._case_counter:04d}"
+        return f"UI-{datetime.now(UTC).strftime('%Y%m%d')}-{self._case_counter:04d}"
 
 
 # ====================================================================
@@ -82,11 +79,11 @@ def preprocess(image: np.ndarray, device: torch.device) -> torch.Tensor:
 # ====================================================================
 
 def run_diagnosis(
-    image: Optional[np.ndarray],
+    image: np.ndarray | None,
     fitz_dropdown: int,
     true_label_dropdown: int,
     state: AppState,
-) -> Tuple:
+) -> tuple:
     if image is None:
         return (None, "Please upload an image.", "", gr.update(), gr.update(), gr.update(), gr.update(), None, "", gr.update(), gr.update(), gr.update())
 
@@ -151,14 +148,14 @@ def run_diagnosis(
     return (overlay, concept_md, triage_md, detail, session_data, f"Case {case_id}")
 
 
-def agree_with_model(session_data: dict, state: AppState) -> Tuple:
+def agree_with_model(session_data: dict, state: AppState) -> tuple:
     if session_data is None:
         return ("No active case.", "", gr.update(), gr.update())
     case_id = session_data["case_id"]
     return (f"✅ Agreed — no override recorded for {case_id}.", "", gr.update(variant="primary"), gr.update(variant="secondary"))
 
 
-def override_triage(session_data: dict, new_action: int, state: AppState) -> Tuple:
+def override_triage(session_data: dict, new_action: int, state: AppState) -> tuple:
     if session_data is None:
         return ("No active case.", "", gr.update(), gr.update())
     case_id = session_data["case_id"]
@@ -180,7 +177,7 @@ def override_triage(session_data: dict, new_action: int, state: AppState) -> Tup
 #  Tab 2 – Analytics Dashboard
 # ====================================================================
 
-def refresh_analytics(state: AppState) -> Tuple:
+def refresh_analytics(state: AppState) -> tuple:
     metrics = state.tracker.compute_metrics()
     if not metrics:
         return (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "No data yet.", "0")

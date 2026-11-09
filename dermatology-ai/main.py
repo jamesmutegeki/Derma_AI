@@ -12,7 +12,6 @@ import logging
 import os
 import random
 import sys
-from typing import List
 
 import numpy as np
 
@@ -43,7 +42,7 @@ else:
 #  Synthetic data generation
 # ---------------------------------------------------------------------------
 
-def generate_mock_cases(num_cases: int = 500) -> List:
+def generate_mock_cases(num_cases: int = 500) -> list:
     from rl_module import Case
     cases = []
     fitz_weights = [1, 1, 1, 3, 4, 4]
@@ -88,7 +87,7 @@ def train_ppo_agent(agent, env, cases, num_episodes: int = 2000, update_interval
     return agent
 
 
-def compute_fairness_metrics(agent, cases: List) -> dict:
+def compute_fairness_metrics(agent, cases: list) -> dict:
     from rl_module import TRUE_LABEL_TO_TRIAGE
     metrics = {}
     for fitz in range(1, 7):
@@ -104,9 +103,9 @@ def compute_fairness_metrics(agent, cases: List) -> dict:
 #  Seed the fairness tracker with benchmark data for the UI dashboard
 # ---------------------------------------------------------------------------
 
-def seed_tracker(agent, cases: List, tracker, hitl):
-    from rl_module import TRUE_LABEL_TO_TRIAGE
+def seed_tracker(agent, cases: list, tracker, hitl):
     from metrics_tracker import CaseRecord
+    from rl_module import TRUE_LABEL_TO_TRIAGE
     for case in cases:
         state = np.concatenate([case.concept_embedding.astype(np.float32), np.eye(6, dtype=np.float32)[case.fitz_type - 1]])
         model_action = agent.evaluate(state)
@@ -158,9 +157,9 @@ def run_headless():
         logger.error("PyTorch is required for headless mode. pip install torch")
         sys.exit(1)
 
-    from model import DermatologyCBM, XAIExplainer
-    from rl_module import PPOAgent, DermTriageEnv, TRUE_LABEL_TO_TRIAGE
     from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
+    from model import DermatologyCBM, XAIExplainer
+    from rl_module import TRUE_LABEL_TO_TRIAGE, DermTriageEnv, PPOAgent
 
     logger.info("=" * 60)
     logger.info("Dermatology AI — Headless Integration Demo")
@@ -233,10 +232,10 @@ def run_ui(share: bool = False):
         logger.error("PyTorch is required for Gradio UI mode. pip install torch")
         sys.exit(1)
 
-    from model import DermatologyCBM
-    from rl_module import PPOAgent, DermTriageEnv
     from hitl_pipeline import HITLPipeline, OfflinePolicyOptimizer
     from metrics_tracker import FairnessTracker
+    from model import DermatologyCBM
+    from rl_module import DermTriageEnv, PPOAgent
 
     logger.info("=" * 60)
     logger.info("Dermatology AI — Launching Gradio UI")
@@ -263,7 +262,7 @@ def run_ui(share: bool = False):
     seed_tracker(agent, cases, tracker, hitl)
 
     logger.info("Building Gradio interface...")
-    from ui import create_ui, AppState
+    from ui import AppState, create_ui
     app_state = AppState(model=model, ppo_agent=agent, hitl=hitl, offline_optimizer=optimizer, tracker=tracker, device=DEVICE)
 
     demo = create_ui(app_state)

@@ -10,19 +10,19 @@ This module tests:
 6. Patient-level aggregation logic (from passion_metrics)
 """
 
-import pytest
-import pandas as pd
-import torch
-from pathlib import Path
 import sys
 import tempfile
+from pathlib import Path
+
+import pandas as pd
+import pytest
+import torch
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datasetEquity import DermDataset
-from model import DermatologyCBM, CONCEPT_NAMES
-
+from model import CONCEPT_NAMES, DermatologyCBM
 
 # --- Hermetic Fixtures using tmp_path ---
 
@@ -64,8 +64,8 @@ def sample_images_dir(tmp_path, sample_passion_metadata):
     img_dir = tmp_path / "images"
     img_dir.mkdir()
 
-    from PIL import Image
     import numpy as np
+    from PIL import Image
 
     for img_id in df['image_id']:
         # Create a small valid JPEG
@@ -166,8 +166,8 @@ def test_fitzpatrick_distribution_reported(sample_passion_splits):
 
 def test_urgent_lane_escalation_rate_computation_hermetic(sample_val_dataset, dummy_cbm_model):
     """Test that urgent lane escalation rate computation runs without error (no threshold assertion)."""
-    from torch.utils.data import DataLoader
     import torch.nn.functional as F
+    from torch.utils.data import DataLoader
 
     device = torch.device('cpu')
     dummy_cbm_model = dummy_cbm_model.to(device)
@@ -204,8 +204,8 @@ def test_urgent_lane_escalation_rate_computation_hermetic(sample_val_dataset, du
 
 def test_overall_urgent_lane_rate_computation_hermetic(sample_val_dataset, dummy_cbm_model):
     """Test overall urgent lane escalation rate computation (no threshold assertion)."""
-    from torch.utils.data import DataLoader
     import torch.nn.functional as F
+    from torch.utils.data import DataLoader
 
     device = torch.device('cpu')
     dummy_cbm_model = dummy_cbm_model.to(device)
@@ -313,7 +313,6 @@ def test_patient_level_aggregation_logic():
     from scripts.passion_metrics import (
         PredictionRecord,
         compute_patient_level_aggregation,
-        compute_urgent_lane_rate
     )
 
     records = [
@@ -339,9 +338,8 @@ def test_patient_level_aggregation_logic():
 def test_urgent_lane_rate_computation():
     """Test urgent lane rate computation with known fixture."""
     from scripts.passion_metrics import (
-        PredictionRecord,
+        build_test_fixture_basic,
         compute_urgent_lane_rate,
-        build_test_fixture_basic
     )
 
     records = build_test_fixture_basic()
@@ -357,9 +355,8 @@ def test_urgent_lane_rate_computation():
 def test_empty_stratum_not_in_results():
     """Test that empty stratum is not present in results (not 0.0)."""
     from scripts.passion_metrics import (
-        PredictionRecord,
+        build_test_fixture_empty_stratum,
         compute_urgent_lane_rate,
-        build_test_fixture_empty_stratum
     )
 
     records = build_test_fixture_empty_stratum()

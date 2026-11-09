@@ -14,14 +14,12 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.distributions import Categorical
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -95,7 +93,7 @@ class Case:
     concept_embedding: np.ndarray  # shape (NUM_CONCEPTS,)
     fitz_type: int                 # 1-6
     true_label: int                # 0=benign, 1=melanoma, 2=kaposi_sarcoma
-    patient_id: Optional[str] = None
+    patient_id: str | None = None
 
 
 class DermTriageEnv:
@@ -111,10 +109,10 @@ class DermTriageEnv:
         self.num_concepts = num_concepts
         self.state_dim = num_concepts + NUM_FITZ_TYPES
         self.action_dim = 3
-        self.current_case: Optional[Case] = None
-        self._cases: List[Case] = []
+        self.current_case: Case | None = None
+        self._cases: list[Case] = []
 
-    def seed(self, cases: List[Case]):
+    def seed(self, cases: list[Case]):
         """Inject a case list for episode sampling."""
         self._cases = cases
 
@@ -122,7 +120,7 @@ class DermTriageEnv:
         self.current_case = random.choice(self._cases) if self._cases else None
         return self._build_state(self.current_case)
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict]:
         assert self.current_case is not None, "Call reset() before step()."
 
         reward = fairness_weighted_reward(
@@ -141,7 +139,7 @@ class DermTriageEnv:
         }
         return next_state, reward, done, info
 
-    def _build_state(self, case: Optional[Case]) -> np.ndarray:
+    def _build_state(self, case: Case | None) -> np.ndarray:
         if case is None:
             return np.zeros(self.state_dim, dtype=np.float32)
         concept = case.concept_embedding.astype(np.float32)
@@ -182,15 +180,15 @@ class PPONetwork(nn.Module):
                 nn.init.orthogonal_(m.weight, gain=math.sqrt(2))
                 nn.init.zeros_(m.bias)
 
-    def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, state: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         features = self.feature(state)
         action_logits = self.actor(features)
         value = self.critic(features)
         return action_logits, value
 
     def get_action_and_value(
-        self, state: torch.Tensor, action: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, state: torch.Tensor, action: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         action_logits, value = self.forward(state)
         probs = Categorical(logits=action_logits)
 
@@ -208,12 +206,12 @@ class PPONetwork(nn.Module):
 
 @dataclass
 class Rollout:
-    states: List[np.ndarray]
-    actions: List[int]
-    rewards: List[float]
-    dones: List[bool]
-    log_probs: List[float]
-    values: List[float]
+    states: list[np.ndarray]
+    actions: list[int]
+    rewards: list[float]
+    dones: list[bool]
+    log_probs: list[float]
+    values: list[float]
 
 
 class PPOAgent:
@@ -251,7 +249,7 @@ class PPOAgent:
         self.network = PPONetwork(state_dim, action_dim, hidden_dim).to(device)
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
 
-    def select_action(self, state: np.ndarray) -> Tuple[int, float, float]:
+    def select_action(self, state: np.ndarray) -> tuple[int, float, float]:
         tensor = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
         with torch.no_grad():
             action, log_prob, _, value = self.network.get_action_and_value(tensor)
@@ -263,7 +261,7 @@ class PPOAgent:
             action_logits, _ = self.network.forward(tensor)
         return torch.argmax(action_logits, dim=1).item()
 
-    def update(self, rollouts: List[Rollout], epochs: int = 10, batch_size: int = 64) -> dict:
+    def update(self, rollouts: list[Rollout], epochs: int = 10, batch_size: int = 64) -> dict:
         all_states, all_actions, all_log_probs_old, all_returns, all_advantages = (
             self._prepare_batch(rollouts)
         )
@@ -310,7 +308,7 @@ class PPOAgent:
 
         return {k: float(np.mean(v)) for k, v in metrics.items()}
 
-    def _prepare_batch(self, rollouts: List[Rollout]):
+    def _prepare_batch(self, rollouts: list[Rollout]):
         all_states, all_actions, all_log_probs, all_returns, all_advantages = [], [], [], [], []
 
         for rollout in rollouts:

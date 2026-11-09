@@ -32,8 +32,14 @@ sys.path.insert(0, str(ROOT))
 
 from datasetEquity import DermDataset, MultiSourceDermDataset
 from model import NUM_CONCEPTS
+from rl_module import (
+    TRUE_LABEL_TO_TRIAGE,
+    Case,
+    DermTriageEnv,
+    PPOAgent,
+    Rollout,
+)
 from samplesEquity import MelaninNormalization, dark_skin_aug
-from rl_module import Case, DermTriageEnv, PPOAgent, Rollout, TRUE_LABEL_TO_TRIAGE, TRIAGE_NAMES
 
 # ---------------------------------------------------------------------------
 # Paths / constants

@@ -11,12 +11,9 @@ Provides:
 
 from __future__ import annotations
 
-import json
 import logging
-import random
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import numpy as np
 import torch
@@ -25,7 +22,6 @@ from rl_module import (
     PPOAgent,
     Rollout,
     fairness_weighted_reward,
-    TRUE_LABEL_TO_TRIAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,12 +43,12 @@ class ClinicianOverride:
     """
 
     patient_id: str
-    concept_embed: List[float]
+    concept_embed: list[float]
     fitz_type: int
     true_label: int
     model_action: int
     clinician_action: int
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     notes: str = ""
 
 
@@ -77,9 +73,9 @@ class HITLPipeline:
         self.num_fitz = 6
         self.state_dim = num_concepts + self.num_fitz
 
-        self.correction_buffer: List[ClinicianOverride] = []
+        self.correction_buffer: list[ClinicianOverride] = []
         self.buffer_capacity = buffer_capacity
-        self.override_log: List[ClinicianOverride] = []
+        self.override_log: list[ClinicianOverride] = []
 
     def process_case(
         self,
@@ -87,8 +83,8 @@ class HITLPipeline:
         concept_embed: np.ndarray,
         fitz_type: int,
         true_label: int,
-        clinician_action: Optional[int] = None,
-    ) -> Tuple[int, Optional[ClinicianOverride]]:
+        clinician_action: int | None = None,
+    ) -> tuple[int, ClinicianOverride | None]:
         """Run model triage and (optionally) record clinician override.
 
         Args:
@@ -151,7 +147,7 @@ class OfflinePolicyOptimizer:
         for param_group in self.ppo_agent.optimizer.param_groups:
             param_group["lr"] = learning_rate
 
-    def optimise(self, overrides: List[ClinicianOverride]) -> dict:
+    def optimise(self, overrides: list[ClinicianOverride]) -> dict:
         """Run offline PPO update from clinician correction data.
 
         For each override, the *clinician's action* is treated as the
@@ -174,7 +170,7 @@ class OfflinePolicyOptimizer:
         logger.info("Offline policy update complete: %s", metrics)
         return metrics
 
-    def _overrides_to_rollouts(self, overrides: List[ClinicianOverride]) -> List[Rollout]:
+    def _overrides_to_rollouts(self, overrides: list[ClinicianOverride]) -> list[Rollout]:
         rollouts = []
         for ov in overrides:
             concept = np.array(ov.concept_embed, dtype=np.float32)
@@ -189,7 +185,6 @@ class OfflinePolicyOptimizer:
                 ov.fitz_type,
             )
 
-            import torch
             state_t = torch.FloatTensor(state).to(self.ppo_agent.device).unsqueeze(0)
             action_t = torch.LongTensor([ov.clinician_action]).to(self.ppo_agent.device)
             with torch.no_grad():

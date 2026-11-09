@@ -8,14 +8,12 @@ Provides:
     - XAIExplainer: Integrated Gradients and Grad-CAM for clinical audit.
 """
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+
 import numpy as np
-from typing import List, Optional, Tuple
-
 import timm
-
+import torch
+import torch.nn.functional as F
+from torch import nn
 
 CONCEPT_NAMES = [
     "asymmetry",
@@ -54,7 +52,7 @@ class HRNetFeatureExtractor(nn.Module):
         self._output_stride = self.feature_info.reduction()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        features: List[torch.Tensor] = self.backbone(x)
+        features: list[torch.Tensor] = self.backbone(x)
         return features[0]  # (B, C, H/4, W/4)
 
     @property
@@ -74,7 +72,7 @@ class ConceptBottleneck(nn.Module):
         self,
         in_features: int,
         num_concepts: int = NUM_CONCEPTS,
-        hidden_dim: Optional[int] = None,
+        hidden_dim: int | None = None,
     ):
         super().__init__()
         hidden_dim = hidden_dim or in_features // 2
@@ -139,7 +137,7 @@ class DermatologyCBM(nn.Module):
         self._concept_names = CONCEPT_NAMES
         self.to(torch.float32)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         fm = self.backbone(x)
         concepts = self.concept_bottleneck(fm)
         logits = self.classifier(concepts)
@@ -153,7 +151,7 @@ class DermatologyCBM(nn.Module):
         return self.backbone(x)
 
     @property
-    def concept_names(self) -> List[str]:
+    def concept_names(self) -> list[str]:
         return self._concept_names
 
 
@@ -170,8 +168,8 @@ class GradCAM:
 
     def __init__(self, model: DermatologyCBM):
         self.model = model
-        self.gradients: Optional[torch.Tensor] = None
-        self.activations: Optional[torch.Tensor] = None
+        self.gradients: torch.Tensor | None = None
+        self.activations: torch.Tensor | None = None
         self._register_hooks()
 
     def _register_hooks(self):
@@ -197,7 +195,7 @@ class GradCAM:
             h.remove()
         self._backward_handles.clear()
 
-    def generate(self, x: torch.Tensor, class_idx: Optional[int] = None) -> np.ndarray:
+    def generate(self, x: torch.Tensor, class_idx: int | None = None) -> np.ndarray:
         self.model.zero_grad()
         logits, _ = self.model(x)
 
@@ -259,7 +257,7 @@ class XAIExplainer:
         return logits
 
     def integrated_gradients(
-        self, x: torch.Tensor, target: Optional[int] = None, steps: int = 50
+        self, x: torch.Tensor, target: int | None = None, steps: int = 50
     ) -> np.ndarray:
         if not self._captum_available:
             raise ImportError("captum is required for Integrated Gradients. pip install captum")
@@ -284,7 +282,7 @@ class XAIExplainer:
         saliency = (saliency - saliency.min()) / max(saliency.ptp(), 1e-8)
         return saliency
 
-    def grad_cam(self, x: torch.Tensor, class_idx: Optional[int] = None) -> np.ndarray:
+    def grad_cam(self, x: torch.Tensor, class_idx: int | None = None) -> np.ndarray:
         return self.gradcam.generate(x, class_idx)
 
     def concept_attribution(self, x: torch.Tensor) -> dict:

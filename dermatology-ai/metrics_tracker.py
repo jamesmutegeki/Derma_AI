@@ -11,14 +11,13 @@ from __future__ import annotations
 import json
 import os
 from collections import defaultdict
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
 
-from rl_module import FITZPATRICK_LABELS, TRUE_LABEL_TO_TRIAGE, TRIAGE_NAMES
+from rl_module import FITZPATRICK_LABELS, TRIAGE_NAMES, TRUE_LABEL_TO_TRIAGE
 
 
 @dataclass
@@ -27,11 +26,11 @@ class CaseRecord:
     fitz_type: int
     true_label: int
     model_triage: int
-    clinician_triage: Optional[int] = None
+    clinician_triage: int | None = None
     is_override: bool = False
     reward: float = 0.0
-    concepts: List[float] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    concepts: list[float] = field(default_factory=list)
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     offline_updated: bool = False
 
 
@@ -39,10 +38,10 @@ class FairnessTracker:
     LEGACY_LABEL = "Fitz I-III"
     TARGET_LABEL = "Fitz IV-VI"
 
-    def __init__(self, persist_path: Optional[str] = "case_history.json"):
+    def __init__(self, persist_path: str | None = "case_history.json"):
         self.persist_path = persist_path
-        self.cases: List[CaseRecord] = []
-        self._snapshots: List[dict] = []  # metric snapshots for trend analysis
+        self.cases: list[CaseRecord] = []
+        self._snapshots: list[dict] = []  # metric snapshots for trend analysis
         self._load()
 
     # ------------------------------------------------------------------
@@ -61,7 +60,7 @@ class FairnessTracker:
                 break
 
     def snapshot(self, tag: str = ""):
-        self._snapshots.append({"tag": tag, **self.compute_metrics(), "timestamp": datetime.now(timezone.utc).isoformat()})
+        self._snapshots.append({"tag": tag, **self.compute_metrics(), "timestamp": datetime.now(UTC).isoformat()})
 
     # ------------------------------------------------------------------
     #  Core metrics
@@ -71,7 +70,7 @@ class FairnessTracker:
         if not self.cases:
             return {}
 
-        by_type: Dict[int, List[CaseRecord]] = defaultdict(list)
+        by_type: dict[int, list[CaseRecord]] = defaultdict(list)
         for c in self.cases:
             by_type[c.fitz_type].append(c)
 
@@ -218,7 +217,7 @@ class FairnessTracker:
         fig.update_layout(title=f"Clinician Override Rate ({self.compute_metrics().get('override_rate', 0):.1%})", height=300)
         return fig
 
-    def trend_chart(self) -> Optional[dict]:
+    def trend_chart(self) -> dict | None:
         import plotly.graph_objects as go
 
         if len(self._snapshots) < 2:

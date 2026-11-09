@@ -1,7 +1,6 @@
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
-import numpy as np
 import cv2
+from albumentations.pytorch import ToTensorV2
 
 
 class MelaninNormalization(A.ImageOnlyTransform):
