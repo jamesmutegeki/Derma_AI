@@ -9,7 +9,12 @@ Collection of my web applications and software projects.
 - [**Explainable Dermatology AI: Combining RL and XAI for Transparent Treatment and Diagnosis**](./dermatology-ai/) — AI-powered dermatology triage and diagnosis support system with clinician-in-the-loop (HITL) reinforcement learning.
 - [**Explainable Dermatology AI Poster**](./dermatology-ai/poster.html/)
 
+## Project roadmap
 
+- [**Evidence Atlas — interactive progress dashboard**](./docs/roadmap/index.html)
+- [**Full roadmap, project explanation, and evidence ledger**](./ROADMAP.md)
+
+Update `docs/roadmap/status.json`, then run `python3 docs/roadmap/build.py` to regenerate both views. Browser edits are local drafts until exported and committed.
 
 # Derma_AI — Agent Task Instructions
 
