@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dr. Pixel's Skin Clinic — how this dermatology AI actually works</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#151b23; --panel2:#1b232d; --line:#2a3441;
+    --ink:#e6edf3; --muted:#9aa7b4; --dim:#6b7785;
+    --accent:#4cc2a0; --accent2:#6ea8fe; --warn:#e3b341; --bad:#f2726f; --good:#57c98a;
+    --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 15% -10%, #16222e 0%, var(--bg) 55%) fixed;
+    color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent2)}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 80px}
+  header.top{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:14.5px;margin:0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;letter-spacing:.03em;
+         border:1px solid var(--line);background:var(--panel2);color:var(--muted)}
+  .badge.warn{border-color:#5a4a1e;background:#241f10;color:var(--warn)}
+  .badge.bad{border-color:#5c2b2b;background:#2a1616;color:var(--bad)}
+  .badge.good{border-color:#1f4d3a;background:#12241d;color:var(--good)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--panel)}
+  .seg button{background:none;border:0;color:var(--muted);padding:7px 13px;font-size:13px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#06231b;font-weight:650}
+  .hud{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:14px 0 0}
+  .xpbar{flex:1 1 240px;height:10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+  .xpbar > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s ease}
+  .xpnum{font:600 13px var(--mono);color:var(--muted);min-width:92px}
+  nav.tabs{display:flex;gap:6px;overflow:auto;margin:20px 0 16px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+  nav.tabs button{white-space:nowrap;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
+                  padding:9px 12px;font-size:14px;cursor:pointer;border-radius:8px 8px 0 0}
+  nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);background:var(--panel)}
+  section.view{display:none;animation:fade .25s ease}
+  section.view.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  h2{font-size:19px;margin:0 0 6px}
+  h3{font-size:15.5px;margin:0 0 6px}
+  p{margin:0 0 10px}
+  .muted{color:var(--muted)} .dim{color:var(--dim)} .small{font-size:13px}
+  .narr{display:flex;gap:12px;align-items:flex-start;background:linear-gradient(180deg,#17222c,#151b23);
+        border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;padding:14px;margin:14px 0}
+  .avatar{width:44px;height:44px;border-radius:50%;flex:0 0 44px;display:grid;place-items:center;font-size:22px;
+          background:radial-gradient(circle at 30% 30%,#2b6b5b,#12332c);border:1px solid #2f6b5c}
+  .narr p{margin:0}
+  .stagebtns{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+  .stagebtns button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;
+                    padding:7px 10px;font-size:12.5px;cursor:pointer}
+  .stagebtns button[aria-current="true"]{border-color:var(--accent);color:var(--ink);background:#12241f}
+  .stagebtns button.done::after{content:" ✓";color:var(--good)}
+  .split{display:grid;gap:16px;grid-template-columns:minmax(280px,420px) 1fr}
+  @media(max-width:820px){.split{grid-template-columns:1fr}}
+  canvas{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line);background:#0b0f14}
+  .controls{display:grid;gap:12px;margin-top:10px}
+  .ctrl{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;font-size:13px}
+  .ctrl input[type=range]{grid-column:1/2;width:100%;accent-color:var(--accent)}
+  .ctrl output{grid-column:2/3;font:600 12.5px var(--mono);color:var(--accent)}
+  .ctrl label{grid-column:1/3;color:var(--muted)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px;margin:8px 0}
+  .kv b{color:var(--muted);font-weight:600}
+  .bars{display:grid;gap:8px;margin-top:6px}
+  .bar{display:grid;grid-template-columns:110px 1fr 54px;gap:10px;align-items:center;font-size:13px}
+  .bar .track{height:12px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+  .bar .track > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .35s ease}
+  .bar .val{font:600 12px var(--mono);color:var(--muted);text-align:right}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  code,pre{font-family:var(--mono);font-size:12.5px}
+  pre{background:#0b0f14;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;margin:8px 0}
+  .chip{display:inline-block;padding:2px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);
+        font-size:11.5px;color:var(--muted);margin:0 4px 4px 0}
+  .quiz{border:1px dashed var(--line);border-radius:12px;padding:14px;margin-top:14px;background:#12181f}
+  .quiz .opts{display:grid;gap:8px;margin-top:8px}
+  .quiz button{text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+               padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13.5px}
+  .quiz button:hover{border-color:var(--accent2)}
+  .quiz button.ok{border-color:var(--good);background:#12241d}
+  .quiz button.no{border-color:var(--bad);background:#2a1616}
+  .quiz .why{margin-top:8px;font-size:13px;color:var(--muted);display:none}
+  .quiz.answered .why{display:block}
+  .ds{display:grid;gap:10px}
+  .ds .card{padding:14px}
+  .radarwrap{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media(max-width:820px){.radarwrap{grid-template-columns:1fr}}
+  .toggle{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);cursor:pointer}
+  .toggle input{accent-color:var(--accent)}
+  .banner{border:1px solid #5a4a1e;background:#241f10;color:#f2d38a;border-radius:12px;padding:12px 14px;font-size:13.5px}
+  .banner.bad{border-color:#5c2b2b;background:#2a1616;color:#f5a3a1}
+  .banner.good{border-color:#1f4d3a;background:#12241d;color:#9fe0bf}
+  .concept{display:grid;gap:0}
+  .concept .tabs{display:flex;gap:4px;margin:6px 0 10px;flex-wrap:wrap}
+  .concept .tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;
+                        padding:5px 9px;font-size:12px;cursor:pointer}
+  .concept .tabs button[aria-pressed="true"]{color:var(--ink);border-color:var(--accent)}
+  .pane{display:none} .pane.on{display:block}
+  .heat{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;margin:6px 0}
+  .heat i{display:block;padding-top:100%;border-radius:2px}
+  .matrix{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;font-size:13px;align-items:center;max-width:420px}
+  .matrix div{padding:10px;text-align:center;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+  .matrix .hd{background:none;border:0;color:var(--muted);font-size:12px}
+  .foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+  .rowbtn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:8px 12px;
+          cursor:pointer;font-size:13px}
+  .rowbtn:hover{border-color:var(--accent)}
+  .rowbtn.primary{background:var(--accent);color:#06231b;border-color:transparent;font-weight:650}
+  .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  ul.tight{margin:6px 0 0 18px;padding:0} ul.tight li{margin:3px 0}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media print{nav.tabs,.seg,.stagebtns,.rowbtn{display:none}body{background:#fff;color:#000}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>Dr.&nbsp;Pixel’s Skin Clinic</h1>
+    <p class="sub">A guided tour of how this dermatology triage prototype works — one image, eight rooms, sixteen ideas.
+      Built to be honest: <b>nothing here is a measurement of the model</b>, because no frozen checkpoint exists yet.</p>
+  </div>
+  <div class="flex">
+    <span class="badge bad">Research prototype · not a medical device</span>
+    <div class="seg" role="group" aria-label="Explanation depth">
+      <button data-depth="beginner" aria-pressed="true">Beginner</button>
+      <button data-depth="practitioner" aria-pressed="false">Practitioner</button>
+      <button data-depth="expert" aria-pressed="false">Expert</button>
+    </div>
+  </div>
+</header>
+
+<div class="hud">
+  <div class="xpbar" aria-hidden="true"><i id="xpfill"></i></div>
+  <div class="xpnum" id="xpnum">0 XP · 0/8 rooms</div>
+  <div class="small dim" id="badges">no badges yet</div>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-view="pipeline">1 · The clinic</button>
+  <button role="tab" aria-selected="false" data-view="arena">2 · Dataset arena</button>
+  <button role="tab" aria-selected="false" data-view="codex">3 · Concept codex</button>
+  <button role="tab" aria-selected="false" data-view="limits">4 · Break the AI</button>
+  <button role="tab" aria-selected="false" data-view="metrics">5 · Metrics desk</button>
+  <button role="tab" aria-selected="false" data-view="report">6 · Final report</button>
+</nav>
+
+<!-- ============================ 1. PIPELINE ============================ -->
+<section class="view on" id="view-pipeline" role="tabpanel">
+  <div class="banner bad" id="honesty-banner">
+    <b>No checkpoint, no numbers.</b> Serving is disabled (<code>serving.enabled: false</code>, <code>/api/diagnose</code> → 503
+    <code>model_unavailable</code>) and the Kaposi sarcoma class is paused until a real cohort exists. Everything you see in
+    this room is a <b>demonstration on a drawn image</b> — a mechanism, not a result.
+  </div>
+
+  <div class="narr" id="narr">
+    <div class="avatar" aria-hidden="true">🩺</div>
+    <p id="narrtext"><b>Dr. Pixel:</b> Welcome. I’ll walk a photograph through the machine, one room at a time. Press a room below, or
+      “next” to go in order. You choose how deep the explanation goes.</p>
+  </div>
+
+  <div class="stagebtns" id="stagebtns" role="group" aria-label="Pipeline rooms"></div>
+
+  <div class="split">
+    <div class="card">
+      <canvas id="stage" width="420" height="320" aria-label="Illustrative lesion image at the current pipeline stage"></canvas>
+      <div class="controls">
+        <div class="ctrl">
+          <label for="thr">Decision threshold <span class="dim">(how much evidence before “urgent”)</span></label>
+          <input type="range" id="thr" min="0" max="100" value="55">
+          <output id="thrv">0.55</output>
+        </div>
+        <div class="ctrl">
+          <label for="aug">Augmentation strength</label>
+          <input type="range" id="aug" min="0" max="100" value="35">
+          <output id="augv">0.35</output>
+        </div>
+        <div class="ctrl">
+          <label for="temp">Softmax temperature <span class="dim">(confidence sharpness)</span></label>
+          <input type="range" id="temp" min="20" max="300" value="100">
+          <output id="tempv">1.00</output>
+        </div>
+        <div class="flex">
+          <button class="rowbtn" id="prevStage">← previous</button>
+          <button class="rowbtn primary" id="nextStage">next room →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="stageTitle">Room 1 — The photograph arrives</h2>
+      <p id="stageBody"></p>
+      <div class="kv" id="stageKV"></div>
+      <div id="stageWidget"></div>
+    </div>
+  </div>
+
+  <div class="quiz" id="quiz"></div>
+</section>
+
+<!-- ============================ 2. ARENA ============================ -->
+<section class="view" id="view-arena" role="tabpanel">
+  <div class="card">
+    <h2>The dataset arena</h2>
+    <p class="muted">Eight sources were examined. The ratings below are <b>qualitative judgements</b> from the dataset cards in this
+      repository — not measurements of anything. The fairness column says who is missing, because that is what decides whether a
+      result would transfer to a Ugandan clinic.</p>
+    <div id="dsCards" class="grid g2" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Head to head</h2>
+    <div class="radarwrap">
+      <div><canvas id="radar" width="420" height="360" aria-label="Qualitative comparison of the datasets"></canvas></div>
+      <div>
+        <p class="small muted">Pick two datasets to compare. Axes are 0–5 editorial ratings: volume, skin-tone diversity,
+          label quality, class balance, real-world realism, licensing clarity.</p>
+        <div class="flex" style="margin:10px 0">
+          <select id="radarA" class="rowbtn"></select>
+          <select id="radarB" class="rowbtn"></select>
+        </div>
+        <div id="radarVerdict" class="small"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Ablation lab <span class="badge warn">illustrative only</span></h2>
+    <p class="muted small">Toggle sources to see the <em>shape</em> of the argument: dermoscopic-only data looks strong in
+      training and brittle in clinic; adding clinical photographs and dark-skin data costs headline accuracy and buys the thing
+      that matters. The percentages are invented to make that point and are <b>labelled as invented</b> on every bar.</p>
+    <div class="grid g3" style="margin:12px 0" id="ablationToggles"></div>
+    <div class="bars" id="ablationBars"></div>
+    <p class="small dim" style="margin-top:10px">Why it is not a real ablation: there is no trained model to ablate, and no
+      evaluation report to quote. A real ablation needs a frozen checkpoint, one variable changed at a time, and identical splits.</p>
+  </div>
+</section>
+
+<!-- ============================ 3. CODEX ============================ -->
+<section class="view" id="view-codex" role="tabpanel">
+  <div class="card">
+    <h2>Concept codex <span class="badge" id="codexCount"></span></h2>
+    <p class="muted">Sixteen ideas the project stands on. Each card has four faces: <b>what it is</b>, <b>how this project does
+      it</b>, <b>what it is for</b>, and <b>a toy</b> you can poke. Toy outputs are demonstrations.</p>
+    <div class="flex" style="margin:10px 0">
+      <input id="codexSearch" class="rowbtn" style="flex:1 1 220px;color:var(--ink)" placeholder="search concepts…" aria-label="Search concepts">
+      <span class="small dim" id="codexHit"></span>
+    </div>
+    <div id="codexList" class="grid" style="gap:14px"></div>
+  </div>
+</section>
+
+<!-- ============================ 4. LIMITS ============================ -->
+<section class="view" id="view-limits" role="tabpanel">
+  <div class="grid g2">
+    <div class="card">
+      <h2>What it can do</h2>
+      <ul class="tight">
+        <li>Sort a photographed lesion into <b>routine</b>, <b>follow-up</b> or <b>urgent</b> — it does not name a disease.</li>
+        <li>Show the concepts and the pixel regions behind a lane, so a clinician can audit the reason.</li>
+        <li>Record a clinician’s override, with a reason, in an audit trail.</li>
+        <li>Report per-skin-tone behaviour <em>when a frozen checkpoint exists</em> — with sample sizes and intervals.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>What it cannot do</h2>
+      <ul class="tight">
+        <li>Replace a dermatologist or produce a diagnosis.</li>
+        <li>Recognise a condition it never saw — including <b>Kaposi sarcoma</b>, which is paused for lack of a cohort.</li>
+        <li>Be trusted on skin tones it was not validated on; no African cohort is in hand.</li>
+        <li>Work on a bad photograph: blur, shadow, a lesion at the frame edge.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Break the AI</h2>
+    <p class="muted small">Take the same lesion and damage it. Watch the evidence collapse — and note that the honest output is
+      “uncertain, refer”, not a confident wrong answer.</p>
+    <div class="flex" style="margin:10px 0">
+      <button class="rowbtn" data-break="blur">blur it</button>
+      <button class="rowbtn" data-break="dark">shoot it in shadow</button>
+      <button class="rowbtn" data-break="edge">push the lesion to the edge</button>
+      <button class="rowbtn" data-break="ood">a tattoo, not a lesion</button>
+      <button class="rowbtn primary" data-break="reset">reset</button>
+    </div>
+    <div class="split" style="grid-template-columns:minmax(280px,420px) 1fr">
+      <canvas id="breakCanvas" width="420" height="320" aria-label="Damaged lesion demonstration"></canvas>
+      <div>
+        <div class="bars" id="breakBars"></div>
+        <p id="breakVerdict" class="small" style="margin-top:12px"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 5. METRICS ============================ -->
+<section class="view" id="view-metrics" role="tabpanel">
+  <div class="banner" style="margin-bottom:14px">
+    This desk runs on a <b>synthetic prediction set</b> generated in your browser, so the arithmetic is real and the model is
+    not. Where the project’s own numbers belong, the cell says <b>not yet measured</b> — the correct value until a frozen
+    checkpoint and an evaluation report exist.
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h2>Operating point</h2>
+      <div class="ctrl">
+        <label for="mthr">Threshold on “urgent” probability</label>
+        <input type="range" id="mthr" min="5" max="95" value="50">
+        <output id="mthrv">0.50</output>
+      </div>
+      <div class="matrix" id="matrix" style="margin-top:12px"></div>
+      <p class="small dim" style="margin-top:10px">Move the threshold right: sensitivity for malignancy falls, specificity rises.
+        There is no free lunch — only a trade you can defend.</p>
+    </div>
+    <div class="card">
+      <h2>ROC <span class="badge warn">synthetic</span></h2>
+      <canvas id="roc" width="420" height="340" aria-label="ROC curve for synthetic scores"></canvas>
+      <div class="kv"><b>AUC (synthetic)</b><span id="aucv">—</span><b>Real model</b><span>not yet measured</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Per-class and per-skin-tone</h2>
+    <table>
+      <thead><tr><th>Class</th><th>Support in a real report</th><th>Recall</th><th>What we can say</th></tr></thead>
+      <tbody>
+        <tr><td>benign</td><td>—</td><td>not yet measured</td><td>No frozen checkpoint.</td></tr>
+        <tr><td>melanoma</td><td>—</td><td>not yet measured</td><td>Would carry a wide interval: 52 melanomas in PAD-UFES-20.</td></tr>
+        <tr><td>kaposi_sarcoma</td><td>0</td><td>null</td><td><b>Paused.</b> No public dataset has a KS cohort at usable scale.</td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:14px">
+      <thead><tr><th>Fitzpatrick</th><th>n</th><th>Urgent-lane rate</th><th>Comment</th></tr></thead>
+      <tbody>
+        <tr><td>I–II</td><td>—</td><td>not yet measured</td><td>PAD-UFES-20 is mostly II–III.</td></tr>
+        <tr><td>III</td><td>—</td><td>not yet measured</td><td>PASSION local subset contains III.</td></tr>
+        <tr><td>IV–VI</td><td>—</td><td>not yet measured</td><td>The population this is aimed at. No African cohort in hand.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ 6. REPORT ============================ -->
+<section class="view" id="view-report" role="tabpanel">
+  <div class="card">
+    <h2>Your visit summary</h2>
+    <div class="kv" id="reportStats"></div>
+    <div class="flex" style="margin:12px 0">
+      <button class="rowbtn primary" id="genReport">refresh summary</button>
+      <button class="rowbtn" id="exportReport">export JSON</button>
+      <button class="rowbtn" onclick="window.print()">print</button>
+    </div>
+    <div id="reportBody"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2>Plug in your real numbers</h2>
+    <p class="muted small">Everything the dashboard reads lives in one object at the top of the script. Set
+      <code>measured: true</code> only when a frozen <code>model_manifest.json</code> and an evaluation report exist, then fill
+      <code>results</code>. Until then the page refuses to display a figure as if it were a result.</p>
+    <pre id="configDump"></pre>
+  </div>
+</section>
+
+<div class="foot">
+  <p><b>Research prototype · Not a medical device · No Business Associate Agreement (BAA) · Do not use with real patient data.</b></p>
+  <p class="dim">Educational artefact. No photograph is loaded from disk or network; the lesion is drawn in the browser. No
+    performance figure appears anywhere on this page, because none has been measured. Kaposi sarcoma is paused until a real
+    cohort exists; there is no African cohort in this project.</p>
+</div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   ONE PLACE TO CHANGE EVERYTHING.
+   measured:false  -> the page will not show a metric as if it were real.
+   ===================================================================== */
+const CONFIG = {
+  project: "Explainable Dermatology AI — triage prototype",
+  measured: false,
+  ksPaused: true,
+  classes: ["benign", "melanoma", "kaposi_sarcoma"],
+  triage: ["routine", "follow_up", "urgent"],
+  results: null,          // e.g. {macro_f1: .., per_class: {...}, n: ..} only when measured:true
+  datasets: [
+    { id:"padufes", name:"PAD-UFES-20", images:2298, patients:1373, classes:6, kind:"clinical (phone)",
+      tone:"Fitzpatrick per patient, mostly II–III", labels:"cancers biopsy-proven", licence:"CC BY 4.0",
+      role:"Lane A training — the only source with biopsy-proven melanoma plus a skin-tone field",
+      bias:"Brazilian public-clinic population; only 52 melanomas", ratings:{volume:3,diversity:2,label:5,balance:2,realism:5,licence:5} },
+    { id:"ham", name:"HAM10000", images:10015, patients:null, classes:7, kind:"dermoscopic",
+      tone:"not recorded", labels:"histopathology for most", licence:"CC BY-NC 4.0",
+      role:"Lane A training — melanoma-rich baseline", bias:"dermoscopy ≠ a phone photo in a clinic; no skin type",
+      ratings:{volume:4,diversity:1,label:5,balance:2,realism:2,licence:4} },
+    { id:"scin", name:"SCIN", images:10000, patients:null, classes:null, kind:"clinical (crowdsourced)",
+      tone:"self-reported, Monk scale", labels:"dermatologist-labelled", licence:"CC BY 4.0",
+      role:"tone-stratified evaluation", bias:"US crowd; no melanoma/KS cohort of usable size",
+      ratings:{volume:4,diversity:4,label:4,balance:2,realism:4,licence:5} },
+    { id:"ddi", name:"DDI", images:656, patients:570, classes:null, kind:"clinical",
+      tone:"deliberately dark-skin weighted", labels:"expert-curated, path-confirmed", licence:"research use",
+      role:"external fairness test", bias:"small; one source",
+      ratings:{volume:1,diversity:5,label:5,balance:2,realism:5,licence:3} },
+    { id:"passion", name:"PASSION", images:4901, patients:1653, classes:4, kind:"clinical (paediatric)",
+      tone:"Fitzpatrick III–VI", labels:"four inflammatory groups", licence:"access-controlled, non-redistributable",
+      role:"triage-behaviour cohort only — it has no melanoma and no KS", bias:"no neoplastic disease at all",
+      ratings:{volume:3,diversity:5,label:4,balance:3,realism:5,licence:2} },
+    { id:"dermamnist", name:"DermaMNIST", images:10015, patients:null, classes:7, kind:"28–224 px thumbnails",
+      tone:"not recorded", labels:"derived from HAM10000", licence:"CC BY-NC 4.0",
+      role:"CI and smoke tests only — never a result", bias:"a thumbnail is not a photograph",
+      ratings:{volume:4,diversity:1,label:4,balance:2,realism:1,licence:4} },
+    { id:"isic", name:"ISIC Archive", images:485000, patients:null, classes:null, kind:"mostly dermoscopic",
+      tone:"mostly light skin", labels:"mixed provenance", licence:"CC, mixed",
+      role:"breadth; KS exists only in handfuls (16 in DERM12345)", bias:"light-skin skew; dermoscopy",
+      ratings:{volume:5,diversity:2,label:3,balance:3,realism:2,licence:4} },
+    { id:"dermnet", name:"DermNet (scrape)", images:19500, patients:null, classes:23, kind:"web images",
+      tone:"mixed, unrecorded", labels:"derived from page text", licence:"no redistribution right",
+      role:"rejected — licence and provenance", bias:"scraped against the site’s terms",
+      ratings:{volume:3,diversity:3,label:1,balance:3,realism:3,licence:1} }
+  ],
+  concepts: [
+    { id:"cnn", name:"CNN & ViT basics", what:"A convolutional network slides small filters over the image and learns edges, then textures, then shapes; a vision transformer does the same job by letting every patch attend to every other patch.",
+      analogy:"Reading a face: first the edges of the mouth, then the whole expression.",
+      how:"model.py: HRNet-W18 (timm) backbone → pooled features → 7 concept logits → 3-class head.",
+      used:"Turning pixels into features without hand-written rules.", type:"static" },
+    { id:"transfer", name:"Transfer learning", what:"Start from weights trained on a million natural images, then fine-tune on skin. You inherit general vision and spend your little data on the domain.",
+      analogy:"A new driver learns your city faster than someone learning to drive from scratch.",
+      how:"timm.create_model(..., pretrained=True); tests use --no-pretrained so CI never needs the internet.",
+      used:"Thousands, not millions, of labelled lesions.", type:"static" },
+    { id:"augment", name:"Augmentation", what:"Random flips, rotations, crops and colour jitter. The label stays the same; the model stops memorising one composition.",
+      analogy:"Practising a serve from every angle so match day is not a surprise.",
+      how:"transforms.py wraps albumentations; strength is a single knob in the training config.",
+      used:"Small datasets and phone cameras that never hold still.", type:"augment" },
+    { id:"imbalance", name:"Class imbalance", what:"When melanoma is 1 % of the data, plain accuracy is gamed by predicting “benign”. Weighted or focal losses make rare mistakes expensive.",
+      analogy:"A referee who penalises the mistake that actually loses the game.",
+      how:"Weighted cross-entropy; the RL reward penalises misses on darker skin more heavily.",
+      used:"52 melanomas out of 2,298 images.", type:"weights" },
+    { id:"softmax", name:"Logits & softmax", what:"The head emits raw scores (logits). Softmax turns them into numbers that sum to one; temperature decides how sharp they are.",
+      analogy:"Ranking three suspects, then converting the ranking into a share of blame.",
+      how:"Temperature is applied at report time; the stored artefact keeps raw logits.",
+      used:"Comparable probabilities across classes — and honest uncertainty.", type:"softmax" },
+    { id:"loss", name:"Loss functions", what:"A number that says how wrong one prediction was; training is the search for weights that make it small. Cross-entropy for classes, focal loss when easy examples dominate.",
+      analogy:"A coach’s scorecard that weights the errors that matter.",
+      how:"CrossEntropyLoss with class weights; the report records the loss used.",
+      used:"Steering learning toward the mistakes that harm patients.", type:"static" },
+    { id:"optim", name:"Optimisers & schedules", what:"AdamW adapts the step size per weight; a schedule (warm-up then cosine decay) stops the last epochs from overshooting.",
+      analogy:"A hiker who takes big steps on open ground and small ones near the summit.",
+      how:"AdamW, lr 1e-4, cosine decay, warm-up; seed recorded in provenance.",
+      used:"Stable fine-tuning of a pretrained backbone.", type:"static" },
+    { id:"leakage", name:"Splits & leakage", what:"If the same patient’s photos land in train and test, the model recognises the person, not the disease. Splitting must be by patient or lesion, never by image.",
+      analogy:"A exam that reuses last year’s questions — the score is real, the skill is not.",
+      how:"GroupShuffleSplit on patient_id / lesion_id; the builder refuses splits that contradict the data.",
+      used:"Every number this project will ever quote.", type:"leakage" },
+    { id:"metrics", name:"Sensitivity, specificity, F1, AUC", what:"Sensitivity: of the cancers, how many were flagged. Specificity: of the benign, how many were left alone. They trade against each other; AUC summarises the whole trade-off curve.",
+      analogy:"A smoke alarm: catching every fire versus waking the house for toast.",
+      how:"eval scripts compute all four plus intervals; nothing is quoted without a report.",
+      used:"Choosing an operating point you can defend to a clinician.", type:"static" },
+    { id:"calibration", name:"Calibration", what:"A model that says 0.9 should be right about nine times in ten. Sharpness is not calibration; a confident wrong model is worse than a hedged right one.",
+      analogy:"A weather forecaster who says 70 % and is right 70 % of the time.",
+      how:"Reliability curves and expected calibration error in the evaluation harness.",
+      used:"Deciding when to escalate instead of guessing.", type:"calibration" },
+    { id:"gradcam", name:"Grad-CAM / attribution", what:"A heat map of which pixels moved the score. Useful only if you check what it is pointing at — the lesion, or the ruler beside it.",
+      analogy:"A student showing their working — and you checking whether the working is the answer.",
+      how:"captum Integrated Gradients and Grad-CAM, computed per case, stored with the case.",
+      used:"Separating evidence from artefact.", type:"gradcam" },
+    { id:"segmentation", name:"Segmentation", what:"Pixel-level outlining of the lesion. This project does not use it for decisions; it would add a second failure mode before the first is measured.",
+      analogy:"Tracing the coastline before you have learned to read the map.",
+      how:"Not implemented. Deliberately.", used:"—", type:"static" },
+    { id:"domainshift", name:"Domain shift", what:"Dermoscopy, phone photos and thumbnails are different distributions. A model can look excellent in one and fail in another without any bug.",
+      analogy:"A Paris-trained chef in a Kampala market: same skill, wrong ingredients.",
+      how:"Tone-stratified evaluation; SCIN added specifically to test the shift.",
+      used:"Not shipping something that only works on the training camera.", type:"static" },
+    { id:"fairness", name:"Fairness across skin tones", what:"A single accuracy hides the group it fails. Per-tone recall with intervals, reported with n, is the minimum honest disclosure.",
+      analogy:"An average wage that hides who is paid nothing.",
+      how:"Per-Fitzpatrick metrics with support; empty strata say “not measured”, never 0.",
+      used:"The core claim of the project — and its biggest open risk.", type:"static" },
+    { id:"cbm", name:"Concept bottleneck", what:"The network must first commit to human-named concepts (asymmetry, border, colour variation…), then classify from those alone. The explanation is the model’s actual pathway, not a post-hoc guess.",
+      analogy:"A mechanic who writes the diagnosis on the job card before ordering parts.",
+      how:"7 concept logits → bottleneck → 3-class head (model.py, concept names in constants.py).",
+      used:"Auditable reasoning a clinician can argue with.", type:"cbm" },
+    { id:"hitl", name:"Human-in-the-loop RL", what:"Clinician overrides on borderline cases become the training signal. A fairness-weighted reward makes a missed cancer on dark skin cost more than a false alarm.",
+      analogy:"A trainee who is corrected at the bedside and remembers it.",
+      how:"rl_module.py: PPO-style updates, override log with reasons, reward weighting by skin tone.",
+      used:"A model that improves in the clinic instead of decaying there.", type:"static" }
+  ]
+};
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const el = (t, a={}, ...kids) => { const n=document.createElement(t); for(const k in a){ if(k==="class") n.className=a[k]; else if(k==="html") n.innerHTML=a[k]; else n.setAttribute(k,a[k]); } kids.forEach(k=>n.append(k)); return n; };
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const pct = v => (v*100).toFixed(0)+"%";
+
+/* ---------------------------- state ---------------------------- */
+const state = {
+  depth: "beginner",
+  stage: 0,
+  visited: new Set(),
+  quizScore: 0, quizDone: new Set(),
+  thr: 0.55, aug: 0.35, temp: 1.0,
+  breakMode: "reset",
+  ablation: { padufes:true, ham:true, scin:false, ddi:false, passion:false }
+};
+const DEPTH_LABEL = { beginner:"Beginner", practitioner:"Practitioner", expert:"Expert" };
+
+/* ---------------------------- tabs ---------------------------- */
+$$("nav.tabs button").forEach(b => b.addEventListener("click", () => {
+  $$("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
+  $$("section.view").forEach(v => v.classList.toggle("on", v.id === "view-"+b.dataset.view));
+  if (b.dataset.view === "report") renderReport();
+  if (b.dataset.view === "arena") { drawRadar(); renderAblation(); }
+}));
+
+$$(".seg button").forEach(b => b.addEventListener("click", () => {
+  $$(".seg button").forEach(x => x.setAttribute("aria-pressed", x===b));
+  state.depth = b.dataset.depth;
+  renderStage(); renderCodex();
+}));
+
+/* ---------------------------- drawing ---------------------------- */
+function drawScene(ctx, W, H, opt={}) {
+  const { aug=0, heat=false, mode="raw", dark=false, blur=false, edge=false, ood=false, heatOnArtefact=false } = opt;
+  ctx.save();
+  // skin
+  const g = ctx.createLinearGradient(0,0,W,H);
+  const base = dark ? ["#4a3428","#2b1d16"] : ["#c69a76","#9c6f4e"];
+  g.addColorStop(0, base[0]); g.addColorStop(1, base[1]);
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // texture
+  for (let i=0;i<420;i++){
+    ctx.fillStyle = `rgba(${dark?20:255},${dark?12:230},${dark?8:210},0.035)`;
+    ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2);
+  }
+  const cx = edge ? W*0.86 : W*0.5, cy = H*0.52, rx = W*0.19, ry = H*0.24;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(aug * 0.35); ctx.scale(1 + aug*0.12, 1 + aug*0.12);
+  // lesion
+  const lg = ctx.createRadialGradient(0,0,4,0,0,Math.max(rx,ry)*1.15);
+  lg.addColorStop(0, ood ? "#2f6f8f" : "#2a1a14");
+  lg.addColorStop(0.55, ood ? "#1f5570" : "#3a2318");
+  lg.addColorStop(1, ood ? "rgba(31,85,112,0)" : "rgba(58,35,24,0)");
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.ellipse(0,0,rx,ry,0.2,0,Math.PI*2); ctx.fill();
+  // uneven pigment
+  for (let i=0;i<26;i++){
+    const a = Math.random()*Math.PI*2, r = Math.random();
+    ctx.fillStyle = `rgba(18,10,8,${0.10+Math.random()*0.25})`;
+    ctx.beginPath(); ctx.ellipse(Math.cos(a)*rx*r*0.8, Math.sin(a)*ry*r*0.8, 3+Math.random()*7, 2+Math.random()*6, Math.random()*3, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  // ruler mark (the artefact)
+  ctx.fillStyle = "rgba(240,240,245,.85)";
+  ctx.fillRect(W*0.62, H*0.16, W*0.30, 7);
+  for (let i=0;i<9;i++) ctx.fillRect(W*0.62 + i*(W*0.30/8), H*0.16, 2, i%2?11:16);
+  // hairs
+  ctx.strokeStyle = "rgba(20,12,8,.55)"; ctx.lineWidth = 1.6;
+  for (let i=0;i<7;i++){
+    ctx.beginPath();
+    const x = Math.random()*W, y = Math.random()*H;
+    ctx.moveTo(x,y); ctx.quadraticCurveTo(x+18, y-9, x+38, y+6); ctx.stroke();
+  }
+  if (heat) {
+    const hx = heatOnArtefact ? W*0.77 : cx, hy = heatOnArtefact ? H*0.19 : cy;
+    const hg = ctx.createRadialGradient(hx,hy,2,hx,hy,W*0.30);
+    hg.addColorStop(0,"rgba(255,80,40,.85)");
+    hg.addColorStop(0.45,"rgba(255,190,60,.42)");
+    hg.addColorStop(1,"rgba(255,190,60,0)");
+    ctx.fillStyle = hg; ctx.fillRect(0,0,W,H);
+  }
+  if (mode === "normalize") { ctx.fillStyle="rgba(120,150,160,.16)"; ctx.fillRect(0,0,W,H); }
+  if (mode === "grid") {
+    ctx.strokeStyle = "rgba(110,168,254,.25)"; ctx.lineWidth = 1;
+    for (let x=0;x<=W;x+=W/8){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y=0;y<=H;y+=H/8){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  }
+  if (blur) { try { ctx.filter = "blur(6px)"; ctx.drawImage(ctx.canvas,0,0); ctx.filter="none"; } catch(e){} }
+  if (dark) { ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(0,0,W,H); }
+  ctx.restore();
+}
+
+/* ---------------------------- stages ---------------------------- */
+const STAGES = [
+  { id:"arrive", title:"The photograph arrives",
+    text:{ beginner:"Someone points a phone at a lesion and takes a picture. That is all the machine ever gets: pixels. No history, no blood test, no dermatologist standing beside it.",
+           practitioner:"A clinical photograph, typically 3000×4000, with a ruler and sometimes an ink mark on the skin. Quality is uncontrolled: mixed lighting, motion, hair.",
+           expert:"Input is an RGB photograph of unspecified geometry. Known nuisance variables: specular highlights, ruler/ink artefacts, hair occlusion, white-balance drift, and variable working distance. None is corrected downstream by the model." },
+    kv:[["Input","photograph, RGB"],["Output","a file — nothing more"],["Recorded with it","site? skin type? camera? <b>often nothing</b>"]],
+    quiz:{ q:"Why does a missing skin-tone field matter so much?", a:["It makes the file bigger","You cannot report fairness for a group you never recorded","It changes the image colours"], right:1,
+           why:"A metric per skin tone requires the tone to be recorded. This is why Fitzpatrick per patient is the single most valuable column in PAD-UFES-20." } },
+  { id:"label", title:"The label is the truth",
+    text:{ beginner:"For learning, every picture needs an answer. The best answer is a biopsy read under a microscope — a pathologist’s verdict, not an opinion.",
+           practitioner:"Cancers in PAD-UFES-20 are biopsy-proven; benign classes are dermatologist consensus. HAM10000 is largely histopathology-confirmed.",
+           expert:"Reference standard differs by dataset and is recorded per row. Weak labels (consensus, page text) inflate apparent performance; the dataset cards carry this caveat." },
+    kv:[["Best label","histopathology"],["Second best","expert consensus"],["Worst","scraped page text"]],
+    quiz:{ q:"A dataset labelled by scraping web pages is…", a:["fine if big enough","a weak reference standard that flatters the model","better than biopsy"], right:1,
+           why:"Volume does not fix provenance. This is why the DermNet scrape was rejected in this project." } },
+  { id:"prep", title:"Preprocessing",
+    text:{ beginner:"The picture is resized to a fixed square and its colours are nudged so that two photos of the same skin look similar. Nothing clever, but it decides what the model can see.",
+           practitioner:"Resize to 224×224, normalise with ImageNet statistics, optional colour constancy and melanin normalisation before the backbone.",
+           expert:"Resampling removes fine texture at high zoom; normalisation couples the model to the training camera’s white balance. Melanin normalisation helps cross-tone transfer but can erase diagnostic colour variation — a trade-off, not a free win." },
+    kv:[["Image size","224 × 224"],["Normalisation","mean/std per channel"],["Risk","erasing the colour that matters"]],
+    quiz:{ q:"Resizing to 224 px mainly costs you…", a:["nothing","fine texture and small structures","colour"], right:1,
+           why:"Downsampling is a lossy operation. It is affordable, but it must be acknowledged." } },
+  { id:"aug", title:"Augmentation",
+    text:{ beginner:"The same lesion is shown flipped, rotated and slightly recoloured, so the model learns the disease instead of the exact picture.",
+           practitioner:"Random flips, small rotations, crops, brightness/contrast jitter. Strength is capped: too much and the lesion changes meaning.",
+           expert:"Geometric and photometric transforms approximate plausible nuisance variation. Aggressive colour jitter can destroy the pigment cues that distinguish melanoma from naevus — augmentation is a hypothesis about invariance." },
+    kv:[["Cheap regulariser","yes"],["Danger","teaching the wrong invariance"],["Recorded","strength + seed"]],
+    quiz:{ q:"Flip an image horizontally. Should the label change?", a:["Yes","No","Only for melanoma"], right:1,
+           why:"A mirrored lesion is the same lesion. That is exactly why flips are safe augmentation while, say, a hue inversion is not." } },
+  { id:"features", title:"Feature extraction",
+    text:{ beginner:"The network turns the picture into a long list of numbers describing edges, textures and shapes. Think of a very literal art critic.",
+           practitioner:"A pretrained HRNet-W18 backbone produces a feature map; global pooling gives one vector per image.",
+           expert:"The backbone contributes most of the parameters. Its ImageNet prior is what makes 10k images workable — and also what carries the light-skin bias in." },
+    kv:[["Backbone","HRNet-W18 (timm)"],["Init","ImageNet"],["Frozen?","fine-tuned, low LR"]],
+    quiz:{ q:"Most of the model’s parameters live in…", a:["the 3-class head","the backbone","the loss"], right:1,
+           why:"The head is tiny. Which is why most of the bias, and most of the transfer, comes from the backbone." } },
+  { id:"head", title:"Concepts, then classes",
+    text:{ beginner:"Before it decides, the model must answer seven human questions — how asymmetric is it, how irregular the border, how varied the colour. Only then does it pick a lane.",
+           practitioner:"7 concept logits form a bottleneck; the 3-class head reads only those concepts. This makes the explanation the actual pathway.",
+           expert:"A concept bottleneck trades a little accuracy for auditability; concept leakage (head inferring unstated information) must be checked, not assumed away." },
+    kv:[["Concepts","7"],["Classes","benign / melanoma / kaposi_sarcoma"],["Why","explanation you can argue with"]],
+    quiz:{ q:"What makes a bottleneck model easier to audit?", a:["It is smaller","The decision passes through human-named concepts","It trains faster"], right:1,
+           why:"A post-hoc heat map is a guess about the model. A bottleneck forces the model to state its reasoning first." } },
+  { id:"explain", title:"Where was it looking?",
+    text:{ beginner:"The heat map shows which pixels pushed the answer up. Now look carefully: is the red on the lesion — or on the ruler next to it?",
+           practitioner:"Integrated Gradients and Grad-CAM per case. The project checks for shortcut reliance on rulers, ink and frame edges.",
+           expert:"Attribution maps are not causal. Agreement between IG and Grad-CAM raises confidence in the explanation, not in the prediction; artefact reliance is tested by occluding the artefact and measuring the score drop." },
+    kv:[["Methods","IG + Grad-CAM"],["Failure mode","heat on the ruler"],["Test","occlude and re-score"]],
+    quiz:{ q:"A heat map centred on the ruler means…", a:["the model is careful","the model may be using an artefact, not the lesion","the ruler is malignant"], right:1,
+           why:"This is the shortcut the project is built to catch. A convincing picture is not evidence." } },
+  { id:"decide", title:"The decision and the safety rail",
+    text:{ beginner:"The model does not say “cancer”. It says: routine, come back soon, or see someone now. A threshold decides how eager it is to escalate.",
+           practitioner:"Triage lane from the class probabilities plus a threshold; Kaposi sarcoma refuses to run while paused; serving is disabled until a frozen artefact exists.",
+           expert:"Threshold selection is a clinical policy choice, not a model property. It must be fixed before evaluation and reported alongside sensitivity/specificity — moving it after seeing results is a form of tuning on the test set." },
+    kv:[["Output","routine / follow_up / urgent"],["Never","a diagnosis"],["KS","paused — no cohort"]],
+    quiz:{ q:"Who should choose the escalation threshold?", a:["Whoever gets the best score","The clinical owner, before evaluation","The GPU"], right:1,
+           why:"The threshold encodes how much missed cancer versus how many false alarms a service can bear. That is a clinical decision." } }
+];
+
+function renderStageButtons(){
+  const host = $("#stagebtns"); host.innerHTML = "";
+  STAGES.forEach((s,i) => {
+    const b = el("button", {"data-i":i, "aria-current": i===state.stage}, `${i+1}. ${s.title}`);
+    if (state.visited.has(i)) b.classList.add("done");
+    b.addEventListener("click", () => { state.stage = i; renderStage(); });
+    host.append(b);
+  });
+}
+
+function renderStage(){
+  const s = STAGES[state.stage];
+  state.visited.add(state.stage);
+  const c = $("#stage"), ctx = c.getContext("2d");
+  const heat = state.stage >= 6, grid = state.stage === 4, norm = state.stage === 2;
+  drawScene(ctx, c.width, c.height, {
+    aug: state.stage >= 3 ? state.aug : 0,
+    heat, mode: norm ? "normalize" : (grid ? "grid" : "raw"),
+    heatOnArtefact: state.stage === 6
+  });
+  $("#stageTitle").textContent = `Room ${state.stage+1} — ${s.title}`;
+  $("#stageBody").innerHTML = s.text[state.depth];
+  $("#stageKV").innerHTML = s.kv.map(([k,v]) => `<b>${k}</b><span>${v}</span>`).join("");
+  const w = $("#stageWidget"); w.innerHTML = "";
+  if (state.stage === 5) w.append(softmaxWidget());
+  if (state.stage === 6) w.append(gradcamWidget());
+  if (state.stage === 7) w.append(decisionWidget());
+  if (state.stage === 3) w.append(el("p", {class:"small dim"}, "Drag “augmentation strength” and watch the lesion tilt and scale. The label never changes — that is the point."));
+  renderStageButtons(); renderNarrator(); renderQuiz(); updateXP();
+}
+
+function renderNarrator(){
+  const lines = {
+    beginner: "Room by room. Ask me anything by pressing the concepts tab — sixteen ideas, each with a toy.",
+    practitioner: "The mechanism is the same at every depth; only the vocabulary changes. The honesty constraints do not.",
+    expert: "Nothing in this walk-through is a measurement. Where a number would normally sit, the page says “not yet measured” on purpose."
+  };
+  $("#narrtext").innerHTML = `<b>Dr. Pixel:</b> ${lines[state.depth]}`;
+}
+
+/* -------- stage widgets -------- */
+function softmaxWidget(){
+  const box = el("div", {class:"card", html:"<h3>Logits → probabilities</h3>"});
+  const bars = el("div", {class:"bars"});
+  const logits = [1.9, 1.1, -0.6];
+  const draw = () => {
+    const z = logits.map(v => v / state.temp);
+    const m = Math.max(...z), ex = z.map(v => Math.exp(v-m)), S = ex.reduce((a,b)=>a+b,0);
+    const p = ex.map(v => v/S);
+    bars.innerHTML = CONFIG.classes.map((c,i) =>
+      `<div class="bar"><span>${c}</span><span class="track"><i style="width:${(p[i]*100).toFixed(1)}%"></i></span><span class="val">${p[i].toFixed(2)}</span></div>`).join("");
+  };
+  const note = el("p", {class:"small dim"}, "Temperature 1.0 is the trained setting. Lower it (sharper) and the model sounds certain; raise it and it hedges. Sharpness is not accuracy.");
+  box.append(bars, note);
+  const obs = new MutationObserver(draw); draw();
+  document.addEventListener("input", ev => { if (ev.target && ev.target.id === "temp") draw(); });
+  return box;
+}
+
+function gradcamWidget(){
+  const box = el("div", {class:"card"});
+  box.append(el("h3", {}, "Where the evidence sits"));
+  box.append(el("p", {class:"small"}, "Same image, two attributions. The left is what a careful model should do; the right is the shortcut this project tests for."));
+  const row = el("div", {class:"flex"});
+  [["honest","On the lesion"],["artefact","On the ruler"]].forEach(([mode,label]) => {
+    const wrap = el("div", {style:"flex:1 1 180px"});
+    const cv = el("canvas", {width:"220", height:"160"});
+    drawScene(cv.getContext("2d"), 220, 160, {heat:true, heatOnArtefact: mode==="artefact"});
+    wrap.append(cv, el("p", {class:"small dim", style:"margin:4px 0 0"}, label));
+    row.append(wrap);
+  });
+  box.append(row, el("p", {class:"small", style:"margin-top:8px"}, "A heat map is a claim about the model. The check is to cover the artefact and see whether the score collapses — if it does, the model was reading the ruler."));
+  return box;
+}
+
+function decisionWidget(){
+  const box = el("div", {class:"card"});
+  const render = () => {
+    const evidence = 0.72;
+    const urgency = evidence; // demonstration only
+    let lane = "routine", colour = "var(--good)", why = "below the threshold — routine monitoring";
+    if (urgency >= state.thr) { lane = "urgent"; colour = "var(--bad)"; why = "at or above the threshold — urgent review"; }
+    else if (urgency >= state.thr - 0.2) { lane = "follow_up"; colour = "var(--warn)"; why = "inside the grey band — short-interval review"; }
+    box.innerHTML = `<h3>The lane, not the diagnosis</h3>
+      <p class="small">Illustrative evidence = <b>${evidence.toFixed(2)}</b> (fixed for this demonstration). Your threshold = <b>${state.thr.toFixed(2)}</b>.</p>
+      <div class="kv"><b>Lane</b><span style="color:${colour};font-weight:650">${lane}</span>
+      <b>Because</b><span>${why}</span>
+      <b>Kaposi sarcoma</b><span style="color:var(--warn)">paused — the class has no cohort, so it is not offered</span>
+      <b>Serving</b><span>disabled — <code>/api/diagnose</code> returns 503 <code>model_unavailable</code></span></div>`;
+  };
+  render();
+  document.addEventListener("input", ev => { if (ev.target && ev.target.id === "thr") render(); });
+  return box;
+}
+
+/* ---------------------------- quiz ---------------------------- */
+function renderQuiz(){
+  const s = STAGES[state.stage], host = $("#quiz");
+  const q = s.quiz;
+  host.innerHTML = "";
+  host.classList.remove("answered");   // each room gets its own unanswered quiz
+  host.append(el("h3", {}, `Check yourself · Room ${state.stage+1}`));
+  host.append(el("p", {class:"small", style:"margin:4px 0 0"}, q.q));
+  const opts = el("div", {class:"opts"});
+  q.a.forEach((text, i) => {
+    const b = el("button", {type:"button"}, text);
+    b.addEventListener("click", () => {
+      if (host.classList.contains("answered")) return;
+      const ok = i === q.right;
+      b.classList.add(ok ? "ok" : "no");
+      if (!ok) opts.querySelectorAll("button")[q.right].classList.add("ok");
+      host.classList.add("answered");
+      $(".why", host).textContent = (ok ? "Correct. " : "Not quite. ") + q.why;
+      if (ok && !state.quizDone.has(state.stage)) { state.quizDone.add(state.stage); state.quizScore++; }
+      updateXP();
+    });
+    opts.append(b);
+  });
+  host.append(opts, el("p", {class:"why"}));
+}
+
+/* ---------------------------- XP ---------------------------- */
+function updateXP(){
+  const rooms = state.visited.size, total = STAGES.length;
+  const xp = rooms*10 + state.quizScore*15;
+  const fill = clamp((rooms/total)*100, 0, 100);
+  $("#xpfill").style.width = fill + "%";
+  $("#xpnum").textContent = `${xp} XP · ${rooms}/${total} rooms`;
+  const badges = [];
+  if (rooms >= 3) badges.push("first steps");
+  if (rooms >= total) badges.push("full tour");
+  if (state.quizScore >= 5) badges.push("sharp eye");
+  if (state.quizScore === total) badges.push("perfect check");
+  $("#badges").textContent = badges.length ? "badges: " + badges.join(" · ") : "no badges yet";
+}
+
+/* ---------------------------- arena ---------------------------- */
+function renderDatasets(){
+  const host = $("#dsCards"); host.innerHTML = "";
+  CONFIG.datasets.forEach(d => {
+    const c = el("div", {class:"card"});
+    c.innerHTML = `<h3>${d.name}</h3>
+      <div class="flex" style="margin:2px 0 8px">
+        <span class="chip">${d.images.toLocaleString()} images</span>
+        ${d.patients ? `<span class="chip">${d.patients.toLocaleString()} patients</span>` : ""}
+        <span class="chip">${d.kind}</span>
+        <span class="chip">${d.licence}</span>
+      </div>
+      <p class="small"><b>Tone:</b> ${d.tone}<br><b>Labels:</b> ${d.labels}</p>
+      <p class="small"><b>Role here:</b> ${d.role}</p>
+      <p class="small" style="color:var(--warn)"><b>Bias:</b> ${d.bias}</p>`;
+    host.append(c);
+  });
+}
+
+const AXES = ["volume","diversity","label","balance","realism","licence"];
+const AXIS_LABEL = { volume:"volume", diversity:"skin-tone diversity", label:"label quality", balance:"class balance", realism:"real-world realism", licence:"licensing clarity" };
+
+function drawRadar(){
+  const cv = $("#radar"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const a = CONFIG.datasets.find(d => d.id === $("#radarA").value) || CONFIG.datasets[0];
+  const b = CONFIG.datasets.find(d => d.id === $("#radarB").value) || CONFIG.datasets[1];
+  ctx.clearRect(0,0,W,H);
+  const cx = W/2, cy = H/2 + 6, R = Math.min(W,H)*0.36;
+  const N = AXES.length;
+  const pt = (i, r) => { const ang = -Math.PI/2 + i*2*Math.PI/N; return [cx + Math.cos(ang)*R*r, cy + Math.sin(ang)*R*r]; };
+  // grid
+  [0.25,0.5,0.75,1].forEach(r => {
+    ctx.beginPath();
+    for (let i=0;i<N;i++){ const [x,y] = pt(i,r); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.closePath(); ctx.strokeStyle = "rgba(255,255,255,.08)"; ctx.stroke();
+  });
+  for (let i=0;i<N;i++){ const [x,y] = pt(i,1); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.strokeStyle="rgba(255,255,255,.07)"; ctx.stroke(); }
+  ctx.fillStyle = "#9aa7b4"; ctx.font = "11px system-ui"; ctx.textAlign = "center";
+  for (let i=0;i<N;i++){ const [x,y] = pt(i,1.14); ctx.fillText(AXIS_LABEL[AXES[i]], x, y); }
+  const poly = (d, colour) => {
+    ctx.beginPath();
+    AXES.forEach((ax,i) => { const v = d.ratings[ax]/5, [x,y] = pt(i,v); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.closePath();
+    ctx.fillStyle = colour.replace("1)", ".18)"); ctx.fill();
+    ctx.strokeStyle = colour; ctx.lineWidth = 2; ctx.stroke();
+  };
+  poly(a, "rgba(76,194,160,1)");
+  poly(b, "rgba(110,168,254,1)");
+  $("#radarVerdict").innerHTML = `<b style="color:var(--accent)">${a.name}</b> vs <b style="color:var(--accent2)">${b.name}</b><br>
+    <span class="dim">Editorial ratings, not measurements.</span>`;
+}
+
+function renderAblation(){
+  const host = $("#ablationToggles"); host.innerHTML = "";
+  ["padufes","ham","scin","ddi","passion"].forEach(id => {
+    const d = CONFIG.datasets.find(x => x.id === id);
+    const lab = el("label", {class:"toggle"});
+    const input = el("input", {type:"checkbox"});
+    input.checked = !!state.ablation[id];
+    input.addEventListener("change", () => { state.ablation[id] = input.checked; drawAblation(); });
+    lab.append(input, el("span", {}, d.name));
+    host.append(lab);
+  });
+  drawAblation();
+}
+
+function drawAblation(){
+  const bars = $("#ablationBars");
+  const A = state.ablation;
+  const base = 0.50;
+  const illustrative = {
+    "Headline accuracy (in-domain)": base + (A.ham?0.20:0) + (A.padufes?0.10:0) + (A.scin?0.04:0),
+    "Accuracy on dark skin":          base - 0.12 + (A.ddi?0.18:0) + (A.passion?0.10:0) + (A.scin?0.08:0),
+    "Clinical-photo realism":         base - 0.05 + (A.padufes?0.22:0) + (A.scin?0.12:0) + (A.passion?0.10:0),
+    "Melanoma recall":                base - 0.10 + (A.ham?0.16:0) + (A.padufes?0.14:0)
+  };
+  bars.innerHTML = Object.entries(illustrative).map(([k,v]) =>
+    `<div class="bar"><span class="small">${k}</span>
+      <span class="track"><i style="width:${clamp(v,0.02,0.98)*100}%"></i></span>
+      <span class="val">illus.</span></div>`).join("");
+}
+
+/* ---------------------------- codex ---------------------------- */
+function conceptWidget(c){
+  const box = el("div", {style:"margin-top:8px"});
+  if (c.type === "softmax") {
+    const b = el("div", {class:"bars"});
+    const draw = () => {
+      const z = [1.9, 1.1, -0.6].map(v => v/state.temp), m = Math.max(...z);
+      const e = z.map(v => Math.exp(v-m)), S = e.reduce((a,x)=>a+x,0), p = e.map(v => v/S);
+      b.innerHTML = CONFIG.classes.map((n,i) => `<div class="bar"><span>${n}</span><span class="track"><i style="width:${p[i]*100}%"></i></span><span class="val">${p[i].toFixed(2)}</span></div>`).join("");
+    };
+    draw(); document.addEventListener("input", ev => { if (ev.target.id === "temp") draw(); });
+    box.append(b, el("p", {class:"small dim"}, "Driven by the temperature slider in room 6."));
+  }
+  if (c.type === "augment") {
+    const cv = el("canvas", {width:"260", height:"180"});
+    const draw = () => drawScene(cv.getContext("2d"), 260, 180, {aug: state.aug});
+    draw(); document.addEventListener("input", ev => { if (ev.target.id === "aug") draw(); });
+    box.append(cv);
+  }
+  if (c.type === "leakage") {
+    const out = el("p", {class:"small"});
+    const btn = el("button", {class:"rowbtn", type:"button"}, "toggle split by image ↔ by patient");
+    let byImage = true;
+    const paint = () => {
+      out.innerHTML = byImage
+        ? "<b style='color:var(--bad)'>Split by image:</b> photos of the same patient appear on both sides; the model recognises the person. The score looks excellent and means nothing. <i>(Demonstration, invented number.)</i>"
+        : "<b style='color:var(--good)'>Split by patient:</b> no patient crosses the boundary. The score drops — and becomes the first number you can defend. <i>(Demonstration, invented number.)</i>";
+    };
+    paint();
+    btn.addEventListener("click", () => { byImage = !byImage; paint(); });
+    box.append(btn, out);
+  }
+  if (c.type === "weights") {
+    const b = el("div", {class:"bars"});
+    const draw = () => {
+      const counts = {benign: 8398, melanoma: 1165, kaposi_sarcoma: 0}; // real corpus targets
+      const present = CONFIG.classes.filter(k => counts[k] > 0);
+      const w = {}; present.forEach(k => w[k] = 1/Math.sqrt(counts[k]));
+      const sum = present.reduce((s,k)=>s+w[k]*counts[k],0);
+      b.innerHTML = present.map(k => `<div class="bar"><span>${k}</span><span class="track"><i style="width:${(w[k]*counts[k]/sum*100).toFixed(1)}%"></i></span><span class="val">${(w[k]*counts[k]/sum*100).toFixed(0)}%</span></div>`).join("")
+        + `<p class="small dim" style="margin-top:6px">Share of the loss with inverse-sqrt weights: the 1,165 melanomas stop being drowned by 8,398 benign lesions. Corpus targets are the real conversion counts; the weighting is the real formula.</p>`;
+    };
+    draw(); box.append(b);
+  }
+  if (c.type === "gradcam") {
+    const row = el("div", {class:"flex"});
+    [["lesion","on the lesion"],["artefact","on the ruler"]].forEach(([m,l]) => {
+      const wrap = el("div");
+      const cv = el("canvas", {width:"180", height:"130"});
+      drawScene(cv.getContext("2d"), 180, 130, {heat:true, heatOnArtefact: m==="artefact"});
+      wrap.append(cv, el("p", {class:"small dim"}, l)); row.append(wrap);
+    });
+    box.append(row);
+  }
+  if (c.type === "calibration") {
+    const cv = el("canvas", {width:"260", height:"170"});
+    const ctx = cv.getContext("2d");
+    ctx.strokeStyle = "rgba(255,255,255,.15)"; ctx.strokeRect(30,10,210,140);
+    ctx.beginPath(); ctx.moveTo(30,150); ctx.lineTo(240,10); ctx.strokeStyle = "#9aa7b4"; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+    const pts = [[0.1,0.22],[0.2,0.31],[0.35,0.3],[0.5,0.52],[0.65,0.6],[0.8,0.86],[0.9,0.88]];
+    ctx.beginPath(); pts.forEach(([x,y],i) => { const X = 30 + x*210, Y = 150 - y*140; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+    ctx.strokeStyle = "#4cc2a0"; ctx.lineWidth = 2; ctx.stroke();
+    pts.forEach(([x,y]) => { ctx.beginPath(); ctx.arc(30+x*210, 150-y*140, 3, 0, 6.3); ctx.fillStyle = "#4cc2a0"; ctx.fill(); });
+    ctx.fillStyle = "#6b7785"; ctx.font = "10px system-ui";
+    ctx.fillText("predicted", 100, 166); ctx.fillText("observed", 2, 80);
+    box.append(cv, el("p", {class:"small dim"}, "Dotted = perfect calibration. A curve below it means the model is over-confident — the dangerous direction."));
+  }
+  if (c.type === "cbm") {
+    const names = ["asymmetry","border","colour","diameter","evolution","texture","vessel"];
+    const b = el("div", {class:"bars"});
+    const draw = () => {
+      const scores = names.map((n,i) => clamp(0.35 + 0.12*Math.sin(i + state.temp*3), 0.02, 0.98));
+      b.innerHTML = names.map((n,i) => `<div class="bar"><span>${n}</span><span class="track"><i style="width:${scores[i]*100}%"></i></span><span class="val">${scores[i].toFixed(2)}</span></div>`).join("");
+    };
+    draw(); document.addEventListener("input", ev => { if (ev.target.id === "temp") draw(); });
+    box.append(b, el("p", {class:"small dim"}, "Seven concept scores feed the lane. In the real model these are logits from the bottleneck, stored with the case."));
+  }
+  return box;
+}
+
+function renderCodex(){
+  const host = $("#codexList"); host.innerHTML = "";
+  const q = ($("#codexSearch").value || "").toLowerCase();
+  const list = CONFIG.concepts.filter(c =>
+    !q || c.name.toLowerCase().includes(q) || (c.what + c.how + c.used).toLowerCase().includes(q));
+  $("#codexHit").textContent = `${list.length} of ${CONFIG.concepts.length}`;
+  $("#codexCount").textContent = `${CONFIG.concepts.length} cards`;
+  list.forEach(c => {
+    const card = el("div", {class:"card concept"});
+    const tabs = el("div", {class:"tabs"});
+    const panes = {};
+    [["what","What it is"],["how","How this project does it"],["used","What it is for"],["play","Play"]].forEach(([k,label],i) => {
+      const b = el("button", {type:"button", "aria-pressed": i===0}, label);
+      b.addEventListener("click", () => {
+        tabs.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x===b));
+        Object.values(panes).forEach(p => p.classList.remove("on"));
+        panes[k].classList.add("on");
+      });
+      tabs.append(b);
+    });
+    const pWhat = el("div", {class:"pane on"});
+    pWhat.append(el("p", {}, c.what));
+    if (c.analogy) pWhat.append(el("p", {class:"small muted"}, "Analogy: " + c.analogy));
+    const pHow = el("div", {class:"pane"});
+    pHow.append(el("p", {class:"small"}, c.how));
+    const pUsed = el("div", {class:"pane"});
+    pUsed.append(el("p", {class:"small"}, c.used));
+    const pPlay = el("div", {class:"pane"});
+    pPlay.append(conceptWidget(c));
+    panes.what = pWhat; panes.how = pHow; panes.used = pUsed; panes.play = pPlay;
+    card.append(el("h3", {}, c.name), tabs, pWhat, pHow, pUsed, pPlay);
+    host.append(card);
+  });
+}
+
+/* ---------------------------- break the AI ---------------------------- */
+function renderBreak(){
+  const cv = $("#breakCanvas");
+  drawScene(cv.getContext("2d"), cv.width, cv.height, {
+    dark: state.breakMode === "dark", blur: state.breakMode === "blur",
+    edge: state.breakMode === "edge", ood: state.breakMode === "ood"
+  });
+  const map = {
+    reset:      [0.72, 0.18, 0.10, "A well-lit lesion, centred, no artefact in the way. The mechanism behaves as designed — which still proves nothing about accuracy."],
+    blur:       [0.38, 0.34, 0.28, "Motion blur. The evidence spreads across classes: the honest answer is “uncertain”, and uncertainty should route to a human, not to a lane."],
+    dark:       [0.33, 0.36, 0.31, "Shot in shadow. Contrast collapses; concept scores flatten. This is the everyday failure of phone photography in a clinic without a light."],
+    edge:       [0.30, 0.30, 0.40, "Lesion pushed to the frame edge by cropping. Part of the lesion is simply missing — a silent, common error in real capture."],
+    ood:        [0.36, 0.20, 0.44, "Not a lesion at all: a tattoo. An out-of-distribution input should be refused, not classified. A model that answers confidently here is dangerous."]
+  };
+  const [b,m,k,verdict] = map[state.breakMode];
+  $("#breakBars").innerHTML = CONFIG.classes.map((c,i) => {
+    const v = [b,m,k][i];
+    return `<div class="bar"><span>${c}</span><span class="track"><i style="width:${v*100}%"></i></span><span class="val">${v.toFixed(2)}</span></div>`;
+  }).join("") + `<p class="small dim" style="margin-top:6px">Demonstration values — not a model output.</p>`;
+  $("#breakVerdict").textContent = verdict;
+}
+$$("[data-break]").forEach(b => b.addEventListener("click", () => { state.breakMode = b.dataset.break; renderBreak(); }));
+
+/* ---------------------------- metrics ---------------------------- */
+const SYN = (() => {
+  let seed = 20261105;
+  const rnd = () => (seed = (seed*1664525 + 1013904223) % 4294967296) / 4294967296;
+  const rows = [];
+  for (let i=0;i<400;i++){
+    const malignant = rnd() < 0.30;                    // 30% in this synthetic set
+    const tone = ["II","III","IV","V","VI"][Math.floor(rnd()*5)];
+    const skill = tone === "V" || tone === "VI" ? 0.62 : 0.84;  // deliberately uneven: to show the subgroup view
+    const score = clamp((malignant ? skill : 1-skill) * 0.75 + rnd()*0.5, 0, 1);
+    rows.push({malignant, tone, score});
+  }
+  return rows;
+})();
+
+function rocPoints(){
+  const pts = [];
+  for (let t=0; t<=1.0001; t+=0.02){
+    const tp = SYN.filter(r => r.malignant && r.score >= t).length;
+    const fn = SYN.filter(r => r.malignant && r.score <  t).length;
+    const fp = SYN.filter(r => !r.malignant && r.score >= t).length;
+    const tn = SYN.filter(r => !r.malignant && r.score <  t).length;
+    pts.push({ t, tpr: tp/(tp+fn || 1), fpr: fp/(fp+tn || 1) });
+  }
+  return pts;
+}
+function auc(){
+  const p = rocPoints();
+  let a = 0;
+  for (let i=1;i<p.length;i++) a += (p[i].fpr - p[i-1].fpr) * (p[i].tpr + p[i-1].tpr)/2;
+  return Math.abs(a);
+}
+function renderMetrics(){
+  const t = state.mThr;
+  const tp = SYN.filter(r => r.malignant && r.score >= t).length;
+  const fn = SYN.filter(r => r.malignant && r.score <  t).length;
+  const fp = SYN.filter(r => !r.malignant && r.score >= t).length;
+  const tn = SYN.filter(r => !r.malignant && r.score <  t).length;
+  $("#matrix").innerHTML = `
+    <div class="hd"></div><div class="hd">predicted urgent</div><div class="hd">predicted calm</div>
+    <div class="hd">malignant</div><div>${tp} <span class="dim">TP</span></div><div>${fn} <span class="dim">FN</span></div>
+    <div class="hd">benign</div><div>${fp} <span class="dim">FP</span></div><div>${tn} <span class="dim">TN</span></div>`;
+  const sens = tp/(tp+fn || 1), spec = tn/(tn+fp || 1);
+  $("#matrix").append(el("p", {class:"small", style:"grid-column:1/4;margin-top:8px"},
+    `Sensitivity ${(sens*100).toFixed(0)}% · Specificity ${(spec*100).toFixed(0)}% — computed from the synthetic set, not the model.`));
+  // ROC
+  const cv = $("#roc"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+  const pad = 34, w = W - pad - 14, h = H - pad - 14;
+  ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.strokeRect(pad, 14, w, h);
+  ctx.beginPath(); ctx.moveTo(pad, 14+h); ctx.lineTo(pad+w, 14); ctx.setLineDash([4,4]);
+  ctx.strokeStyle = "#4a5563"; ctx.stroke(); ctx.setLineDash([]);
+  const pts = rocPoints();
+  ctx.beginPath();
+  pts.forEach((p,i) => { const X = pad + p.fpr*w, Y = 14 + h - p.tpr*h; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+  ctx.strokeStyle = "#6ea8fe"; ctx.lineWidth = 2; ctx.stroke();
+  const here = pts.reduce((best,p) => Math.abs(p.t - t) < Math.abs(best.t - t) ? p : best, pts[0]);
+  ctx.beginPath(); ctx.arc(pad + here.fpr*w, 14 + h - here.tpr*h, 5, 0, 6.3); ctx.fillStyle = "#e3b341"; ctx.fill();
+  ctx.fillStyle = "#6b7785"; ctx.font = "10px system-ui"; ctx.fillText("false positive rate →", pad + w/2 - 50, H - 6);
+  ctx.save(); ctx.translate(10, 14 + h/2 + 30); ctx.rotate(-Math.PI/2); ctx.fillText("true positive rate →", 0, 0); ctx.restore();
+  $("#aucv").textContent = auc().toFixed(2) + " (synthetic)";
+}
+
+/* ---------------------------- report ---------------------------- */
+function renderReport(){
+  const rooms = state.visited.size;
+  $("#reportStats").innerHTML = `
+    <b>Depth</b><span>${DEPTH_LABEL[state.depth]}</span>
+    <b>Rooms visited</b><span>${rooms} of ${STAGES.length}</span>
+    <b>Checks answered</b><span>${state.quizScore} of ${STAGES.length}</span>
+    <b>Model status</b><span>no frozen checkpoint · serving disabled · Kaposi sarcoma paused</span>`;
+  const bullets = [
+    "The system sorts a photographed lesion into routine, follow-up or urgent; it deliberately does not name a disease.",
+    "A concept bottleneck makes the reasoning auditable: seven human-named concepts sit between pixels and lane.",
+    "Grad-CAM and Integrated Gradients are used to test whether the model reads the lesion or an artefact such as a ruler.",
+    "Training data is PAD-UFES-20 and HAM10000; SCIN and DDI are for tone-stratified evaluation.",
+    "No public dataset contains Kaposi sarcoma at usable scale, so that class is paused and can never be served.",
+    "No African cohort has been obtained; every fairness statement about dark skin is therefore provisional.",
+    "Splits are by patient or lesion, because splitting by image inflates scores through leakage.",
+    "The evaluation harness refuses to freeze a smoke run; a number is only quotable from a frozen report.",
+    "Clinician overrides on borderline cases feed a fairness-weighted reinforcement loop.",
+    "Serving is disabled by configuration until a frozen artefact and a cohort exist — the honest default."
+  ];
+  const best = "PAD-UFES-20 is the best single source for this project: it is the only freely obtainable dataset with biopsy-proven cancers, clinical (phone) photographs and a skin-tone field per patient. HAM10000 is the better training volume, SCIN and DDI are the better fairness tests, and PASSION can only measure escalation behaviour. None of them supplies Kaposi sarcoma.";
+  $("#reportBody").innerHTML = `
+    <h3>Ten things this project is</h3>
+    <ul class="tight">${bullets.map(b => `<li>${b}</li>`).join("")}</ul>
+    <h3 style="margin-top:14px">Strengths and weaknesses</h3>
+    <p class="small"><b>Strengths:</b> auditable reasoning, honest hold states enforced in code, reproducible evaluation harness, and documentation that refuses to quote unmeasured numbers.</p>
+    <p class="small"><b>Weaknesses:</b> no frozen model, no African cohort, no Kaposi sarcoma data, tiny melanoma counts (52 in PAD-UFES-20), and a fairness claim that is currently a plan rather than a measurement.</p>
+    <h3 style="margin-top:14px">Best dataset</h3>
+    <p class="small">${best}</p>
+    <h3 style="margin-top:14px">Risks</h3>
+    <ul class="tight small"><li>Shortcut learning on rulers, ink and framing.</li>
+    <li>Distribution shift between dermoscopy and clinic photography.</li>
+    <li>Over-reading a wide confidence interval from few melanomas.</li>
+    <li>Scope creep: adding Kaposi sarcoma back without a cohort.</li></ul>
+    <h3 style="margin-top:14px">Next steps</h3>
+    <ol class="tight small"><li>Complete the corpus: 10,015 HAM10000 + 2,298 PAD-UFES-20 images.</li>
+    <li>Train once on a T4, freeze the artefact, keep serving disabled.</li>
+    <li>Run the tone-stratified evaluation on SCIN and DDI; report intervals and n.</li>
+    <li>Request the Ugandan Kaposi sarcoma cohort under an approved protocol.</li>
+    <li>Repeat the artefact-occlusion test; publish the explanation audit, not just the accuracy.</li></ol>`;
+  $("#configDump").textContent = JSON.stringify({
+    project: CONFIG.project, measured: CONFIG.measured, ksPaused: CONFIG.ksPaused,
+    classes: CONFIG.classes, triage: CONFIG.triage, results: CONFIG.results
+  }, null, 2);
+}
+$("#genReport").addEventListener("click", renderReport);
+$("#exportReport").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ config: CONFIG, state: { depth: state.depth, rooms: [...state.visited], quizScore: state.quizScore } }, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "dr-pixel-session.json"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
+/* ---------------------------- wiring ---------------------------- */
+["thr","aug","temp"].forEach(id => {
+  const input = $("#"+id), out = $("#"+id+"v");
+  const paint = () => {
+    const v = +input.value;
+    if (id === "thr") { state.thr = v/100; out.textContent = state.thr.toFixed(2); }
+    if (id === "aug") { state.aug = v/100; out.textContent = state.aug.toFixed(2); }
+    if (id === "temp") { state.temp = v/100; out.textContent = state.temp.toFixed(2); }
+    renderStageCanvasOnly();
+  };
+  input.addEventListener("input", paint); paint();
+});
+function renderStageCanvasOnly(){
+  const c = $("#stage"), ctx = c.getContext("2d");
+  drawScene(ctx, c.width, c.height, {
+    aug: state.stage >= 3 ? state.aug : 0,
+    heat: state.stage >= 6, mode: state.stage === 2 ? "normalize" : (state.stage === 4 ? "grid" : "raw"),
+    heatOnArtefact: state.stage === 6
+  });
+}
+$("#prevStage").addEventListener("click", () => { state.stage = clamp(state.stage-1, 0, STAGES.length-1); renderStage(); });
+$("#nextStage").addEventListener("click", () => { state.stage = clamp(state.stage+1, 0, STAGES.length-1); renderStage(); });
+
+const mthr = $("#mthr");
+state.mThr = 0.5;
+mthr.addEventListener("input", () => { state.mThr = +mthr.value/100; $("#mthrv").textContent = state.mThr.toFixed(2); renderMetrics(); });
+$("#mthrv").textContent = state.mThr.toFixed(2);
+
+["radarA","radarB"].forEach((id,i) => {
+  const sel = $("#"+id);
+  CONFIG.datasets.forEach(d => sel.append(el("option", {value:d.id}, d.name)));
+  sel.value = CONFIG.datasets[i===0?0:2].id;
+  sel.addEventListener("change", drawRadar);
+});
+$("#codexSearch").addEventListener("input", renderCodex);
+
+/* boot */
+renderDatasets(); drawRadar(); renderAblation();
+renderCodex(); renderStage(); renderBreak(); renderMetrics(); renderReport();
+</script>
+</body>
+</html>

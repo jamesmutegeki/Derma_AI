@@ -36,6 +36,8 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONT_PAGE = [
     ("docs/field-guide.html", "The Honest Triage Machine",
      "Seven rooms explaining the project and its concepts, with one toy each"),
+    ("docs/explainer.html", "Dr. Pixel's Skin Clinic",
+     "An interactive walk-through: eight rooms, a dataset arena, a 16-card concept codex"),
     ("docs/roadmap.html", "The twelve-week roadmap",
      "43 tasks, week sheets, dependency map, scenarios, progress"),
     ("docs/roadmap_wallchart.html", "The wall chart",
