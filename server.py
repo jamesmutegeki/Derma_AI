@@ -459,6 +459,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    from fastapi.staticfiles import StaticFiles
+    assets_dir = Path(__file__).parent / "assets"
+    assets_dir.mkdir(exist_ok=True)
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
     # -----------------------------------------------------------------------
     #  Lazy backend initialisation
     # -----------------------------------------------------------------------
